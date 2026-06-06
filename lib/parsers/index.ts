@@ -1,0 +1,28 @@
+import type { Banco } from '@/lib/types'
+import type { EmailInput, ParseResult } from './types'
+import { parseRappiCard } from './rappicard'
+import { parseBancolombia } from './bancolombia'
+import { parseNu } from './nu'
+
+const PARSERS: Partial<Record<Banco, (email: EmailInput) => ParseResult>> = {
+  RAPPICARD: parseRappiCard,
+  BANCOLOMBIA: parseBancolombia,
+  NU: parseNu,
+}
+
+export function trySpecificParser(
+  banco: Banco,
+  email: EmailInput
+): ParseResult {
+  const parser = PARSERS[banco]
+  if (!parser) return null
+
+  try {
+    return parser(email)
+  } catch (err) {
+    console.error(`Parser error for ${banco}:`, err)
+    return null
+  }
+}
+
+export type { EmailInput, ParseResult }
