@@ -133,6 +133,12 @@ main               ← siempre deployable
 feature/<nombre>   ← una rama por mejora, PR a main
 ```
 
+**Reglas de git para Claude Code:**
+- Nunca hacer commit ni push automáticamente
+- Siempre trabajar en ramas `feature/<nombre>`, nunca directo en `main`
+- Al terminar un bloque de cambios coherente, avisar: *"Buen momento para commit en `feature/xxx` — ¿lo hacemos?"*
+- El merge a `main` y el push los decide el usuario
+
 ## Mejoras pendientes (backlog)
 
 - **RappiCard vs RappiPay**: `noreply@rappipay.co` debería mapearse a `RAPPIPAY` (cuenta débito), no `RAPPICARD` (crédito). Requiere migración de BD para agregar el valor al CHECK constraint.
