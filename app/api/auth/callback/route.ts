@@ -21,9 +21,9 @@ export async function GET(request: Request) {
   const { session } = data
   const { provider_token, provider_refresh_token, user } = session
 
-  // Persist Gmail tokens for background syncing
+  const admin = createAdminClient()
+
   if (provider_refresh_token) {
-    const admin = createAdminClient()
     await admin.from('user_tokens').upsert({
       user_id: user.id,
       gmail_access_token: provider_token ?? null,
@@ -31,7 +31,20 @@ export async function GET(request: Request) {
       token_expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
       updated_at: new Date().toISOString(),
     })
+    return NextResponse.redirect(new URL(next, request.url))
   }
 
-  return NextResponse.redirect(new URL(next, request.url))
+  // Supabase didn't forward the Google refresh token — check if we already have one
+  const { data: existing } = await admin
+    .from('user_tokens')
+    .select('gmail_refresh_token')
+    .eq('user_id', user.id)
+    .single()
+
+  if (existing?.gmail_refresh_token) {
+    return NextResponse.redirect(new URL(next, request.url))
+  }
+
+  // No token anywhere — redirect to direct Google OAuth flow to obtain it
+  return NextResponse.redirect(new URL('/api/auth/gmail-connect', request.url))
 }
