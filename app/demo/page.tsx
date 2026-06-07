@@ -130,6 +130,7 @@ export default function DemoPage() {
         prevMonth="2026-05"
         nextMonth="2026-07"
         isCurrentMonth={true}
+        gmailConnected={true}
       />
     </>
   )

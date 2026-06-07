@@ -18,6 +18,7 @@ interface Props {
   prevMonth: string
   nextMonth: string
   isCurrentMonth: boolean
+  gmailConnected: boolean
 }
 
 export default function DashboardClient({
@@ -29,6 +30,7 @@ export default function DashboardClient({
   prevMonth,
   nextMonth,
   isCurrentMonth,
+  gmailConnected,
 }: Props) {
   const router = useRouter()
   const [, startTransition] = useTransition()
@@ -109,6 +111,26 @@ export default function DashboardClient({
             </button>
           </div>
         </div>
+
+        {!gmailConnected && (
+          <a
+            href="/api/auth/gmail-connect"
+            className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-xl p-4 hover:bg-amber-100 transition-colors"
+          >
+            <div className="w-9 h-9 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+              <svg className="w-5 h-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+              </svg>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-amber-800">Gmail no conectado</p>
+              <p className="text-xs text-amber-600 mt-0.5">Toca aquí para conectar tu cuenta y poder sincronizar.</p>
+            </div>
+            <svg className="w-4 h-4 text-amber-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </a>
+        )}
 
         <StatsCards stats={stats} />
         <SpendingChart transactions={transactions} />
