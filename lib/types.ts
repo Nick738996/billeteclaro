@@ -121,19 +121,19 @@ export const CATEGORIA_LABELS: Record<Categoria, string> = {
 }
 
 export const CATEGORIA_COLORS: Record<Categoria, string> = {
-  HOGAR: '#6366f1',
-  TRANSPORTE: '#f59e0b',
-  SALIDAS: '#ec4899',
-  SALUD: '#10b981',
-  SUSCRIPCIONES: '#8b5cf6',
-  COMPRAS_ONLINE: '#3b82f6',
-  INVERSION: '#14b8a6',
-  DONACIONES: '#f97316',
-  EDUCACION: '#84cc16',
-  REEMBOLSABLE: '#06b6d4',
-  TRANSFERENCIA: '#a855f7',
-  INGRESO: '#22c55e',
-  OTRO: '#94a3b8',
+  HOGAR: '#6366f1',       // indigo   — hogar/servicios
+  TRANSPORTE: '#f59e0b',  // amber    — movilidad
+  SALIDAS: '#f43f5e',     // rose     — restaurantes/ocio
+  SALUD: '#10b981',       // emerald  — salud
+  SUSCRIPCIONES: '#d946ef', // fuchsia — Netflix/Spotify
+  COMPRAS_ONLINE: '#0ea5e9', // sky   — compras digitales
+  INVERSION: '#14b8a6',   // teal     — ahorro/inversión
+  DONACIONES: '#f97316',  // orange   — donaciones
+  EDUCACION: '#84cc16',   // lime     — educación
+  REEMBOLSABLE: '#38bdf8', // light-blue — reembolsable
+  TRANSFERENCIA: '#a855f7', // purple  — transferencias
+  INGRESO: '#22c55e',     // green    — ingresos
+  OTRO: '#94a3b8',        // slate    — sin categoría
 }
 
 export const BANCO_LABELS: Record<Banco, string> = {

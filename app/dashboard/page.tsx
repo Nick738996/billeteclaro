@@ -6,6 +6,9 @@ import type { Transaction, MonthlyStats, Categoria } from '@/lib/types'
 import { isIngreso } from '@/lib/types'
 import DashboardClient from './DashboardClient'
 
+// Never cache — data changes after each sync and on month navigation
+export const dynamic = 'force-dynamic'
+
 interface Props {
   searchParams: { month?: string }
 }

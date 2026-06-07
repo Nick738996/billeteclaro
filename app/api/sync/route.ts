@@ -11,8 +11,9 @@ import { extractWithGroq } from '@/lib/ai/extractor'
 import type { ExtractedTransaction } from '@/lib/types'
 import { format } from 'date-fns'
 
-const MAX_EMAILS_PER_SYNC = 100
-const CLAUDE_CONCURRENCY = 3
+const MAX_EMAILS_PER_SYNC = 2000
+const FETCH_BATCH_SIZE = 10
+const GROQ_CONCURRENCY = 3
 
 export async function POST() {
   const supabase = createClient()
@@ -62,8 +63,8 @@ export async function POST() {
 
     const gmail = buildGmailClient(access_token)
 
-    // Get all bank email IDs from Gmail
-    const allMessageIds = await listBankMessageIds(gmail)
+    // Search 1 year back to ensure full history on first sync
+    const allMessageIds = await listBankMessageIds(gmail, 365)
 
     // Find which ones we haven't processed yet
     const { data: existing } = await admin
@@ -80,17 +81,15 @@ export async function POST() {
     let transaccionesNuevas = 0
     const errores: string[] = []
 
-    // Process emails in batches — fetch 5 at a time, then Claude 3 at a time
-    const fetchBatchSize = 5
-    for (let i = 0; i < newIds.length; i += fetchBatchSize) {
-      const batch = newIds.slice(i, i + fetchBatchSize)
+    for (let i = 0; i < newIds.length; i += FETCH_BATCH_SIZE) {
+      const batch = newIds.slice(i, i + FETCH_BATCH_SIZE)
 
       const emailDetails = await Promise.allSettled(
         batch.map((id) => getMessageDetails(gmail, id))
       )
 
-      // Separate emails that need Claude from those handled by specific parsers
-      const needsClaude: typeof emailDetails[number][] = []
+      // Separate emails that need Groq from those handled by specific parsers
+      const needsGroq: typeof emailDetails[number][] = []
       const transactions: Array<{ id: string; extracted: ExtractedTransaction }> = []
 
       for (const result of emailDetails) {
@@ -111,15 +110,15 @@ export async function POST() {
         if (parsed) {
           transactions.push({ id: email.id, extracted: { ...parsed, banco: email.banco } })
         } else {
-          needsClaude.push(result)
+          needsGroq.push(result)
         }
       }
 
-      // Run Claude extractions with concurrency limit
-      for (let j = 0; j < needsClaude.length; j += CLAUDE_CONCURRENCY) {
-        const claudeBatch = needsClaude.slice(j, j + CLAUDE_CONCURRENCY)
-        const claudeResults = await Promise.allSettled(
-          claudeBatch.map((r) => {
+      // Groq fallback for any email the specific parser couldn't handle
+      for (let j = 0; j < needsGroq.length; j += GROQ_CONCURRENCY) {
+        const groqBatch = needsGroq.slice(j, j + GROQ_CONCURRENCY)
+        const groqResults = await Promise.allSettled(
+          groqBatch.map((r) => {
             if (r.status === 'rejected') return Promise.resolve(null)
             const email = r.value
             return extractWithGroq({
@@ -132,11 +131,11 @@ export async function POST() {
           })
         )
 
-        for (const res of claudeResults) {
+        for (const res of groqResults) {
           if (res.status === 'fulfilled' && res.value) {
             transactions.push(res.value)
           } else if (res.status === 'rejected') {
-            errores.push(`Claude error: ${res.reason}`)
+            errores.push(`Groq error: ${res.reason}`)
           }
         }
       }
