@@ -1,11 +1,6 @@
 export type Banco =
   | 'RAPPICARD'
-  | 'BANCOLOMBIA'
-  | 'NU'
-  | 'NEQUI'
-  | 'DAVIPLATA'
-  | 'BBVA'
-  | 'DAVIVIENDA'
+  | 'RAPPIPAY'
   | 'OTRO'
 
 export type TipoTransaccion =
@@ -143,12 +138,7 @@ export const CATEGORIA_COLORS: Record<Categoria, string> = {
 
 export const BANCO_LABELS: Record<Banco, string> = {
   RAPPICARD: 'RappiCard',
-  BANCOLOMBIA: 'Bancolombia',
-  NU: 'Nu',
-  NEQUI: 'Nequi',
-  DAVIPLATA: 'Daviplata',
-  BBVA: 'BBVA',
-  DAVIVIENDA: 'Davivienda',
+  RAPPIPAY: 'RappiPay',
   OTRO: 'Otro',
 }
 

@@ -3,42 +3,20 @@ import type { Banco } from '@/lib/types'
 
 const BANK_SENDERS: Record<string, Banco> = {
   'noreply@rappicard.co': 'RAPPICARD',
-  'noreply@rappipay.co': 'RAPPICARD',
-  'noreply@holdingrappipay.co': 'RAPPICARD',
-  'alertas@notificacionesbancolombia.com': 'BANCOLOMBIA',
-  'alertas@bancolombia.com.co': 'BANCOLOMBIA',
-  'no-reply@nu.com.co': 'NU',
-  'notificaciones@nu.com.co': 'NU',
+  'noreply@rappipay.co': 'RAPPIPAY',
+  'noreply@holdingrappipay.co': 'RAPPIPAY',
 }
-
-const BANK_SENDER_PATTERNS: Array<[RegExp, Banco]> = [
-  [/@nequi\.com\.co$/i, 'NEQUI'],
-  [/@daviplata\.com$/i, 'DAVIPLATA'],
-  [/@bbva\.com\.co$/i, 'BBVA'],
-  [/@davivienda\.com$/i, 'DAVIVIENDA'],
-]
 
 const GMAIL_SEARCH_QUERY = [
   'from:noreply@rappicard.co',
   'from:noreply@rappipay.co',
   'from:noreply@holdingrappipay.co',
-  'from:alertas@notificacionesbancolombia.com',
-  'from:alertas@bancolombia.com.co',
-  'from:no-reply@nu.com.co',
-  'from:notificaciones@nu.com.co',
 ].join(' OR ')
 
 export function detectBank(fromHeader: string): Banco {
   const emailMatch = fromHeader.match(/<([^>]+)>/)
   const email = (emailMatch ? emailMatch[1] : fromHeader).toLowerCase().trim()
-
-  if (BANK_SENDERS[email]) return BANK_SENDERS[email]
-
-  for (const [pattern, banco] of BANK_SENDER_PATTERNS) {
-    if (pattern.test(email)) return banco
-  }
-
-  return 'OTRO'
+  return BANK_SENDERS[email] ?? 'OTRO'
 }
 
 export async function refreshGmailToken(refreshToken: string): Promise<{

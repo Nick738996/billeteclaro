@@ -37,6 +37,7 @@ REGLAS:
 - comercio: nombre del establecimiento o persona (no el nombre del banco)
 - Para transferencias, comercio = nombre del destinatario u origen
 
+BANCOS posibles: RAPPICARD (tarjeta crédito Rappi) | RAPPIPAY (cuenta débito Rappi)
 TIPOS válidos: COMPRA | TRANSFERENCIA_ENVIADA | TRANSFERENCIA_RECIBIDA | PAGO_SERVICIO | RETIRO | ABONO_DEUDA | INGRESO
 
 CATEGORÍAS válidas: HOGAR | TRANSPORTE | SALIDAS | SALUD | SUSCRIPCIONES | COMPRAS_ONLINE | INVERSION | DONACIONES | EDUCACION | REEMBOLSABLE | TRANSFERENCIA | INGRESO | OTRO

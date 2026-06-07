@@ -15,12 +15,15 @@ export function parseRappiCard(email: EmailInput): ParseResult {
   const comercio = extractMerchant(body)
   const tipo = detectTipo(subject, body)
   const fecha = extractDate(email.date)
+  const label = email.from.includes('rappipay') || email.from.includes('holdingrappipay')
+    ? 'RappiPay'
+    : 'RappiCard'
 
   return {
     fecha,
     monto,
     comercio,
-    descripcion: comercio ? `${comercio} — RappiCard` : 'Transacción RappiCard',
+    descripcion: comercio ? `${comercio} — ${label}` : `Transacción ${label}`,
     banco: 'RAPPICARD',
     tipo,
     categoria: guessCategoria(comercio ?? ''),
