@@ -38,7 +38,6 @@ export default async function DashboardPage({ searchParams }: Props) {
     .from('transactions')
     .select('*')
     .eq('user_id', user.id)
-    .gt('monto', 0)
     .gte('fecha', start.toISOString())
     .lte('fecha', end.toISOString())
     .order('fecha', { ascending: false })

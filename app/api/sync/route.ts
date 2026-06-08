@@ -72,6 +72,18 @@ export async function POST() {
       .eq('user_id', user.id)
 
     const processedIds = new Set((existing ?? []).map((r) => r.gmail_message_id))
+
+    // Agregar IDs ignorados en syncs anteriores (pre-auths de Uber, etc.)
+    const { data: pastLogs } = await admin
+      .from('sync_log')
+      .select('skipped_ids')
+      .eq('user_id', user.id)
+
+    for (const log of pastLogs ?? []) {
+      for (const id of (log.skipped_ids ?? []) as string[]) {
+        processedIds.add(id)
+      }
+    }
     const newIds = allMessageIds
       .filter((id) => !processedIds.has(id))
       .slice(0, MAX_EMAILS_PER_SYNC)
@@ -141,7 +153,7 @@ export async function POST() {
     }
 
     // FASE 2 — Dedup Uber sobre TODAS las transacciones (no por batch)
-    const dedupedTransactions = deduplicateUber(allTransactions)
+    const { transactions: dedupedTransactions, preauthIds } = deduplicateUber(allTransactions)
 
     // FASE 3 — Insertar
     let transaccionesNuevas = 0
@@ -185,12 +197,13 @@ export async function POST() {
       }
     }
 
-    // Update sync log
+    // Update sync log — guardar pre-auth IDs para no reprocessarlos en futuros syncs
     await admin.from('sync_log').update({
       finished_at: new Date().toISOString(),
       correos_revisados: newIds.length,
       transacciones_nuevas: transaccionesNuevas,
       errores,
+      skipped_ids: preauthIds,
       status: errores.length > 0 && transaccionesNuevas === 0 ? 'ERROR' : 'DONE',
     }).eq('id', syncId)
 
@@ -213,18 +226,20 @@ export async function POST() {
   }
 }
 
-function deduplicateUber(
-  txs: Array<{ id: string; extracted: ExtractedTransaction }>
-): Array<{ id: string; extracted: ExtractedTransaction }> {
-  const uberTxs = txs.filter(t => t.extracted.comercio?.toLowerCase() === 'uber')
-  if (uberTxs.length < 2) return txs
+function deduplicateUber(txs: Array<{ id: string; extracted: ExtractedTransaction }>): {
+  transactions: Array<{ id: string; extracted: ExtractedTransaction }>
+  preauthIds: string[]
+} {
+  const uberTxs = txs.filter(t => t.extracted.comercio?.toLowerCase().includes('uber'))
 
-  const toRemove = new Set<string>()
+  if (uberTxs.length < 2) return { transactions: txs, preauthIds: [] }
+
+  const preauthIds = new Set<string>()
 
   for (let i = 0; i < uberTxs.length; i++) {
-    if (toRemove.has(uberTxs[i].id)) continue
+    if (preauthIds.has(uberTxs[i].id)) continue
     for (let j = i + 1; j < uberTxs.length; j++) {
-      if (toRemove.has(uberTxs[j].id)) continue
+      if (preauthIds.has(uberTxs[j].id)) continue
 
       const timeA = new Date(uberTxs[i].extracted.fecha ?? '').getTime()
       const timeB = new Date(uberTxs[j].extracted.fecha ?? '').getTime()
@@ -233,18 +248,19 @@ function deduplicateUber(
       if (diffHours <= 2) {
         const amountA = uberTxs[i].extracted.monto
         const amountB = uberTxs[j].extracted.monto
-        const diff = Math.abs(amountA - amountB) / Math.max(amountA, amountB)
+        const pctDiff = Math.abs(amountA - amountB) / Math.max(amountA, amountB)
 
-        if (diff <= 0.2) {
-          // Descartar el más temprano (pre-autorización), conservar el más tardío (cobro real)
-          toRemove.add(timeA <= timeB ? uberTxs[i].id : uberTxs[j].id)
+        if (pctDiff <= 0.2) {
+          preauthIds.add(timeA <= timeB ? uberTxs[i].id : uberTxs[j].id)
         }
-        // Si los montos difieren >20% son viajes distintos — conservar ambos
       }
     }
   }
 
-  return txs.filter(t => !toRemove.has(t.id))
+  return {
+    transactions: txs.filter(t => !preauthIds.has(t.id)),
+    preauthIds: [...preauthIds],
+  }
 }
 
 async function generateAuditId(

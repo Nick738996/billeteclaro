@@ -53,7 +53,7 @@ El setup script (`scripts/setup.mjs`) valida `.env.local`, conecta vía `DATABAS
 | Base de datos | Supabase (PostgreSQL, us-east-1) |
 | Auth | Supabase Auth + Google OAuth |
 | Email | Gmail API v1 (`gmail.readonly`) |
-| IA / extracción | Groq API — modelo `llama-3.3-70b-versatile` |
+| IA / extracción | Gemini API — modelo `gemini-2.0-flash-lite` |
 | UI | Tailwind CSS + Recharts (PieChart) |
 | PWA | @ducanh2912/next-pwa (deshabilitado en dev) |
 
@@ -203,7 +203,7 @@ SUPABASE_SERVICE_ROLE_KEY
 DATABASE_URL          # Supabase Session Pooler: postgresql://postgres.REF:PASS@aws-1-us-east-1.pooler.supabase.com:5432/postgres
 GOOGLE_CLIENT_ID      # Google Cloud Console — OAuth 2.0
 GOOGLE_CLIENT_SECRET
-GROQ_API_KEY          # console.groq.com — gratis, llama-3.3-70b-versatile
+GEMINI_API_KEY        # aistudio.google.com — gratis, gemini-2.0-flash-lite
 NEXT_PUBLIC_APP_URL
 ```
 
@@ -228,7 +228,7 @@ feature/<nombre>   ← una rama por mejora, PR a main
 
 | Decisión | Razón |
 |---|---|
-| Groq en vez de Gemini para extracción | Solo Groq API key estaba en `.env.local`; Gemini daba 403 |
+| Gemini 2.0 Flash Lite para extracción | Misma cuenta Google del OAuth, gratis 1500 req/día, JSON nativo con `responseMimeType` |
 | Parsers de regex primero, Groq como fallback | Sin costo para RappiCard/RappiPay que son el 100% del MVP |
 | Fecha fija `after:2026/05/01` en Gmail search | Evita sync lenta de 365 días; el usuario solo tiene datos desde mayo |
 | `ABONO_DEUDA` excluido de gastos | Pago de tarjeta de crédito no es gasto real; inflaba el balance |
