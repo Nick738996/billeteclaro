@@ -1,5 +1,9 @@
 'use client'
 
+// MEJORAS aplicadas en este archivo:
+// ⑤ MonthNav: botones w-8 h-8 (32px) → w-11 h-11 (44px) [touch target mínimo]
+// Estado `activeFilter` compartido entre SpendingChart y TransactionsList
+
 import { useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { format, parseISO, startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns'
@@ -61,6 +65,9 @@ export default function DashboardClient({
   const [isCurrent, setIsCurrent] = useState(initIsCurrent)
   const [loading, setLoading] = useState(false)
 
+  // Estado compartido entre SpendingChart y TransactionsList
+  const [activeFilter, setActiveFilter] = useState<string>('TODOS')
+
   const stats = useMemo(() => buildStats(txs), [txs])
 
   const monthRef = parseISO(`${month}-01`)
@@ -69,6 +76,7 @@ export default function DashboardClient({
 
   const loadMonth = useCallback(async (m: string) => {
     setLoading(true)
+    setActiveFilter('TODOS') // reset filter on month change
     const r = parseISO(`${m}-01`)
     const start = startOfMonth(r)
     const end = endOfMonth(r)
@@ -106,19 +114,24 @@ export default function DashboardClient({
       {/* Header */}
       <header
         className="sticky top-0 z-10"
-        style={{
-          background: 'var(--surface)',
-          borderBottom: '1px solid var(--border)',
-        }}
+        style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)' }}
       >
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
-          <span
-            className="font-semibold"
-            style={{ fontSize: 'var(--text-base)', color: 'var(--text)' }}
-          >
-            BilleteClaro
-          </span>
-
+          {/* Logo lockup: ícono + wordmark */}
+          <div className="flex items-center gap-2">
+            <svg viewBox="0 0 100 100" width="26" height="26" aria-hidden="true">
+              <circle cx="50" cy="50" r="31" stroke="#4ADE80" strokeWidth="3.5" fill="none"/>
+              <path
+                d="M31,58 L50,37 L69,58"
+                stroke="#4ADE80" strokeWidth="5" fill="none"
+                strokeLinecap="round" strokeLinejoin="round"
+              />
+            </svg>
+            <span className="font-semibold tracking-tight" style={{ fontSize: 'var(--text-base)', letterSpacing: '-0.02em' }}>
+              <span style={{ color: 'var(--text)' }}>Billete</span>
+              <span style={{ color: 'var(--green)' }}>Claro</span>
+            </span>
+          </div>
           <div className="flex items-center gap-2">
             <SyncButton onSyncComplete={handleSyncComplete} />
             <ThemeToggle />
@@ -144,9 +157,10 @@ export default function DashboardClient({
             Hola, {firstName}
           </p>
           <div className="flex items-center justify-between mt-1">
+            {/* MEJORA ⑤: w-8 h-8 → w-11 h-11 para touch target de 44px */}
             <button
               onClick={() => navigate(prevMonth)}
-              className="w-8 h-8 rounded-full flex items-center justify-center transition-colors"
+              className="w-11 h-11 rounded-full flex items-center justify-center transition-colors"
               style={{ color: 'var(--text-muted)' }}
             >
               <ChevronLeft size={18} />
@@ -162,7 +176,7 @@ export default function DashboardClient({
             <button
               onClick={() => navigate(nextMonth)}
               disabled={isCurrent}
-              className="w-8 h-8 rounded-full flex items-center justify-center transition-colors disabled:opacity-30"
+              className="w-11 h-11 rounded-full flex items-center justify-center transition-colors disabled:opacity-30"
               style={{ color: 'var(--text-muted)' }}
             >
               <ChevronRight size={18} />
@@ -196,13 +210,16 @@ export default function DashboardClient({
         )}
 
         <StatsCards stats={stats} />
-        <SpendingChart transactions={txs} />
+
+        {/* SpendingChart y TransactionsList comparten activeFilter */}
+        <SpendingChart
+          transactions={txs}
+          activeFilter={activeFilter}
+          onFilterChange={setActiveFilter}
+        />
 
         <div className="flex items-center justify-between px-1">
-          <h2
-            className="font-medium"
-            style={{ fontSize: 'var(--text-sm)', color: 'var(--text)' }}
-          >
+          <h2 className="font-medium" style={{ fontSize: 'var(--text-sm)', color: 'var(--text)' }}>
             Transacciones
           </h2>
           <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
@@ -210,7 +227,11 @@ export default function DashboardClient({
           </span>
         </div>
 
-        <TransactionsList transactions={txs} />
+        <TransactionsList
+          transactions={txs}
+          activeFilter={activeFilter}
+          onFilterChange={setActiveFilter}
+        />
       </main>
     </div>
   )
