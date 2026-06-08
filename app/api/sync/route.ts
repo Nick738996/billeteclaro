@@ -63,23 +63,23 @@ export async function POST() {
 
     const gmail = buildGmailClient(access_token)
 
-    // Search 1 year back to ensure full history on first sync
     const allMessageIds = await listBankMessageIds(gmail)
 
-    // Find which ones we haven't processed yet
+    // Traer TODOS los IDs ya procesados del usuario (sin .in() para evitar límite de URL)
     const { data: existing } = await admin
       .from('transactions')
       .select('gmail_message_id')
       .eq('user_id', user.id)
-      .in('gmail_message_id', allMessageIds)
 
     const processedIds = new Set((existing ?? []).map((r) => r.gmail_message_id))
     const newIds = allMessageIds
       .filter((id) => !processedIds.has(id))
       .slice(0, MAX_EMAILS_PER_SYNC)
 
-    let transaccionesNuevas = 0
     const errores: string[] = []
+
+    // FASE 1 — Recolectar todas las transacciones de todos los batches
+    const allTransactions: Array<{ id: string; extracted: ExtractedTransaction }> = []
 
     for (let i = 0; i < newIds.length; i += FETCH_BATCH_SIZE) {
       const batch = newIds.slice(i, i + FETCH_BATCH_SIZE)
@@ -88,9 +88,7 @@ export async function POST() {
         batch.map((id) => getMessageDetails(gmail, id))
       )
 
-      // Separate emails that need Groq from those handled by specific parsers
       const needsGroq: typeof emailDetails[number][] = []
-      const transactions: Array<{ id: string; extracted: ExtractedTransaction }> = []
 
       for (const result of emailDetails) {
         if (result.status === 'rejected') {
@@ -108,13 +106,12 @@ export async function POST() {
         })
 
         if (parsed) {
-          transactions.push({ id: email.id, extracted: { ...parsed, banco: email.banco } })
+          allTransactions.push({ id: email.id, extracted: { ...parsed, banco: email.banco } })
         } else {
           needsGroq.push(result)
         }
       }
 
-      // Groq fallback for any email the specific parser couldn't handle
       for (let j = 0; j < needsGroq.length; j += GROQ_CONCURRENCY) {
         const groqBatch = needsGroq.slice(j, j + GROQ_CONCURRENCY)
         const groqResults = await Promise.allSettled(
@@ -127,61 +124,64 @@ export async function POST() {
               date: email.date,
               body: email.body,
               banco: email.banco,
-            }).then((extracted) => extracted ? { id: email.id, extracted: { ...extracted, banco: email.banco } } : null)
+            }).then((extracted) =>
+              extracted ? { id: email.id, extracted: { ...extracted, banco: email.banco } } : null
+            )
           })
         )
 
         for (const res of groqResults) {
           if (res.status === 'fulfilled' && res.value) {
-            transactions.push(res.value)
+            allTransactions.push(res.value)
           } else if (res.status === 'rejected') {
             errores.push(`Groq error: ${res.reason}`)
           }
         }
       }
+    }
 
-      // Uber: descartar pre-autorización y conservar solo el cobro real (el último)
-      const dedupedTransactions = deduplicateUber(transactions)
+    // FASE 2 — Dedup Uber sobre TODAS las transacciones (no por batch)
+    const dedupedTransactions = deduplicateUber(allTransactions)
 
-      // Build rows for insertion
-      if (dedupedTransactions.length > 0) {
-        const rows = await Promise.all(
-          dedupedTransactions.map(async ({ id, extracted }) => {
-            const fecha = extracted.fecha ? new Date(extracted.fecha) : new Date()
-            const idAuditoria = await generateAuditId(admin, user.id, fecha)
+    // FASE 3 — Insertar
+    let transaccionesNuevas = 0
 
-            return {
-              user_id: user.id,
-              gmail_message_id: id,
-              fecha: fecha.toISOString(),
-              monto: extracted.monto,
-              comercio: extracted.comercio,
-              descripcion: extracted.descripcion,
-              banco: extracted.banco,
-              tipo: extracted.tipo,
-              categoria: extracted.categoria,
-              subcategoria: extracted.subcategoria,
-              id_auditoria: idAuditoria,
-              moneda: extracted.moneda,
-              monto_usd: extracted.monto_usd,
-              flags: extracted.flags,
-              raw_snippet: null,
-              procesado: true,
-            }
-          })
-        )
+    if (dedupedTransactions.length > 0) {
+      const rows = await Promise.all(
+        dedupedTransactions.map(async ({ id, extracted }) => {
+          const fecha = extracted.fecha ? new Date(extracted.fecha) : new Date()
+          const idAuditoria = await generateAuditId(admin, user.id, fecha)
 
-        // Upsert — ignore duplicates via unique constraint
-        const { error: insertError, data: inserted } = await admin
-          .from('transactions')
-          .upsert(rows, { onConflict: 'user_id,gmail_message_id', ignoreDuplicates: true })
-          .select('id')
+          return {
+            user_id: user.id,
+            gmail_message_id: id,
+            fecha: fecha.toISOString(),
+            monto: extracted.monto,
+            comercio: extracted.comercio,
+            descripcion: extracted.descripcion,
+            banco: extracted.banco,
+            tipo: extracted.tipo,
+            categoria: extracted.categoria,
+            subcategoria: extracted.subcategoria,
+            id_auditoria: idAuditoria,
+            moneda: extracted.moneda,
+            monto_usd: extracted.monto_usd,
+            flags: extracted.flags,
+            raw_snippet: null,
+            procesado: true,
+          }
+        })
+      )
 
-        if (insertError) {
-          errores.push(`Insert error: ${insertError.message}`)
-        } else {
-          transaccionesNuevas += inserted?.length ?? 0
-        }
+      const { error: insertError, data: inserted } = await admin
+        .from('transactions')
+        .upsert(rows, { onConflict: 'user_id,gmail_message_id', ignoreDuplicates: true })
+        .select('id')
+
+      if (insertError) {
+        errores.push(`Insert error: ${insertError.message}`)
+      } else {
+        transaccionesNuevas += inserted?.length ?? 0
       }
     }
 

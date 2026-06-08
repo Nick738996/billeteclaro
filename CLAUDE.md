@@ -1,14 +1,36 @@
-# CLAUDE.md
+# BilleteClaro — Memoria del Proyecto
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## Qué es
 
-## Producto
-
-**BilleteClaro** — PWA de finanzas personales para Colombia. Lee automáticamente correos de notificación de bancos desde Gmail, extrae cada transacción con parsers específicos + IA como fallback, y presenta un dashboard financiero. El usuario no hace nada manualmente.
+**BilleteClaro** — PWA de finanzas personales para Colombia. Lee automáticamente correos de notificación de bancos desde Gmail, extrae cada transacción con parsers específicos + IA como fallback, y presenta un dashboard financiero minimalista. El usuario no hace nada manualmente.
 
 - Dominio objetivo: `billeteclaro.app`
 - Mercado: Colombia (MVP)
 - Supabase project ref: `txfnesqouciiiklhsjaw` (us-east-1)
+
+---
+
+## Estado de las etapas
+
+- [x] **Etapa 1 — Recolección de datos** ← en curso, casi completa
+- [ ] **Etapa 2 — Categorización** (pendiente confirmación)
+- [ ] **Etapa 3 — Asesor financiero IA** (pendiente confirmación)
+
+### Criterios Etapa 1 — estado actual
+
+| Criterio | Estado |
+|---|---|
+| Todos los correos Rappi en Supabase sin duplicados | ✅ dedup por `gmail_message_id UNIQUE` |
+| Uber sin doble cobro | ✅ `deduplicateUber()` en sync route |
+| Datos persisten al cambiar sesión y mes | ✅ Supabase, no localStorage |
+| Cada transacción tiene ID único MMDD-NN | ✅ `generateAuditId()` |
+| Nombre del comercio es legible | ✅ `toTitleCase()` en parsers y en UI |
+| Ingresos y egresos identificados correctamente | ✅ `isIngreso()`, `isGasto()` excluye `ABONO_DEUDA` |
+| Botón sincronizar sin llamadas duplicadas | ⚠️ separado del delete, falta cooldown explícito |
+| "Sincronizado hace X minutos" | ❌ pendiente |
+| Sync automática si pasaron +15 min | ❌ pendiente |
+
+---
 
 ## Comandos
 
@@ -21,17 +43,21 @@ npx tsc --noEmit   # type check (no hay test runner configurado aún)
 
 El setup script (`scripts/setup.mjs`) valida `.env.local`, conecta vía `DATABASE_URL` al Supabase Pooler y ejecuta `supabase/schema.sql`. Requiere todas las variables de `REQUIRED` para continuar; `GOOGLE_CLIENT_ID/SECRET` son opcionales (solo advierten).
 
+---
+
 ## Stack
 
 | Capa | Tecnología |
 |---|---|
-| Framework | Next.js 14 App Router |
+| Framework | Next.js 16 App Router + Turbopack |
 | Base de datos | Supabase (PostgreSQL, us-east-1) |
 | Auth | Supabase Auth + Google OAuth |
 | Email | Gmail API v1 (`gmail.readonly`) |
 | IA / extracción | Groq API — modelo `llama-3.3-70b-versatile` |
 | UI | Tailwind CSS + Recharts (PieChart) |
 | PWA | @ducanh2912/next-pwa (deshabilitado en dev) |
+
+---
 
 ## Arquitectura del pipeline de sync
 
@@ -42,13 +68,18 @@ Gmail OAuth refresh → listBankMessageIds() → filtrar ya procesados
 → por cada email nuevo:
     trySpecificParser(banco, email)  ← rápido, sin costo
     └─ null → extractWithGroq()      ← fallback IA, concurrencia=3
+→ deduplicateUber()                  ← descartar pre-autorizaciones
 → upsert en transactions (dedup por gmail_message_id UNIQUE)
 → actualizar sync_log
 ```
 
 **Deduplicación:** constraint `UNIQUE(user_id, gmail_message_id)` en la BD. El upsert usa `ignoreDuplicates: true`. Re-sincronizar es seguro.
 
-**Límites:** máx 100 emails por sync (`MAX_EMAILS_PER_SYNC`), búsqueda últimos 90 días, paginación hasta 2000 mensajes.
+**Límites:** máx 2000 emails por sync, búsqueda desde `2026/05/01` (fecha fija), paginación hasta 2000 mensajes.
+
+**Uber dedup:** si 2 transacciones de Uber en mismo batch con diferencia de tiempo < 2h y montos < 20% de diferencia, se descarta la más temprana (pre-autorización).
+
+---
 
 ## Detección de bancos (`lib/gmail/client.ts`)
 
@@ -57,27 +88,37 @@ El banco se detecta por el header `From` del email **antes** de parsear:
 | Email sender | Banco |
 |---|---|
 | `noreply@rappicard.co` | RAPPICARD |
-| `noreply@rappipay.co` | RAPPICARD ← **pendiente separar como RAPPIPAY** |
-| `noreply@holdingrappipay.co` | RAPPICARD |
-| `alertas@notificacionesbancolombia.com` | BANCOLOMBIA |
-| `alertas@bancolombia.com.co` | BANCOLOMBIA |
-| `no-reply@nu.com.co` | NU |
-| `notificaciones@nu.com.co` | NU |
-| `*@nequi.com.co` | NEQUI |
-| `*@daviplata.com` | DAVIPLATA |
-| `*@bbva.com.co` | BBVA |
-| `*@davivienda.com` | DAVIVIENDA |
+| `noreply@rappipay.co` | RAPPIPAY |
+| `noreply@holdingrappipay.co` | RAPPIPAY |
+
+---
 
 ## Parsers específicos (`lib/parsers/`)
 
-Tres bancos tienen parser de regex (sin costo de IA):
-- `rappicard.ts` — detecta monto `$X.XXX`, comercio, tipo de transacción
-- `bancolombia.ts` — detecta monto, tipo (COMPRA/TRANSFERENCIA/INGRESO), comercio
-- `nu.ts` — detecta monto, tipo, comercio
+Dos bancos Rappi tienen parsers de regex (sin costo de IA):
+
+- `rappicard.ts` — dos tipos:
+  - `parsePurchase`: extrae `Monto $X`, `Comercio`, fecha ISO. tipo=`COMPRA`
+  - `parsePayment`: extrae monto sin $, fecha `DD mmm YYYY HH:MM`. tipo=`ABONO_DEUDA`
+- `rappipay.ts` — cinco tipos:
+  - `parseTransferenciaRecibida`: `Monto recibido $X` + `tu RappiCuenta`. tipo=`TRANSFERENCIA_RECIBIDA`
+  - `parseTransferenciaEnviada`: `Monto transferido $X` + `Llave destino @handle`. tipo=`TRANSFERENCIA_ENVIADA`
+  - `parseIngresoBancario`: subject contiene "transferencia bancaria". tipo=`INGRESO`
+  - `parsePagoServicio`: `Convenio [name]`, `Pago total $X`. tipo=`PAGO_SERVICIO`
+  - `parseRentabilidad`: `Rentabilidad de [Mes] $X`. tipo=`INGRESO`, subcategoria=`rendimiento`
 
 `lib/parsers/index.ts` exporta `trySpecificParser(banco, email)` que devuelve `null` si el banco no tiene parser — señal para usar Groq.
 
-**Para agregar un banco nuevo:** crear `lib/parsers/mibanaco.ts` que exporte una función `(email: EmailInput) => ParseResult`, registrarla en `lib/parsers/index.ts`, y agregar el sender en `BANK_SENDERS` / `BANK_SENDER_PATTERNS` en `lib/gmail/client.ts`.
+**Para agregar un banco nuevo:** crear `lib/parsers/mibanaco.ts` que exporte una función `(email: EmailInput) => ParseResult`, registrarla en `lib/parsers/index.ts`, y agregar el sender en `BANK_SENDERS` en `lib/gmail/client.ts`.
+
+### Utilidades de parsers (`lib/parsers/utils.ts`)
+
+- `parseCOPAmount(raw)` — maneja `$45.000`, `$45,000`, `400.000,00`
+- `parseSpanishDate(dateStr, timeStr?)` — parsea `"02 de mayo de 2026"` + `"03:18 pm"`
+- `parseISOLikeDate(s)` — parsea `"2026-06-07 12:25:21"`
+- `toTitleCase(str)` — convierte ALL_CAPS → Title Case, respeta mixed-case y @handles
+
+---
 
 ## Extractor IA (`lib/ai/extractor.ts`)
 
@@ -85,12 +126,16 @@ Recibe `{from, subject, date, body, banco}`, manda los primeros 600 chars del bo
 
 El prompt está en español colombiano y tiene reglas explícitas para el formato COP (`$45.000` = 45000).
 
+---
+
 ## Base de datos — puntos clave
 
 - Todos los valores enumerados (`banco`, `tipo`, `categoria`) tienen CHECK constraints en la BD **y** tipos TypeScript en `lib/types.ts`. Si se agrega un valor nuevo hay que actualizar ambos + crear una migración en `supabase/migrations/`.
 - `user_tokens` guarda el `gmail_refresh_token` obtenido en el OAuth callback. El `provider_refresh_token` de Supabase solo está disponible justo después del login — se persiste en el callback (`app/api/auth/callback/route.ts`) usando el admin client.
 - Todas las tablas tienen RLS habilitado con política `auth.uid() = user_id`.
 - `id_auditoria` formato `MMDD-NN` se genera en `generateAuditId()` dentro del sync route contando transacciones del mismo día.
+
+---
 
 ## Auth y tokens Gmail
 
@@ -100,10 +145,14 @@ El callback (`app/api/auth/callback/route.ts`) persiste `session.provider_refres
 
 El middleware protege `/dashboard/**` y redirige `/` si ya hay sesión.
 
+---
+
 ## Clientes Supabase
 
 - `lib/supabase/client.ts` — browser client (`createBrowserClient`), usado en componentes `'use client'`
-- `lib/supabase/server.ts` — server client (`createServerClient` con cookies) + `createAdminClient()` con service role para operaciones que bypasean RLS (sync, callback)
+- `lib/supabase/server.ts` — server client (`createServerClient` con cookies, **async** en Next.js 16) + `createAdminClient()` con service role para operaciones que bypasean RLS (sync, callback)
+
+---
 
 ## Dashboard
 
@@ -112,6 +161,38 @@ El middleware protege `/dashboard/**` y redirige `/` si ya hay sesión.
 Los componentes de UI (`components/dashboard/`) son todos Client Components porque usan estado o Recharts.
 
 `app/demo/page.tsx` es una página pública (sin auth) con 12 transacciones hardcodeadas para mostrar el dashboard sin configuración.
+
+### Lógica de display en TransactionsList
+
+`getDisplayName(t)` genera nombre contextual según `tipo`:
+- `TRANSFERENCIA_ENVIADA` → `"Transferencia a @handle"`
+- `TRANSFERENCIA_RECIBIDA` → `"Transferencia de Bancolombia"`
+- `ABONO_DEUDA` → `"Pago a RappiCard"`
+- `PAGO_SERVICIO` → `"Pago Enel"`
+- Default → `toTitleCase(comercio)` (corrige ALL_CAPS de datos históricos en DB)
+
+---
+
+## Tipos clave (`lib/types.ts`)
+
+```typescript
+type TipoTransaccion = 'COMPRA' | 'TRANSFERENCIA_ENVIADA' | 'TRANSFERENCIA_RECIBIDA'
+                     | 'PAGO_SERVICIO' | 'RETIRO' | 'ABONO_DEUDA' | 'INGRESO'
+
+type Categoria = 'HOGAR' | 'TRANSPORTE' | 'SALIDAS' | 'SALUD' | 'SUSCRIPCIONES'
+               | 'COMPRAS_ONLINE' | 'INVERSION' | 'DONACIONES' | 'EDUCACION'
+               | 'REEMBOLSABLE' | 'TRANSFERENCIA' | 'INGRESO' | 'OTRO'
+
+type Banco = 'RAPPICARD' | 'RAPPIPAY' | 'OTRO'
+```
+
+Funciones de formato:
+- `formatCOP(amount)` — sin decimales: `$45.000`
+- `formatCOPCompact(amount)` — abreviado: `$1.2M`, `$450K`
+- `isIngreso(tipo)` — true para INGRESO y TRANSFERENCIA_RECIBIDA
+- `isGasto(tipo)` — true para todo excepto ingresos y ABONO_DEUDA
+
+---
 
 ## Variables de entorno requeridas
 
@@ -126,6 +207,8 @@ GROQ_API_KEY          # console.groq.com — gratis, llama-3.3-70b-versatile
 NEXT_PUBLIC_APP_URL
 ```
 
+---
+
 ## Flujo de ramas
 
 ```
@@ -139,10 +222,52 @@ feature/<nombre>   ← una rama por mejora, PR a main
 - Al terminar un bloque de cambios coherente, avisar: *"Buen momento para commit en `feature/xxx` — ¿lo hacemos?"*
 - El merge a `main` y el push los decide el usuario
 
-## Mejoras pendientes (backlog)
+---
 
-- **RappiCard vs RappiPay**: `noreply@rappipay.co` debería mapearse a `RAPPIPAY` (cuenta débito), no `RAPPICARD` (crédito). Requiere migración de BD para agregar el valor al CHECK constraint.
-- **Fecha real de transacción**: los parsers usan el header `Date` del email como fallback. Mejorar extracción del timestamp real del body.
-- **Transferencias**: mejorar detección en parsers de regex (patrones de Nequi/Daviplata).
-- **Nombre real del negocio**: el prompt de Groq debe distinguir el instrumento de pago (RappiCard crédito vs RappiCuenta débito) y extraer el nombre real del establecimiento.
-- **Iconos PWA**: faltan `public/icons/icon-192.png` y `public/icons/icon-512.png`.
+## Decisiones tomadas
+
+| Decisión | Razón |
+|---|---|
+| Groq en vez de Gemini para extracción | Solo Groq API key estaba en `.env.local`; Gemini daba 403 |
+| Parsers de regex primero, Groq como fallback | Sin costo para RappiCard/RappiPay que son el 100% del MVP |
+| Fecha fija `after:2026/05/01` en Gmail search | Evita sync lenta de 365 días; el usuario solo tiene datos desde mayo |
+| `ABONO_DEUDA` excluido de gastos | Pago de tarjeta de crédito no es gasto real; inflaba el balance |
+| `toTitleCase` aplicado en parsers Y en UI | Parsers limpian datos nuevos; UI limpia datos históricos en DB |
+| Botón de borrar separado del sync | Evitar que delete+sync pasen juntos accidentalmente |
+| `cookies()` async en Next.js 15+ | Cambio de API rompía `createClient`; se resolvió con `await` |
+
+---
+
+## Bugs conocidos
+
+- **`scrollbar-hide` no funciona en Safari/Chrome sin el plugin Tailwind**: resuelto con inline `scrollbarWidth: 'none'` + clase CSS en globals.css
+- **Uber dedup solo funciona dentro del mismo batch**: si la pre-autorización y el cobro real caen en batches distintos (de 10 emails), no se comparan. Riesgo bajo porque los dos emails llegan con poca diferencia.
+- **`id_auditoria` puede tener gaps**: si se borra y re-sincroniza, el contador de `generateAuditId` ve la BD vacía y reinicia desde -01.
+
+---
+
+## Próximos pasos (Etapa 1 — pendientes menores)
+
+1. **"Sincronizado hace X minutos"** — agregar timestamp del último sync en el header del dashboard
+2. **Sync automática al abrir app** — solo si `last_sync` tiene más de 15 minutos
+3. **Cooldown explícito en sync** — deshabilitar botón 30s después de cada sync
+
+Una vez confirmados: avanzar a **Etapa 2 — Categorización**.
+
+---
+
+## Plan Etapa 2 (cuando se confirme)
+
+Estrategia híbrida sin costo adicional de API:
+
+1. **Nivel 1 — Mapa estático** (`lib/parsers/categories.ts`): Uber→TRANSPORTE, Netflix→SUSCRIPCIONES, etc.
+2. **Nivel 2 — Regex** sobre nombre del comercio: `FARM|DROG`→SALUD, `REST|BAR`→SALIDAS, etc.
+3. **Nivel 3 — Groq** solo si los dos anteriores fallan; resultado se cachea por comercio.
+4. **Edición manual** con opción de aplicar en bulk al mismo comercio.
+
+## Plan Etapa 3 (cuando se confirme)
+
+- Presupuesto mensual por categoría (configurable)
+- Alertas: 80%/100% de presupuesto, fragmentación Uber, gastos nocturnos
+- IA conversacional con Groq (mismo modelo) — contexto: gastos vs presupuesto por mes
+- Tono: directo, colombiano, máximo 3 bullets por respuesta

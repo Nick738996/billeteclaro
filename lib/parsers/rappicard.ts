@@ -1,6 +1,6 @@
 import type { EmailInput, ParseResult } from './types'
-import type { Categoria } from '@/lib/types'
 import { parseCOPAmount, parseSpanishDate, parseISOLikeDate, toTitleCase } from './utils'
+import { guessCategoria } from './commerceCategories'
 
 export function parseRappiCard(email: EmailInput): ParseResult {
   const body = email.body
@@ -40,14 +40,19 @@ function parsePurchase(email: EmailInput): ParseResult {
     ? parseISOLikeDate(fechaISOMatch[1])
     : new Date(email.date).toISOString()
 
+  // "Rappi" sin más detalle = pedido en la app (intermediario de pago)
+  const esRappiApp = /^rappi$/i.test(comercio?.trim() ?? '')
+
   return {
     fecha: fecha ?? new Date(email.date).toISOString(),
     monto,
-    comercio,
-    descripcion: comercio ? `Compra en ${comercio}` : 'Compra RappiCard',
+    comercio: esRappiApp ? 'Rappi (app)' : comercio,
+    descripcion: esRappiApp
+      ? 'Pedido en la app de Rappi'
+      : comercio ? `Compra en ${comercio}` : 'Compra RappiCard',
     banco: 'RAPPICARD',
     tipo: 'COMPRA',
-    categoria: guessCategoria(comercio ?? ''),
+    categoria: esRappiApp ? 'SALIDAS' : guessCategoria(comercio ?? ''),
     subcategoria: null,
     moneda: 'COP',
     monto_usd: null,
@@ -89,17 +94,3 @@ function parsePayment(email: EmailInput): ParseResult {
   }
 }
 
-function guessCategoria(comercio: string): Categoria {
-  const c = comercio.toLowerCase()
-  if (/uber|cabify|didi|indriver|taxi|transmilenio|sitp/.test(c)) return 'TRANSPORTE'
-  if (/netflix|spotify|disney|hbo|prime|apple|claude|adobe|microsoft|google one|youtube/.test(c)) return 'SUSCRIPCIONES'
-  if (/farmacia|drogueria|droguería|clinic|hospital|gym|gimnasio|salud|audifarma|cruz verde/.test(c)) return 'SALUD'
-  if (/rappi\s*food|ifood|restaurante|cafe|café|bar|taberna|cine|pizza|burger|mcdonalds|kfc|subway/.test(c)) return 'SALIDAS'
-  if (/temu|amazon|mercadolibre|shein|falabella|alkosto|linio/.test(c)) return 'COMPRAS_ONLINE'
-  if (/claro|movistar|tigo|epm|codensa|gas natural|acueducto|electricidad|internet|directv|enel/.test(c)) return 'HOGAR'
-  if (/exito|éxito|carulla|jumbo|olimpica|d1|ara|supermercado/.test(c)) return 'HOGAR'
-  if (/cdt|fondo|inversión|inversion|bolsa|crypto|nu invest/.test(c)) return 'INVERSION'
-  if (/iglesia|fundacion|world vision/.test(c)) return 'DONACIONES'
-  if (/universidad|colegio|curso|platzi|udemy|coursera|duolingo/.test(c)) return 'EDUCACION'
-  return 'OTRO'
-}

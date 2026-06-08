@@ -24,21 +24,25 @@ interface Props {
   transactions: Transaction[]
 }
 
-const CATEGORY_FILTERS: Array<{ key: Categoria | 'TODOS'; label: string }> = [
-  { key: 'TODOS',          label: 'Todos' },
-  { key: 'SALIDAS',        label: 'Salidas' },
-  { key: 'TRANSPORTE',     label: 'Transporte' },
-  { key: 'HOGAR',          label: 'Hogar' },
-  { key: 'SALUD',          label: 'Salud' },
-  { key: 'SUSCRIPCIONES',  label: 'Suscripciones' },
-  { key: 'COMPRAS_ONLINE', label: 'Online' },
-  { key: 'TRANSFERENCIA',  label: 'Transferencias' },
-  { key: 'INVERSION',      label: 'Inversión' },
-  { key: 'INGRESO',        label: 'Ingresos' },
-  { key: 'DONACIONES',     label: 'Donaciones' },
-  { key: 'EDUCACION',      label: 'Educación' },
-  { key: 'REEMBOLSABLE',   label: 'Reembolsable' },
-  { key: 'OTRO',           label: 'Otro' },
+type FilterKey = Categoria | 'TODOS' | 'BANCO:RAPPICARD' | 'BANCO:RAPPIPAY'
+
+const CATEGORY_FILTERS: Array<{ key: FilterKey; label: string }> = [
+  { key: 'TODOS',              label: 'Todos' },
+  { key: 'BANCO:RAPPICARD',    label: '💳 Crédito' },
+  { key: 'BANCO:RAPPIPAY',     label: '🏦 Débito' },
+  { key: 'SALIDAS',            label: 'Salidas' },
+  { key: 'TRANSPORTE',         label: 'Transporte' },
+  { key: 'HOGAR',              label: 'Hogar' },
+  { key: 'SALUD',              label: 'Salud' },
+  { key: 'SUSCRIPCIONES',      label: 'Suscripciones' },
+  { key: 'COMPRAS_ONLINE',     label: 'Online' },
+  { key: 'TRANSFERENCIA',      label: 'Transferencias' },
+  { key: 'INVERSION',          label: 'Inversión' },
+  { key: 'INGRESO',            label: 'Ingresos' },
+  { key: 'DONACIONES',         label: 'Donaciones' },
+  { key: 'EDUCACION',          label: 'Educación' },
+  { key: 'REEMBOLSABLE',       label: 'Reembolsable' },
+  { key: 'OTRO',               label: 'Otro' },
 ]
 
 const LOWERCASE_ES = new Set(['y', 'e', 'o', 'de', 'del', 'la', 'el', 'los', 'las', 'en', 'a', 'con', 'por', 'al'])
@@ -97,7 +101,9 @@ function TransactionRow({ t }: { t: Transaction }) {
             {CATEGORIA_LABELS[t.categoria]}
           </span>
           {(() => {
-            const chip = BANCO_CHIP[t.banco]
+            // ABONO_DEUDA: el pago sale de la RappiCuenta (débito), no de la tarjeta
+            const banco = t.tipo === 'ABONO_DEUDA' ? 'RAPPIPAY' : t.banco
+            const chip = BANCO_CHIP[banco]
             return (
               <span
                 className="text-xs px-1.5 py-0.5 rounded-md font-medium"
@@ -130,15 +136,28 @@ function TransactionRow({ t }: { t: Transaction }) {
   )
 }
 
+// Devuelve el banco "efectivo" de la transacción (ABONO_DEUDA sale de RAPPIPAY)
+function efectivoBanco(t: Transaction): Banco {
+  return t.tipo === 'ABONO_DEUDA' ? 'RAPPIPAY' : t.banco
+}
+
 export default function TransactionsList({ transactions }: Props) {
-  const [activeFilter, setActiveFilter] = useState<Categoria | 'TODOS'>('TODOS')
+  const [activeFilter, setActiveFilter] = useState<FilterKey>('TODOS')
   const [search, setSearch] = useState('')
 
   const filtered = transactions.filter((t) => {
-    const matchesCategory =
-      activeFilter === 'TODOS' ||
-      t.categoria === activeFilter ||
-      (activeFilter === 'INGRESO' && isIngreso(t.tipo))
+    let matchesCategory: boolean
+    if (activeFilter === 'TODOS') {
+      matchesCategory = true
+    } else if (activeFilter === 'BANCO:RAPPICARD') {
+      matchesCategory = efectivoBanco(t) === 'RAPPICARD'
+    } else if (activeFilter === 'BANCO:RAPPIPAY') {
+      matchesCategory = efectivoBanco(t) === 'RAPPIPAY'
+    } else {
+      matchesCategory =
+        t.categoria === activeFilter ||
+        (activeFilter === 'INGRESO' && isIngreso(t.tipo))
+    }
     const searchLower = search.toLowerCase()
     const matchesSearch =
       !search ||
@@ -179,24 +198,50 @@ export default function TransactionsList({ transactions }: Props) {
       {/* Category filter carousel */}
       <div className="relative border-b border-slate-50">
         <div
-          className="flex gap-2 px-4 py-3 overflow-x-auto scrollbar-hide"
-          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' } as React.CSSProperties}
+          className="flex gap-2 px-4 py-3 scrollbar-hide"
+          style={{
+            overflowX: 'scroll',
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none',
+            WebkitOverflowScrolling: 'touch',
+          } as React.CSSProperties}
         >
           {CATEGORY_FILTERS.map((f) => {
             const isActive = activeFilter === f.key
-            const catColor = f.key !== 'TODOS' ? CATEGORIA_COLORS[f.key as Categoria] : null
+            // Colores especiales para filtros de banco
+            const bancoColors: Record<string, { active: string; inactive: string; text: string }> = {
+              'BANCO:RAPPICARD': { active: '#ea580c', inactive: '#fff7ed', text: '#ea580c' },
+              'BANCO:RAPPIPAY':  { active: '#0d9488', inactive: '#f0fdfa', text: '#0d9488' },
+            }
+            const bancoColor = bancoColors[f.key]
+            const catColor = !bancoColor && f.key !== 'TODOS'
+              ? CATEGORIA_COLORS[f.key as Categoria]
+              : null
+
+            let buttonStyle: React.CSSProperties
+            if (bancoColor) {
+              buttonStyle = {
+                backgroundColor: isActive ? bancoColor.active : bancoColor.inactive,
+                color: isActive ? '#fff' : bancoColor.text,
+              }
+            } else if (catColor) {
+              buttonStyle = {
+                backgroundColor: isActive ? catColor : `${catColor}22`,
+                color: isActive ? '#fff' : catColor,
+              }
+            } else {
+              buttonStyle = {
+                backgroundColor: isActive ? '#10b981' : '#f1f5f9',
+                color: isActive ? '#fff' : '#475569',
+              }
+            }
+
             return (
               <button
                 key={f.key}
-                onClick={() => setActiveFilter(f.key as Categoria | 'TODOS')}
+                onClick={() => setActiveFilter(f.key)}
                 className="flex-shrink-0 text-xs font-medium px-3 py-1.5 rounded-full transition-colors"
-                style={catColor ? {
-                  backgroundColor: isActive ? catColor : `${catColor}22`,
-                  color: isActive ? '#fff' : catColor,
-                } : {
-                  backgroundColor: isActive ? '#10b981' : '#f1f5f9',
-                  color: isActive ? '#fff' : '#475569',
-                }}
+                style={buttonStyle}
               >
                 {f.label}
               </button>
