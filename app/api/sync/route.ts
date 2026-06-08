@@ -89,6 +89,9 @@ export async function POST() {
       .slice(0, MAX_EMAILS_PER_SYNC)
 
     const errores: string[] = []
+    let parserCount = 0
+    let geminiCount = 0
+    let omitidosCount = 0
 
     // FASE 1 — Recolectar todas las transacciones de todos los batches
     const allTransactions: Array<{ id: string; extracted: ExtractedTransaction }> = []
@@ -100,7 +103,7 @@ export async function POST() {
         batch.map((id) => getMessageDetails(gmail, id))
       )
 
-      const needsGroq: typeof emailDetails[number][] = []
+      const needsGemini: typeof emailDetails[number][] = []
 
       for (const result of emailDetails) {
         if (result.status === 'rejected') {
@@ -118,16 +121,17 @@ export async function POST() {
         })
 
         if (parsed) {
+          parserCount++
           allTransactions.push({ id: email.id, extracted: { ...parsed, banco: email.banco } })
         } else {
-          needsGroq.push(result)
+          needsGemini.push(result)
         }
       }
 
-      for (let j = 0; j < needsGroq.length; j += GROQ_CONCURRENCY) {
-        const groqBatch = needsGroq.slice(j, j + GROQ_CONCURRENCY)
-        const groqResults = await Promise.allSettled(
-          groqBatch.map((r) => {
+      for (let j = 0; j < needsGemini.length; j += GROQ_CONCURRENCY) {
+        const geminiBatch = needsGemini.slice(j, j + GROQ_CONCURRENCY)
+        const geminiResults = await Promise.allSettled(
+          geminiBatch.map((r) => {
             if (r.status === 'rejected') return Promise.resolve(null)
             const email = r.value
             return extractWithGroq({
@@ -142,11 +146,14 @@ export async function POST() {
           })
         )
 
-        for (const res of groqResults) {
+        for (const res of geminiResults) {
           if (res.status === 'fulfilled' && res.value) {
+            geminiCount++
             allTransactions.push(res.value)
+          } else if (res.status === 'fulfilled' && res.value === null) {
+            omitidosCount++
           } else if (res.status === 'rejected') {
-            errores.push(`Groq error: ${res.reason}`)
+            errores.push(`Gemini error: ${res.reason}`)
           }
         }
       }
@@ -197,6 +204,11 @@ export async function POST() {
       }
     }
 
+    console.log(
+      `[sync] ${newIds.length} emails — ` +
+      `${parserCount} parser | ${geminiCount} Gemini | ${omitidosCount} omitidos | ${preauthIds.length} Uber preauth | ${errores.length} errores`
+    )
+
     // Update sync log — guardar pre-auth IDs para no reprocessarlos en futuros syncs
     await admin.from('sync_log').update({
       finished_at: new Date().toISOString(),
@@ -210,6 +222,9 @@ export async function POST() {
     return NextResponse.json({
       correos_revisados: newIds.length,
       transacciones_nuevas: transaccionesNuevas,
+      parser: parserCount,
+      gemini: geminiCount,
+      omitidos: omitidosCount,
       errores,
     })
   } catch (err) {

@@ -167,6 +167,13 @@ export default function TransactionsList({ transactions }: Props) {
     return matchesCategory && matchesSearch
   })
 
+  const totalGastos = filtered
+    .filter((t) => !isIngreso(t.tipo))
+    .reduce((sum, t) => sum + t.monto, 0)
+  const totalIngresos = filtered
+    .filter((t) => isIngreso(t.tipo))
+    .reduce((sum, t) => sum + t.monto, 0)
+
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-100">
       {/* Search */}
@@ -255,6 +262,27 @@ export default function TransactionsList({ transactions }: Props) {
         />
       </div>
 
+      {/* Resumen del filtro activo */}
+      {filtered.length > 0 && (
+        <div className="px-4 py-2.5 flex items-center justify-between border-b border-slate-50 bg-slate-50/40">
+          <span className="text-xs text-slate-400">
+            {filtered.length} transacción{filtered.length !== 1 ? 'es' : ''}
+          </span>
+          <div className="flex items-center gap-3">
+            {totalIngresos > 0 && (
+              <span className="text-sm font-semibold text-emerald-600">
+                +{formatCOP(totalIngresos)}
+              </span>
+            )}
+            {totalGastos > 0 && (
+              <span className="text-sm font-semibold text-slate-700">
+                -{formatCOP(totalGastos)}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Transaction rows */}
       <div className="px-4">
         {filtered.length === 0 ? (
@@ -266,13 +294,7 @@ export default function TransactionsList({ transactions }: Props) {
         )}
       </div>
 
-      {filtered.length > 0 && (
-        <div className="px-4 pb-4 pt-2 text-center">
-          <p className="text-xs text-slate-400">
-            {filtered.length} transacción{filtered.length !== 1 ? 'es' : ''}
-          </p>
-        </div>
-      )}
+      {filtered.length > 0 && <div className="pb-2" />}
     </div>
   )
 }
