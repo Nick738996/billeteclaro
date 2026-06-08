@@ -4,41 +4,96 @@ interface Props {
   stats: MonthlyStats
 }
 
+// MEJORA ①: balance como hero card + gastos/ingresos en row secundario
+// Antes: grid-cols-3 con igual peso (los 3 datos compiten visualmente)
+// Después: balance ocupa full-width con número grande en verde/rojo
+
 export default function StatsCards({ stats }: Props) {
-  const isPositive = stats.balance >= 0
+  const { gastos, ingresos, balance, transacciones } = stats
+  const surplus = balance >= 0
+  const bColor  = surplus ? 'var(--green)' : 'var(--red)'
+  const bSoft   = surplus ? 'var(--green-soft)' : 'var(--red-soft)'
 
   return (
-    <div className="grid grid-cols-3 gap-3">
-      <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
-        <p className="text-xs text-slate-400 font-medium uppercase tracking-wide">Gastos</p>
-        <p className="text-lg font-bold text-rose-600 mt-1 tabular-nums">
-          {formatCOPCompact(stats.gastos)}
-        </p>
-        <p className="text-xs text-slate-400 mt-0.5">
-          {stats.transacciones} mov.
-        </p>
-      </div>
+    <div className="flex flex-col gap-2">
 
-      <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
-        <p className="text-xs text-slate-400 font-medium uppercase tracking-wide">Ingresos</p>
-        <p className="text-lg font-bold text-brand-600 mt-1 tabular-nums">
-          {formatCOPCompact(stats.ingresos)}
-        </p>
-        <p className="text-xs text-slate-400 mt-0.5">este mes</p>
-      </div>
-
-      <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
-        <p className="text-xs text-slate-400 font-medium uppercase tracking-wide">Balance</p>
+      {/* Balance hero */}
+      <div
+        style={{
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--radius-lg)',
+          padding: '20px 20px 18px',
+        }}
+      >
         <p
-          className={`text-lg font-bold mt-1 tabular-nums ${
-            isPositive ? 'text-slate-900' : 'text-rose-600'
-          }`}
+          style={{
+            fontSize: 'var(--text-xs)',
+            fontWeight: 500,
+            letterSpacing: '0.08em',
+            color: 'var(--text-muted)',
+            textTransform: 'uppercase',
+            marginBottom: 10,
+          }}
         >
-          {formatCOPCompact(stats.balance)}
+          Balance neto
         </p>
-        <p className="text-xs text-slate-400 mt-0.5">
-          {isPositive ? 'superávit' : 'déficit'}
-        </p>
+        <div className="flex items-end justify-between">
+          <span
+            className="tabular-nums"
+            style={{ fontSize: 40, fontWeight: 700, color: bColor, letterSpacing: '-0.03em', lineHeight: 1 }}
+          >
+            {formatCOPCompact(Math.abs(balance))}
+          </span>
+          <span
+            style={{
+              fontSize: 'var(--text-xs)',
+              fontWeight: 600,
+              color: bColor,
+              background: bSoft,
+              padding: '4px 10px',
+              borderRadius: 'var(--radius-sm)',
+              marginBottom: 3,
+            }}
+          >
+            {surplus ? 'positivo' : 'negativo'}
+          </span>
+        </div>
+      </div>
+
+      {/* Gastos + Ingresos secundarios */}
+      <div className="grid grid-cols-2 gap-2">
+        {[
+          { label: 'Gastos',   arrow: '↓', value: formatCOPCompact(gastos),   color: 'var(--red)',   sub: `${transacciones} mov.` },
+          { label: 'Ingresos', arrow: '↑', value: formatCOPCompact(ingresos), color: 'var(--green)', sub: 'este mes' },
+        ].map(({ label, arrow, value, color, sub }) => (
+          <div
+            key={label}
+            style={{
+              background: 'var(--surface)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-lg)',
+              padding: '14px 16px',
+            }}
+          >
+            <p
+              style={{
+                fontSize: 'var(--text-xs)',
+                fontWeight: 500,
+                letterSpacing: '0.08em',
+                color: 'var(--text-muted)',
+                textTransform: 'uppercase',
+                marginBottom: 6,
+              }}
+            >
+              {arrow} {label}
+            </p>
+            <p className="tabular-nums" style={{ fontSize: 22, fontWeight: 600, color, letterSpacing: '-0.02em' }}>
+              {value}
+            </p>
+            <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginTop: 3 }}>{sub}</p>
+          </div>
+        ))}
       </div>
     </div>
   )

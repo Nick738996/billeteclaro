@@ -1,51 +1,72 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { Search } from 'lucide-react'
 import {
   type Transaction,
   type Categoria,
   type Banco,
-  type TipoTransaccion,
   CATEGORIA_LABELS,
-  CATEGORIA_COLORS,
   formatCOP,
   isIngreso,
 } from '@/lib/types'
 
-const BANCO_CHIP: Record<Banco, { label: string; bg: string; color: string }> = {
-  RAPPICARD: { label: 'Crédito', bg: '#fff7ed', color: '#ea580c' },
-  RAPPIPAY:  { label: 'Débito',  bg: '#f0fdfa', color: '#0d9488' },
-  OTRO:      { label: 'Otro',    bg: '#f8fafc', color: '#64748b' },
+// MEJORA ③: rows simplificados (divulgación progresiva)
+//   Antes: [CAT chip][BANCO chip] · hora  +  id_auditoria debajo del monto
+//   Después: [CAT chip] · banco (texto plano) · hora  |  id al tocar
+//
+// MEJORA ④: chips colapsados (sin carrusel)
+//   Antes: scroll horizontal con 16 chips
+//   Después: 3 chips fijos + badge de filtro activo + bottom sheet de categorías
+
+// ── Theme maps (igual que el original) ───────────────────────────────────────
+
+const CATEGORIA_THEME: Record<Categoria, { color: string; bg: string }> = {
+  TRANSPORTE:     { color: 'var(--blue)',        bg: 'var(--blue-soft)' },
+  SALIDAS:        { color: 'var(--red)',         bg: 'var(--red-soft)' },
+  HOGAR:          { color: 'var(--green)',       bg: 'var(--green-soft)' },
+  SALUD:          { color: 'var(--green)',       bg: 'var(--green-soft)' },
+  SUSCRIPCIONES:  { color: 'var(--purple)',      bg: 'var(--purple-soft)' },
+  COMPRAS_ONLINE: { color: 'var(--yellow)',      bg: 'var(--yellow-soft)' },
+  INVERSION:      { color: 'var(--purple)',      bg: 'var(--purple-soft)' },
+  DONACIONES:     { color: 'var(--blue)',        bg: 'var(--blue-soft)' },
+  EDUCACION:      { color: 'var(--yellow)',      bg: 'var(--yellow-soft)' },
+  REEMBOLSABLE:   { color: 'var(--yellow)',      bg: 'var(--yellow-soft)' },
+  TRANSFERENCIA:  { color: 'var(--blue)',        bg: 'var(--blue-soft)' },
+  INGRESO:        { color: 'var(--green)',       bg: 'var(--green-soft)' },
+  OTRO:           { color: 'var(--text-muted)', bg: 'var(--surface-2)' },
 }
 
-interface Props {
-  transactions: Transaction[]
+const BANCO_LABEL: Record<Banco, { label: string; color: string }> = {
+  RAPPICARD: { label: 'RappiCard', color: 'var(--yellow)' },
+  RAPPIPAY:  { label: 'RappiPay',  color: 'var(--blue)' },
+  OTRO:      { label: 'Otro',      color: 'var(--text-muted)' },
 }
 
 type FilterKey = Categoria | 'TODOS' | 'BANCO:RAPPICARD' | 'BANCO:RAPPIPAY'
 
-const CATEGORY_FILTERS: Array<{ key: FilterKey; label: string }> = [
-  { key: 'TODOS',              label: 'Todos' },
-  { key: 'BANCO:RAPPICARD',    label: '💳 Crédito' },
-  { key: 'BANCO:RAPPIPAY',     label: '🏦 Débito' },
-  { key: 'SALIDAS',            label: 'Salidas' },
-  { key: 'TRANSPORTE',         label: 'Transporte' },
-  { key: 'HOGAR',              label: 'Hogar' },
-  { key: 'SALUD',              label: 'Salud' },
-  { key: 'SUSCRIPCIONES',      label: 'Suscripciones' },
-  { key: 'COMPRAS_ONLINE',     label: 'Online' },
-  { key: 'TRANSFERENCIA',      label: 'Transferencias' },
-  { key: 'INVERSION',          label: 'Inversión' },
-  { key: 'INGRESO',            label: 'Ingresos' },
-  { key: 'DONACIONES',         label: 'Donaciones' },
-  { key: 'EDUCACION',          label: 'Educación' },
-  { key: 'REEMBOLSABLE',       label: 'Reembolsable' },
-  { key: 'OTRO',               label: 'Otro' },
+// Solo las categorías (para el bottom sheet)
+const CAT_FILTER_KEYS: Array<{ key: FilterKey; label: string }> = [
+  { key: 'SALIDAS',        label: 'Salidas' },
+  { key: 'TRANSPORTE',     label: 'Transporte' },
+  { key: 'HOGAR',          label: 'Hogar' },
+  { key: 'SALUD',          label: 'Salud' },
+  { key: 'SUSCRIPCIONES',  label: 'Suscripciones' },
+  { key: 'COMPRAS_ONLINE', label: 'Online' },
+  { key: 'TRANSFERENCIA',  label: 'Transferencias' },
+  { key: 'INVERSION',      label: 'Inversión' },
+  { key: 'INGRESO',        label: 'Ingresos' },
+  { key: 'DONACIONES',     label: 'Donaciones' },
+  { key: 'EDUCACION',      label: 'Educación' },
+  { key: 'REEMBOLSABLE',   label: 'Reembolsable' },
+  { key: 'OTRO',           label: 'Otro' },
 ]
 
-const LOWERCASE_ES = new Set(['y', 'e', 'o', 'de', 'del', 'la', 'el', 'los', 'las', 'en', 'a', 'con', 'por', 'al'])
+// ── Helpers (iguales al original) ─────────────────────────────────────────────
+
+const LOWERCASE_ES = new Set(['y','e','o','de','del','la','el','los','las','en','a','con','por','al'])
 
 function toTitleCase(str: string): string {
   if (!str) return str
@@ -60,92 +81,314 @@ function toTitleCase(str: string): string {
 
 function getDisplayName(t: Transaction): string {
   const comercio = t.comercio ? toTitleCase(t.comercio) : null
-
-  switch (t.tipo as TipoTransaccion) {
-    case 'TRANSFERENCIA_ENVIADA':
-      return comercio ? `Transferencia a ${comercio}` : 'Transferencia enviada'
-    case 'TRANSFERENCIA_RECIBIDA':
-      return comercio ? `Transferencia de ${comercio}` : 'Transferencia recibida'
-    case 'ABONO_DEUDA':
-      return comercio ? `Pago a ${comercio}` : 'Pago tarjeta'
-    case 'PAGO_SERVICIO':
-      return comercio ? `Pago ${comercio}` : 'Pago servicio'
-    default:
-      return comercio ?? t.descripcion ?? 'Transacción'
+  switch (t.tipo) {
+    case 'TRANSFERENCIA_ENVIADA':  return comercio ? `Transferencia a ${comercio}` : 'Transferencia enviada'
+    case 'TRANSFERENCIA_RECIBIDA': return comercio ? `Transferencia de ${comercio}` : 'Transferencia recibida'
+    case 'ABONO_DEUDA':            return comercio ? `Pago a ${comercio}` : 'Pago tarjeta'
+    case 'PAGO_SERVICIO':          return comercio ? `Pago ${comercio}` : 'Pago servicio'
+    default:                       return comercio ?? t.descripcion ?? 'Transacción'
   }
 }
 
-function TransactionRow({ t }: { t: Transaction }) {
-  const income = isIngreso(t.tipo)
-  const date = new Date(t.fecha)
-  const color = CATEGORIA_COLORS[t.categoria]
+function efectivoBanco(t: Transaction): Banco {
+  return t.tipo === 'ABONO_DEUDA' ? 'RAPPIPAY' : t.banco
+}
+
+function groupByDate(txs: Transaction[]): Array<{ dateLabel: string; items: Transaction[] }> {
+  const groups: Record<string, Transaction[]> = {}
+  for (const t of txs) {
+    const label = format(new Date(t.fecha), "d 'de' MMMM", { locale: es })
+    groups[label] = groups[label] ?? []
+    groups[label].push(t)
+  }
+  return Object.entries(groups).map(([dateLabel, items]) => ({ dateLabel, items }))
+}
+
+// ── CategorySheet ─────────────────────────────────────────────────────────────
+
+function CategorySheet({
+  active,
+  onChange,
+  onClose,
+}: {
+  active: FilterKey
+  onChange: (key: FilterKey) => void
+  onClose: () => void
+}) {
+  return (
+    <>
+      <div
+        className="fixed inset-0 z-50"
+        style={{ background: 'rgba(0,0,0,0.55)' }}
+        onClick={onClose}
+      />
+      <div
+        className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-lg z-50"
+        style={{
+          background: 'var(--surface-2)',
+          borderTop: '1px solid var(--border)',
+          borderRadius: 'var(--radius-xl) var(--radius-xl) 0 0',
+          padding: '12px 20px 40px',
+        }}
+      >
+        <div className="w-9 h-1 rounded-full mx-auto mb-4" style={{ background: 'var(--border)' }} />
+        <p className="font-semibold mb-3" style={{ fontSize: 'var(--text-sm)', color: 'var(--text)' }}>
+          Categorías
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {CAT_FILTER_KEYS.map(f => {
+            const on    = active === f.key
+            const theme = CATEGORIA_THEME[f.key as Categoria] ?? CATEGORIA_THEME['OTRO']
+            return (
+              <button
+                key={f.key}
+                onClick={() => onChange(f.key)}
+                className="rounded-full"
+                style={{
+                  padding: '7px 14px',
+                  background: on ? theme.color : theme.bg,
+                  color: on ? 'var(--bg)' : theme.color,
+                  border: 'none',
+                  fontSize: 'var(--text-xs)',
+                  fontWeight: on ? 600 : 400,
+                  cursor: 'pointer',
+                }}
+              >
+                {f.label}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+    </>
+  )
+}
+
+// ── FilterChips (colapsados) ──────────────────────────────────────────────────
+
+function FilterChips({
+  active,
+  onChange,
+}: {
+  active: FilterKey
+  onChange: (key: FilterKey) => void
+}) {
+  const [sheetOpen, setSheetOpen] = useState(false)
+  const isCatActive    = active !== 'TODOS' && !active.startsWith('BANCO:')
+  const activeCatInfo  = isCatActive ? CAT_FILTER_KEYS.find(f => f.key === active) : null
+  const activeCatTheme = isCatActive ? (CATEGORIA_THEME[active as Categoria] ?? CATEGORIA_THEME['OTRO']) : null
+
+  const FIXED: Array<{ key: FilterKey; label: string; bg: string; color: string; border: string }> = [
+    {
+      key: 'TODOS',
+      label: 'Todos',
+      bg:     active === 'TODOS' ? 'var(--text)' : 'transparent',
+      color:  active === 'TODOS' ? 'var(--bg)'   : 'var(--text-muted)',
+      border: active === 'TODOS' ? 'none'         : '1px solid var(--border)',
+    },
+    {
+      key: 'BANCO:RAPPICARD',
+      label: 'RappiCard',
+      bg:     active === 'BANCO:RAPPICARD' ? 'var(--yellow)'      : 'var(--yellow-soft)',
+      color:  active === 'BANCO:RAPPICARD' ? 'var(--bg)'          : 'var(--yellow)',
+      border: 'none',
+    },
+    {
+      key: 'BANCO:RAPPIPAY',
+      label: 'RappiPay',
+      bg:     active === 'BANCO:RAPPIPAY' ? 'var(--blue)'         : 'var(--blue-soft)',
+      color:  active === 'BANCO:RAPPIPAY' ? 'var(--bg)'           : 'var(--blue)',
+      border: 'none',
+    },
+  ]
 
   return (
-    <div className="flex items-center gap-3 py-3 border-b border-slate-50 last:border-0">
-      <div
-        className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-        style={{ backgroundColor: `${color}18` }}
-      >
-        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color }} />
+    <>
+      <div className="flex items-center gap-1.5">
+        {/* 3 chips fijos */}
+        {FIXED.map(f => (
+          <button
+            key={f.key}
+            onClick={() => onChange(f.key)}
+            className="flex-shrink-0 rounded-full"
+            style={{
+              padding: '5px 12px',
+              background: f.bg,
+              color: f.color,
+              border: f.border,
+              fontSize: 'var(--text-xs)',
+              fontWeight: active === f.key ? 600 : 400,
+              cursor: 'pointer',
+            }}
+          >
+            {f.label}
+          </button>
+        ))}
+
+        {/* Badge de categoría activa (con × para limpiar) */}
+        {activeCatInfo && activeCatTheme && (
+          <button
+            onClick={() => onChange('TODOS')}
+            className="flex-shrink-0 flex items-center gap-1.5 rounded-full"
+            style={{
+              padding: '5px 8px 5px 12px',
+              background: activeCatTheme.color,
+              color: 'var(--bg)',
+              border: 'none',
+              fontSize: 'var(--text-xs)',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            {activeCatInfo.label}
+            <span
+              className="flex items-center justify-center rounded-full"
+              style={{ width: 14, height: 14, background: 'rgba(0,0,0,0.2)', fontSize: 10 }}
+            >
+              ×
+            </span>
+          </button>
+        )}
+
+        <div className="flex-1" />
+
+        {/* Botón para abrir el sheet de categorías */}
+        <button
+          onClick={() => setSheetOpen(true)}
+          className="flex-shrink-0 flex items-center gap-1 rounded-full"
+          style={{
+            padding: '5px 10px',
+            background: 'var(--surface-2)',
+            border: '1px solid var(--border)',
+            color: 'var(--text-muted)',
+            fontSize: 'var(--text-xs)',
+            fontWeight: 500,
+            cursor: 'pointer',
+          }}
+        >
+          {!isCatActive && (
+            <span style={{ color: 'var(--text-subtle)' }}>{CAT_FILTER_KEYS.length}</span>
+          )}
+          <span>▾</span>
+        </button>
       </div>
 
+      {sheetOpen && (
+        <CategorySheet
+          active={active}
+          onChange={key => { onChange(key); setSheetOpen(false) }}
+          onClose={() => setSheetOpen(false)}
+        />
+      )}
+    </>
+  )
+}
+
+// ── TransactionRow (simplificado) ─────────────────────────────────────────────
+
+function TransactionRow({ t }: { t: Transaction }) {
+  const [expanded, setExpanded] = useState(false)
+  const income = isIngreso(t.tipo)
+  const theme  = CATEGORIA_THEME[t.categoria]
+  const banco  = efectivoBanco(t)
+  const chip   = BANCO_LABEL[banco]
+  const time   = format(new Date(t.fecha), 'HH:mm', { locale: es })
+
+  return (
+    <div
+      className="flex items-start gap-3 py-3 cursor-pointer"
+      style={{ borderBottom: '1px solid var(--border-soft)' }}
+      onClick={() => setExpanded(o => !o)}
+    >
+      {/* Icono categoría */}
+      <div
+        className="w-9 h-9 rounded-[var(--radius-md)] flex items-center justify-center flex-shrink-0"
+        style={{ background: theme.bg }}
+      >
+        <div className="w-2 h-2 rounded-full" style={{ background: theme.color }} />
+      </div>
+
+      {/* Nombre + meta */}
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-slate-800 truncate">
+        <p
+          className="font-medium truncate"
+          style={{ fontSize: 'var(--text-sm)', color: 'var(--text)', marginBottom: 5 }}
+        >
           {getDisplayName(t)}
         </p>
-        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+
+        <div className="flex items-center gap-1.5">
+          {/* 1 chip de categoría */}
           <span
-            className="text-xs px-1.5 py-0.5 rounded-md font-medium"
-            style={{ color, backgroundColor: `${color}18` }}
+            style={{
+              fontSize: 'var(--text-xs)',
+              fontWeight: 500,
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em',
+              color: theme.color,
+              background: theme.bg,
+              padding: '2px 6px',
+              borderRadius: 4,
+              flexShrink: 0,
+              whiteSpace: 'nowrap',
+            }}
           >
             {CATEGORIA_LABELS[t.categoria]}
           </span>
-          {(() => {
-            // ABONO_DEUDA: el pago sale de la RappiCuenta (débito), no de la tarjeta
-            const banco = t.tipo === 'ABONO_DEUDA' ? 'RAPPIPAY' : t.banco
-            const chip = BANCO_CHIP[banco]
-            return (
-              <span
-                className="text-xs px-1.5 py-0.5 rounded-md font-medium"
-                style={{ color: chip.color, backgroundColor: chip.bg }}
-              >
-                {chip.label}
-              </span>
-            )
-          })()}
-          <span className="text-xs text-slate-400">·</span>
-          <span className="text-xs text-slate-400">
-            {format(date, "d MMM · HH:mm", { locale: es })}
-          </span>
+
+          {/* Banco y hora como texto plano */}
+          <span style={{ color: 'var(--text-subtle)', fontSize: 'var(--text-xs)' }}>·</span>
+          <span style={{ color: chip.color, fontSize: 'var(--text-xs)' }}>{chip.label}</span>
+          <span style={{ color: 'var(--text-subtle)', fontSize: 'var(--text-xs)' }}>·</span>
+          <span style={{ color: 'var(--text-subtle)', fontSize: 'var(--text-xs)' }}>{time}</span>
         </div>
+
+        {/* id_auditoria — solo visible al expandir */}
+        {expanded && t.id_auditoria && (
+          <p
+            className="font-mono mt-2"
+            style={{
+              fontSize: 'var(--text-xs)',
+              color: 'var(--text-muted)',
+              background: 'var(--surface-2)',
+              padding: '4px 8px',
+              borderRadius: 'var(--radius-sm)',
+            }}
+          >
+            {t.id_auditoria}
+          </p>
+        )}
       </div>
 
+      {/* Monto (sin id_auditoria debajo) */}
       <div className="flex-shrink-0 text-right">
         <p
-          className={`text-sm font-semibold tabular-nums ${
-            income ? 'text-brand-600' : 'text-slate-800'
-          }`}
+          className="font-semibold tabular-nums"
+          style={{
+            fontSize: 'var(--text-sm)',
+            color: income ? 'var(--green)' : 'var(--text)',
+          }}
         >
           {income ? '+' : '-'}{formatCOP(t.monto)}
         </p>
-        {t.id_auditoria && (
-          <p className="text-xs text-slate-300 mt-0.5">{t.id_auditoria}</p>
-        )}
       </div>
     </div>
   )
 }
 
-// Devuelve el banco "efectivo" de la transacción (ABONO_DEUDA sale de RAPPIPAY)
-function efectivoBanco(t: Transaction): Banco {
-  return t.tipo === 'ABONO_DEUDA' ? 'RAPPIPAY' : t.banco
+// ── Main component ─────────────────────────────────────────────────────────────
+
+interface Props {
+  transactions: Transaction[]
+  activeFilter: string
+  onFilterChange: (key: string) => void
 }
 
-export default function TransactionsList({ transactions }: Props) {
-  const [activeFilter, setActiveFilter] = useState<FilterKey>('TODOS')
+export default function TransactionsList({ transactions, activeFilter, onFilterChange }: Props) {
   const [search, setSearch] = useState('')
+  const activeFilterKey = activeFilter as FilterKey
 
-  const filtered = transactions.filter((t) => {
+  const filtered = useMemo(() => transactions.filter(t => {
     let matchesCategory: boolean
     if (activeFilter === 'TODOS') {
       matchesCategory = true
@@ -154,128 +397,72 @@ export default function TransactionsList({ transactions }: Props) {
     } else if (activeFilter === 'BANCO:RAPPIPAY') {
       matchesCategory = efectivoBanco(t) === 'RAPPIPAY'
     } else {
-      matchesCategory =
-        t.categoria === activeFilter ||
-        (activeFilter === 'INGRESO' && isIngreso(t.tipo))
+      matchesCategory = t.categoria === activeFilter || (activeFilter === 'INGRESO' && isIngreso(t.tipo))
     }
-    const searchLower = search.toLowerCase()
-    const matchesSearch =
-      !search ||
-      t.comercio?.toLowerCase().includes(searchLower) ||
-      t.descripcion?.toLowerCase().includes(searchLower) ||
-      CATEGORIA_LABELS[t.categoria].toLowerCase().includes(searchLower)
+    const q = search.toLowerCase()
+    const matchesSearch = !search
+      || t.comercio?.toLowerCase().includes(q)
+      || t.descripcion?.toLowerCase().includes(q)
+      || CATEGORIA_LABELS[t.categoria].toLowerCase().includes(q)
     return matchesCategory && matchesSearch
-  })
+  }), [transactions, activeFilter, search])
 
-  const totalGastos = filtered
-    .filter((t) => !isIngreso(t.tipo))
-    .reduce((sum, t) => sum + t.monto, 0)
-  const totalIngresos = filtered
-    .filter((t) => isIngreso(t.tipo))
-    .reduce((sum, t) => sum + t.monto, 0)
+  const totalGastos   = useMemo(() => filtered.filter(t => !isIngreso(t.tipo)).reduce((s, t) => s + t.monto, 0), [filtered])
+  const totalIngresos = useMemo(() => filtered.filter(t =>  isIngreso(t.tipo)).reduce((s, t) => s + t.monto, 0), [filtered])
+  const groups        = useMemo(() => groupByDate(filtered), [filtered])
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-100">
-      {/* Search */}
-      <div className="p-4 border-b border-slate-100">
-        <div className="relative">
-          <svg
-            className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-            />
-          </svg>
+    <div
+      className="rounded-[var(--radius-lg)]"
+      style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
+    >
+      {/* Buscador */}
+      <div className="px-4 pt-4 pb-3">
+        <div
+          className="flex items-center gap-2 rounded-[var(--radius-md)]"
+          style={{
+            background: 'var(--surface-2)',
+            border: '1px solid var(--border)',
+            padding: '9px 13px',
+          }}
+        >
+          <Search size={14} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
           <input
             type="search"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar transacciones..."
-            className="w-full pl-9 pr-4 py-2 text-sm bg-slate-50 border-0 rounded-lg outline-none focus:ring-2 focus:ring-brand-500/20 placeholder:text-slate-400"
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Buscar comercio..."
+            className="flex-1 bg-transparent outline-none"
+            style={{ fontSize: 'var(--text-sm)', color: 'var(--text)' }}
           />
         </div>
       </div>
 
-      {/* Category filter carousel */}
-      <div className="relative border-b border-slate-50">
-        <div
-          className="flex gap-2 px-4 py-3 scrollbar-hide"
-          style={{
-            overflowX: 'scroll',
-            scrollbarWidth: 'none',
-            msOverflowStyle: 'none',
-            WebkitOverflowScrolling: 'touch',
-          } as React.CSSProperties}
-        >
-          {CATEGORY_FILTERS.map((f) => {
-            const isActive = activeFilter === f.key
-            // Colores especiales para filtros de banco
-            const bancoColors: Record<string, { active: string; inactive: string; text: string }> = {
-              'BANCO:RAPPICARD': { active: '#ea580c', inactive: '#fff7ed', text: '#ea580c' },
-              'BANCO:RAPPIPAY':  { active: '#0d9488', inactive: '#f0fdfa', text: '#0d9488' },
-            }
-            const bancoColor = bancoColors[f.key]
-            const catColor = !bancoColor && f.key !== 'TODOS'
-              ? CATEGORIA_COLORS[f.key as Categoria]
-              : null
-
-            let buttonStyle: React.CSSProperties
-            if (bancoColor) {
-              buttonStyle = {
-                backgroundColor: isActive ? bancoColor.active : bancoColor.inactive,
-                color: isActive ? '#fff' : bancoColor.text,
-              }
-            } else if (catColor) {
-              buttonStyle = {
-                backgroundColor: isActive ? catColor : `${catColor}22`,
-                color: isActive ? '#fff' : catColor,
-              }
-            } else {
-              buttonStyle = {
-                backgroundColor: isActive ? '#10b981' : '#f1f5f9',
-                color: isActive ? '#fff' : '#475569',
-              }
-            }
-
-            return (
-              <button
-                key={f.key}
-                onClick={() => setActiveFilter(f.key)}
-                className="flex-shrink-0 text-xs font-medium px-3 py-1.5 rounded-full transition-colors"
-                style={buttonStyle}
-              >
-                {f.label}
-              </button>
-            )
-          })}
-        </div>
-        {/* Fade gradient — indicates more chips to the right */}
-        <div
-          className="absolute right-0 top-0 bottom-0 w-8 pointer-events-none"
-          style={{ background: 'linear-gradient(to right, transparent, white)' }}
+      {/* Chips colapsados */}
+      <div className="px-4 pb-3" style={{ borderBottom: '1px solid var(--border-soft)' }}>
+        <FilterChips
+          active={activeFilterKey}
+          onChange={key => onFilterChange(key)}
         />
       </div>
 
-      {/* Resumen del filtro activo */}
+      {/* Resumen */}
       {filtered.length > 0 && (
-        <div className="px-4 py-2.5 flex items-center justify-between border-b border-slate-50 bg-slate-50/40">
-          <span className="text-xs text-slate-400">
+        <div
+          className="px-4 py-2.5 flex items-center justify-between"
+          style={{ borderBottom: '1px solid var(--border-soft)', background: 'var(--surface-2)' }}
+        >
+          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
             {filtered.length} transacción{filtered.length !== 1 ? 'es' : ''}
           </span>
           <div className="flex items-center gap-3">
             {totalIngresos > 0 && (
-              <span className="text-sm font-semibold text-emerald-600">
+              <span className="font-semibold tabular-nums" style={{ fontSize: 'var(--text-sm)', color: 'var(--green)' }}>
                 +{formatCOP(totalIngresos)}
               </span>
             )}
             {totalGastos > 0 && (
-              <span className="text-sm font-semibold text-slate-700">
+              <span className="font-semibold tabular-nums" style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>
                 -{formatCOP(totalGastos)}
               </span>
             )}
@@ -283,14 +470,28 @@ export default function TransactionsList({ transactions }: Props) {
         </div>
       )}
 
-      {/* Transaction rows */}
+      {/* Lista agrupada por fecha */}
       <div className="px-4">
         {filtered.length === 0 ? (
-          <p className="text-sm text-slate-400 text-center py-8">
+          <p className="text-center py-8" style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>
             {search ? 'Sin resultados para tu búsqueda' : 'Sin transacciones este mes'}
           </p>
         ) : (
-          filtered.map((t) => <TransactionRow key={t.id} t={t} />)
+          groups.map(({ dateLabel, items }) => (
+            <div key={dateLabel}>
+              <p
+                className="py-2 font-medium uppercase tracking-wider"
+                style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', letterSpacing: '0.06em' }}
+              >
+                {dateLabel}
+              </p>
+              {items.map((t, i) => (
+                <div key={t.id} style={i === items.length - 1 ? { borderBottom: 'none' } : {}}>
+                  <TransactionRow t={t} />
+                </div>
+              ))}
+            </div>
+          ))
         )}
       </div>
 

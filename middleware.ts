@@ -31,11 +31,6 @@ export async function middleware(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname
 
-  // /demo is always accessible — no auth needed
-  if (pathname.startsWith('/demo')) {
-    return supabaseResponse
-  }
-
   // Redirect unauthenticated users away from protected routes
   if (!user && pathname.startsWith('/dashboard')) {
     return NextResponse.redirect(new URL('/', request.url))

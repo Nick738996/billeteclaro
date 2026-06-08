@@ -1,0 +1,57 @@
+:root {
+  /* MODO OSCURO — default */
+  --bg:           #0A0A0A;
+  --surface:      #1C1C1C;
+  --surface-2:    #242424;
+  --border:       #2E2E2E;
+  --border-soft:  #222222;
+  --text:         #FFFFFF;
+  --text-muted:   #888888;
+  --text-subtle:  #444444;
+
+  --green:        #4ADE80;
+  --green-soft:   #153D24;
+  --red:          #FF6B6B;
+  --red-soft:     #3D1515;
+  --yellow:       #FCD34D;
+  --yellow-soft:  #3D2E0F;
+  --blue:         #60A5FA;
+  --blue-soft:    #0F2A3D;
+  --purple:       #A78BFA;
+  --purple-soft:  #26153D;
+
+  --radius-sm:    6px;
+  --radius-md:    10px;
+  --radius-lg:    14px;
+  --radius-xl:    20px;
+
+  --text-xs:   11px;
+  --text-sm:   13px;
+  --text-base: 14px;
+  --text-lg:   16px;
+  --text-xl:   20px;
+  --text-2xl:  24px;
+  --text-3xl:  30px;
+}
+
+[data-theme="light"] {
+  --bg:           #FFFFFF;
+  --surface:      #F8F8F8;
+  --surface-2:    #F0F0F0;
+  --border:       #E8E8E8;
+  --border-soft:  #F2F2F2;
+  --text:         #0A0A0A;
+  --text-muted:   #6B6B6B;
+  --text-subtle:  #C8C8C8;
+
+  --green:        #16A34A;
+  --green-soft:   #DCFCE7;
+  --red:          #DC2626;
+  --red-soft:     #FEE2E2;
+  --yellow:       #D97706;
+  --yellow-soft:  #FEF3C7;
+  --blue:         #2563EB;
+  --blue-soft:    #DBEAFE;
+  --purple:       #7C3AED;
+  --purple-soft:  #EDE9FE;
+}
