@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { format, parseISO, startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import type { Transaction } from '@/lib/types'
 import DashboardClient from './DashboardClient'
 
@@ -24,6 +24,14 @@ export default async function DashboardPage({ searchParams }: Props) {
   const ref = parseISO(`${monthParam}-01`)
   const start = startOfMonth(ref)
   const end = endOfMonth(ref)
+
+  const admin = createAdminClient()
+  const { data: tokenRow } = await admin
+    .from('user_tokens')
+    .select('gmail_refresh_token')
+    .eq('user_id', user.id)
+    .single()
+  const gmailConnected = !!tokenRow?.gmail_refresh_token
 
   const { data: transactions } = await supabase
     .from('transactions')
@@ -51,6 +59,7 @@ export default async function DashboardPage({ searchParams }: Props) {
       prevMonth={prevMonth}
       nextMonth={nextMonth}
       isCurrentMonth={isCurrentMonth}
+      gmailConnected={gmailConnected}
     />
   )
 }

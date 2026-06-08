@@ -152,6 +152,7 @@ export default function DemoPage() {
         prevMonth="2026-05"
         nextMonth="2026-07"
         isCurrentMonth={false}
+        gmailConnected={true}
         allTransactions={DEMO_TRANSACTIONS}
       />
     </>
