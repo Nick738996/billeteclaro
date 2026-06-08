@@ -21,6 +21,8 @@ interface Props {
   prevMonth: string
   nextMonth: string
   isCurrentMonth: boolean
+  /** Si se provee, la navegación filtra localmente sin tocar Supabase (modo demo) */
+  allTransactions?: Transaction[]
 }
 
 function buildStats(txs: Transaction[]): MonthlyStats {
@@ -48,10 +50,12 @@ export default function DashboardClient({
   monthLabel: initLabel,
   currentMonth: initMonth,
   isCurrentMonth: initIsCurrent,
+  allTransactions,
 }: Props) {
   const router = useRouter()
   const supabase = createClient()
   const today = format(new Date(), 'yyyy-MM')
+  const demoMode = allTransactions !== undefined
 
   // All display data lives in client state — never depends on server re-renders
   const [month, setMonth] = useState(initMonth)
@@ -68,24 +72,41 @@ export default function DashboardClient({
   const loadMonth = useCallback(async (m: string) => {
     setLoading(true)
     const r = parseISO(`${m}-01`)
-    const { data } = await supabase
-      .from('transactions')
-      .select('*')
-      .gte('fecha', startOfMonth(r).toISOString())
-      .lte('fecha', endOfMonth(r).toISOString())
-      .order('fecha', { ascending: false })
-    const newTxs = (data ?? []) as Transaction[]
+    const start = startOfMonth(r)
+    const end = endOfMonth(r)
+
+    let newTxs: Transaction[]
+
+    if (demoMode) {
+      // Modo demo: filtra los datos estáticos localmente, sin tocar Supabase
+      newTxs = (allTransactions ?? [])
+        .filter(t => {
+          const f = new Date(t.fecha)
+          return f >= start && f <= end
+        })
+        .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
+    } else {
+      const { data } = await supabase
+        .from('transactions')
+        .select('*')
+        .gte('fecha', start.toISOString())
+        .lte('fecha', end.toISOString())
+        .order('fecha', { ascending: false })
+      newTxs = (data ?? []) as Transaction[]
+    }
+
     setTxs(newTxs)
     setStats(buildStats(newTxs))
     setLabel(format(r, 'MMMM yyyy', { locale: es }))
     setIsCurrent(m === today)
     setMonth(m)
     setLoading(false)
-  }, [supabase, today])
+  }, [supabase, today, demoMode, allTransactions])
 
   const navigate = (m: string) => {
-    // Update URL without triggering a server re-render, fetch data client-side
-    window.history.pushState(null, '', `/dashboard?month=${m}`)
+    if (!demoMode) {
+      window.history.pushState(null, '', `/dashboard?month=${m}`)
+    }
     loadMonth(m)
   }
 
