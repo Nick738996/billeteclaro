@@ -43,11 +43,12 @@ export function buildGmailClient(accessToken: string) {
   return google.gmail({ version: 'v1', auth })
 }
 
+const SYNC_FROM_DATE = '2026/05/01'
+
 export async function listBankMessageIds(
   gmail: ReturnType<typeof buildGmailClient>,
-  daysBack = 90
 ): Promise<string[]> {
-  const query = `{${GMAIL_SEARCH_QUERY}} newer_than:${daysBack}d`
+  const query = `{${GMAIL_SEARCH_QUERY}} after:${SYNC_FROM_DATE}`
   const ids: string[] = []
   let pageToken: string | undefined
 

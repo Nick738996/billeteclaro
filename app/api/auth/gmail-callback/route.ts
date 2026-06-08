@@ -11,7 +11,7 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL('/dashboard?gmail_error=denied', request.url))
   }
 
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
