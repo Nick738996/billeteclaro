@@ -43,30 +43,55 @@ function isTransactionEmail(subject: string, body: string): boolean {
 }
 
 function extractAmount(body: string): number | null {
-  // Patterns: $45,000  |  $45.000  |  45000  COP
-  const patterns = [
-    /\$\s*([\d]{1,3}(?:[.,][\d]{3})*(?:[.,]\d{2})?)/,
-    /COP\s*([\d]{1,3}(?:[.,][\d]{3})*)/i,
-    /valor[:\s]+([\d]{1,3}(?:[.,][\d]{3})*)/i,
-    /monto[:\s]+([\d]{1,3}(?:[.,][\d]{3})*)/i,
+  // Prioridad alta: patrones que aparecen junto al monto real de la transacción
+  const contextPatterns = [
+    /compraste\s+(?:por\s+)?\$\s*([\d]{1,3}(?:[.,][\d]{3})*(?:[.,]\d{1,2})?)/i,
+    /realizaste.*?(?:por|de)\s+\$\s*([\d]{1,3}(?:[.,][\d]{3})*(?:[.,]\d{1,2})?)/i,
+    /(?:valor|monto|total|importe)\s+(?:de\s+(?:tu\s+)?(?:compra|transacci[oó]n|pago|cargo)[:\s]+)?\$?\s*([\d]{1,3}(?:[.,][\d]{3})*(?:[.,]\d{1,2})?)/i,
+    /por\s+(?:un\s+valor\s+de\s+)?\$\s*([\d]{1,3}(?:[.,][\d]{3})*(?:[.,]\d{1,2})?)/i,
+    /cargo\s+de\s+\$\s*([\d]{1,3}(?:[.,][\d]{3})*(?:[.,]\d{1,2})?)/i,
+    /COP\s*([\d]{1,3}(?:[.,][\d]{3})*(?:[.,]\d{1,2})?)/i,
   ]
 
-  for (const pattern of patterns) {
+  for (const pattern of contextPatterns) {
     const match = body.match(pattern)
     if (match) {
-      return parseCOPAmount(match[1])
+      const amount = parseCOPAmount(match[1])
+      if (amount > 0) return amount
     }
+  }
+
+  // Fallback: primer $ del body (menos confiable — puede capturar saldo o cupo)
+  const fallback = body.match(/\$\s*([\d]{1,3}(?:[.,][\d]{3})*(?:[.,]\d{1,2})?)/)
+  if (fallback) {
+    const amount = parseCOPAmount(fallback[1])
+    if (amount > 0) return amount
   }
 
   return null
 }
 
 function parseCOPAmount(raw: string): number {
-  // Handle both comma and period as thousand separators
-  // Colombian format uses . for thousands, , for decimals
-  // But emails sometimes use comma for thousands
-  const cleaned = raw.replace(/\./g, '').replace(/,/g, '')
-  return parseInt(cleaned, 10)
+  const s = raw.trim()
+  const hasDot = s.includes('.')
+  const hasComma = s.includes(',')
+
+  // Ambos separadores presentes: el último es decimal, el otro es miles
+  // Ej: "45.000,00" → quitar ",00" → "45.000" → 45000
+  // Ej: "45,000.00" → quitar ".00" → "45,000" → 45000
+  if (hasDot && hasComma) {
+    const withoutDecimal = s.replace(/[.,]\d{1,2}$/, '')
+    return parseInt(withoutDecimal.replace(/[.,]/g, ''), 10)
+  }
+
+  // Un solo separador: si el último grupo tiene 1-2 dígitos es decimal
+  // Ej: "45.00" → decimal → 45 | "45.000" → miles → 45000
+  const lastSep = Math.max(s.lastIndexOf('.'), s.lastIndexOf(','))
+  if (lastSep !== -1 && s.length - lastSep - 1 <= 2) {
+    return parseInt(s.slice(0, lastSep).replace(/[.,]/g, ''), 10)
+  }
+
+  return parseInt(s.replace(/[.,]/g, ''), 10)
 }
 
 function extractMerchant(body: string): string | null {
