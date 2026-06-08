@@ -94,18 +94,28 @@ function parseCOPAmount(raw: string): number {
   return parseInt(s.replace(/[.,]/g, ''), 10)
 }
 
+// Letra inicial: A-Z + vocales con tilde + Ñ (mayúsculas y minúsculas cubiertas por \w)
+const MERCHANT_FIRST_CHAR = '[A-ZÁÉÍÓÚÑa-záéíóúñ]'
+
 function extractMerchant(body: string): string | null {
   const patterns = [
-    /en\s+([A-Z][A-Za-z0-9\s\-&.]+?)(?:\s+con|\s+por|\s*\n|\s*\r|$)/,
-    /establecimiento[:\s]+([A-Za-z0-9\s\-&.]+?)(?:\n|\r|$)/i,
-    /comercio[:\s]+([A-Za-z0-9\s\-&.]+?)(?:\n|\r|$)/i,
-    /compra\s+en\s+([A-Za-z0-9\s\-&.]+?)(?:\n|\r|$)/i,
+    // "compraste en Éxito" / "compra en McDonald's"
+    new RegExp(`(?:compraste|compra)\\s+en\\s+(${MERCHANT_FIRST_CHAR}[\\w\\s\\-&.']+?)(?:\\s+con|\\s+por|\\s*[\\n\\r]|$)`, 'i'),
+    // "realizaste una compra en Rappi Food"
+    new RegExp(`realizaste.*?en\\s+(${MERCHANT_FIRST_CHAR}[\\w\\s\\-&.']+?)(?:\\s+con|\\s+por|\\s*[\\n\\r]|$)`, 'i'),
+    // "establecimiento: Nombre"
+    /establecimiento[:\s]+([\w\s\-&.'Á-Ú]+?)(?:\n|\r|$)/i,
+    // "comercio: Nombre"
+    /comercio[:\s]+([\w\s\-&.'Á-Ú]+?)(?:\n|\r|$)/i,
+    // "en Nombre con RappiCard" — genérico
+    new RegExp(`\\ben\\s+(${MERCHANT_FIRST_CHAR}[\\w\\s\\-&.']+?)(?:\\s+con|\\s+por|\\s*[\\n\\r]|\\.)`, 'i'),
   ]
 
   for (const pattern of patterns) {
     const match = body.match(pattern)
     if (match) {
-      return match[1].trim().slice(0, 100)
+      const merchant = match[1].trim().replace(/\s+/g, ' ').slice(0, 80)
+      if (merchant.length > 2) return merchant
     }
   }
 
@@ -133,15 +143,17 @@ function extractDate(dateHeader: string): string {
 function guessCategoria(comercio: string): Categoria {
   const c = comercio.toLowerCase()
 
-  if (/uber|cabify|didi|indriver|taxi|transmilenio|sitp|gasolina|gasolinera/.test(c)) return 'TRANSPORTE'
-  if (/rappi|domicilio|delivery|restaurante|cafe|café|bar|club|cine|evento/.test(c)) return 'SALIDAS'
-  if (/farmacia|drogueria|droguería|médico|medico|clinic|hospital|gym|gimnasio|veterinar/.test(c)) return 'SALUD'
-  if (/netflix|spotify|disney|hbo|prime|apple|claude|adobe|microsoft|google.*one/.test(c)) return 'SUSCRIPCIONES'
-  if (/temu|amazon|mercadolibre|shein|falabella|éxito|alkosto/.test(c)) return 'COMPRAS_ONLINE'
-  if (/claro|movistar|tigo|etb|epm|codensa|gases/.test(c)) return 'HOGAR'
-  if (/cdt|fondo|inversión|bóveda|bolsa|crypto/.test(c)) return 'INVERSION'
-  if (/iglesia|fundacion|fundación|world vision/.test(c)) return 'DONACIONES'
-  if (/universidad|colegio|curso|plataforma.*edu/.test(c)) return 'EDUCACION'
+  if (/uber|cabify|didi|indriver|taxi|transmilenio|sitp|metro|gasolina|gasolinera|q8|terpel|biomax|estacion de servicio/.test(c)) return 'TRANSPORTE'
+  if (/rappi\s*food|ifood|domicilio|delivery|restaurante|cafe|café|bar|taberna|club|cine|evento|teatro|parque|heladeria|fruteria|panaderia|sushi|pizza|burger|domino|mcdonalds|mcdonald|kfc|subway/.test(c)) return 'SALIDAS'
+  if (/farmacia|drogueria|droguería|medico|médico|clinic|hospital|eps|gym|gimnasio|veterinar|salud|audifarma|cruz verde|colsubsidio|cafam|compensar/.test(c)) return 'SALUD'
+  if (/netflix|spotify|disney|hbo|prime video|apple tv|apple one|claude|adobe|microsoft|google one|youtube premium|deezer|crunchyroll/.test(c)) return 'SUSCRIPCIONES'
+  if (/temu|amazon|mercadolibre|mercado libre|shein|falabella|alkosto|ktronix|linio|jumbo.*online/.test(c)) return 'COMPRAS_ONLINE'
+  if (/claro|movistar|tigo|etb|epm|codensa|gas natural|gases|emcali|aire|acueducto|electricidad|internet|directv|telecomunicaciones/.test(c)) return 'HOGAR'
+  if (/exito|éxito|carulla|jumbo|olimpica|olímpica|d1|ara|mercado|supertienda|supermercado|corabastos/.test(c)) return 'HOGAR'
+  if (/cdt|fondo|inversión|inversion|boveda|bóveda|bolsa|crypto|bitcoin|eth|nu invest|renta fija/.test(c)) return 'INVERSION'
+  if (/iglesia|fundacion|fundación|world vision|banco de alimentos/.test(c)) return 'DONACIONES'
+  if (/universidad|colegio|curso|platzi|udemy|coursera|edx|duolingo|britanico|campuslands/.test(c)) return 'EDUCACION'
+  if (/reembolso|reembolsable|anticipo|deducible/.test(c)) return 'REEMBOLSABLE'
 
   return 'OTRO'
 }

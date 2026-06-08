@@ -1,7 +1,6 @@
 import { startOfMonth, endOfMonth, parseISO } from 'date-fns'
 import DashboardClient from '@/app/dashboard/DashboardClient'
-import type { Transaction, MonthlyStats } from '@/lib/types'
-import { isIngreso } from '@/lib/types'
+import type { Transaction } from '@/lib/types'
 
 // Fechas fijas para que el demo sea estable independiente del día actual
 const JUN = (d: number, h = 12) => new Date(`2026-06-${String(d).padStart(2,'0')}T${String(h).padStart(2,'0')}:00:00`).toISOString()
@@ -125,15 +124,6 @@ const DEMO_TRANSACTIONS: Transaction[] = [
   },
 ]
 
-function buildStats(txs: Transaction[]): MonthlyStats {
-  const gastos = txs.filter(t => !isIngreso(t.tipo)).reduce((s, t) => s + t.monto, 0)
-  const ingresos = txs.filter(t => isIngreso(t.tipo)).reduce((s, t) => s + t.monto, 0)
-  const porCategoria = txs
-    .filter(t => !isIngreso(t.tipo))
-    .reduce((acc, t) => ({ ...acc, [t.categoria]: (acc[t.categoria as keyof typeof acc] ?? 0) + t.monto }), {} as any)
-  return { gastos, ingresos, balance: ingresos - gastos, transacciones: txs.length, porCategoria }
-}
-
 function filterByMonth(txs: Transaction[], yearMonth: string): Transaction[] {
   const ref = parseISO(`${yearMonth}-01`)
   const start = startOfMonth(ref)
@@ -146,7 +136,6 @@ function filterByMonth(txs: Transaction[], yearMonth: string): Transaction[] {
 export default function DemoPage() {
   const currentMonth = '2026-06'
   const initTxs = filterByMonth(DEMO_TRANSACTIONS, currentMonth)
-  const stats = buildStats(initTxs)
 
   return (
     <>
@@ -158,7 +147,6 @@ export default function DemoPage() {
       <DashboardClient
         user={{ name: 'Demo Usuario' }}
         transactions={initTxs}
-        stats={stats}
         monthLabel="junio 2026"
         currentMonth={currentMonth}
         prevMonth="2026-05"

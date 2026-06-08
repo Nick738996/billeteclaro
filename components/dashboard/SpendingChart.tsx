@@ -1,5 +1,6 @@
 'use client'
 
+import { useMemo } from 'react'
 import { PieChart, Pie, Cell, Tooltip } from 'recharts'
 import { CATEGORIA_COLORS, CATEGORIA_LABELS, formatCOP, type Categoria, type Transaction } from '@/lib/types'
 
@@ -14,16 +15,21 @@ interface ChartEntry {
   categoria: Categoria
 }
 
+const TIPOS_GASTO = new Set(['COMPRA', 'PAGO_SERVICIO', 'RETIRO', 'TRANSFERENCIA_ENVIADA', 'ABONO_DEUDA'])
+
 function buildChartData(transactions: Transaction[]): ChartEntry[] {
   const totals: Partial<Record<Categoria, number>> = {}
 
   for (const t of transactions) {
-    // Only count expenses
-    if (t.tipo === 'INGRESO' || t.tipo === 'TRANSFERENCIA_RECIBIDA') continue
+    // Solo gastos reales — excluye ingresos y transferencias recibidas
+    if (!TIPOS_GASTO.has(t.tipo)) continue
+    // Excluye categorías que no son gastos de consumo
+    if (t.categoria === 'INGRESO') continue
     totals[t.categoria] = (totals[t.categoria] ?? 0) + t.monto
   }
 
   return Object.entries(totals)
+    .filter(([, value]) => value! > 0)
     .map(([cat, value]) => ({
       name: CATEGORIA_LABELS[cat as Categoria] ?? cat,
       value: value!,
@@ -51,7 +57,7 @@ function CustomTooltip({ active, payload }: TooltipProps) {
 }
 
 export default function SpendingChart({ transactions }: Props) {
-  const data = buildChartData(transactions)
+  const data = useMemo(() => buildChartData(transactions), [transactions])
 
   if (data.length === 0) {
     return (

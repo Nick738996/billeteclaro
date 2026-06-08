@@ -2,8 +2,7 @@ import { redirect } from 'next/navigation'
 import { format, parseISO, startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { createClient } from '@/lib/supabase/server'
-import type { Transaction, MonthlyStats, Categoria } from '@/lib/types'
-import { isIngreso } from '@/lib/types'
+import type { Transaction } from '@/lib/types'
 import DashboardClient from './DashboardClient'
 
 // Never cache — data changes after each sync and on month navigation
@@ -36,29 +35,6 @@ export default async function DashboardPage({ searchParams }: Props) {
 
   const txs: Transaction[] = transactions ?? []
 
-  const gastos = txs
-    .filter((t) => !isIngreso(t.tipo))
-    .reduce((s, t) => s + t.monto, 0)
-
-  const ingresos = txs
-    .filter((t) => isIngreso(t.tipo))
-    .reduce((s, t) => s + t.monto, 0)
-
-  const porCategoria = txs
-    .filter((t) => !isIngreso(t.tipo))
-    .reduce<Record<string, number>>((acc, t) => {
-      acc[t.categoria] = (acc[t.categoria] ?? 0) + t.monto
-      return acc
-    }, {})
-
-  const stats: MonthlyStats = {
-    gastos,
-    ingresos,
-    balance: ingresos - gastos,
-    transacciones: txs.length,
-    porCategoria: porCategoria as Record<Categoria, number>,
-  }
-
   const prevMonth = format(subMonths(ref, 1), 'yyyy-MM')
   const nextMonth = format(addMonths(ref, 1), 'yyyy-MM')
   const currentMonth = format(new Date(), 'yyyy-MM')
@@ -70,7 +46,6 @@ export default async function DashboardPage({ searchParams }: Props) {
     <DashboardClient
       user={{ name: user.user_metadata?.full_name ?? user.email ?? 'Usuario' }}
       transactions={txs}
-      stats={stats}
       monthLabel={monthLabel}
       currentMonth={monthParam}
       prevMonth={prevMonth}

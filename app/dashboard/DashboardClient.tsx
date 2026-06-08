@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { format, parseISO, startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -15,13 +15,12 @@ import SyncButton from '@/components/dashboard/SyncButton'
 interface Props {
   user: { name: string }
   transactions: Transaction[]
-  stats: MonthlyStats
   monthLabel: string
   currentMonth: string
   prevMonth: string
   nextMonth: string
   isCurrentMonth: boolean
-  /** Si se provee, la navegación filtra localmente sin tocar Supabase (modo demo) */
+  /** Pasa todas las transacciones para filtrado local sin Supabase (usado en /demo) */
   allTransactions?: Transaction[]
 }
 
@@ -46,7 +45,6 @@ function buildStats(txs: Transaction[]): MonthlyStats {
 export default function DashboardClient({
   user,
   transactions: initTxs,
-  stats: initStats,
   monthLabel: initLabel,
   currentMonth: initMonth,
   isCurrentMonth: initIsCurrent,
@@ -57,13 +55,14 @@ export default function DashboardClient({
   const today = format(new Date(), 'yyyy-MM')
   const demoMode = allTransactions !== undefined
 
-  // All display data lives in client state — never depends on server re-renders
   const [month, setMonth] = useState(initMonth)
   const [txs, setTxs] = useState(initTxs)
-  const [stats, setStats] = useState(initStats)
   const [label, setLabel] = useState(initLabel)
   const [isCurrent, setIsCurrent] = useState(initIsCurrent)
   const [loading, setLoading] = useState(false)
+
+  // Stats y gráfico son derivados de txs — nunca se dessincronizan
+  const stats = useMemo(() => buildStats(txs), [txs])
 
   const monthRef = parseISO(`${month}-01`)
   const prevMonth = format(subMonths(monthRef, 1), 'yyyy-MM')
@@ -78,12 +77,8 @@ export default function DashboardClient({
     let newTxs: Transaction[]
 
     if (demoMode) {
-      // Modo demo: filtra los datos estáticos localmente, sin tocar Supabase
       newTxs = (allTransactions ?? [])
-        .filter(t => {
-          const f = new Date(t.fecha)
-          return f >= start && f <= end
-        })
+        .filter(t => { const f = new Date(t.fecha); return f >= start && f <= end })
         .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
     } else {
       const { data } = await supabase
@@ -95,8 +90,8 @@ export default function DashboardClient({
       newTxs = (data ?? []) as Transaction[]
     }
 
+    // Solo actualizar txs — stats se recalcula automáticamente via useMemo
     setTxs(newTxs)
-    setStats(buildStats(newTxs))
     setLabel(format(r, 'MMMM yyyy', { locale: es }))
     setIsCurrent(m === today)
     setMonth(m)
