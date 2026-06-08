@@ -143,12 +143,11 @@ export const BANCO_LABELS: Record<Banco, string> = {
 }
 
 export function formatCOP(amount: number): string {
-  return new Intl.NumberFormat('es-CO', {
-    style: 'currency',
-    currency: 'COP',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
+  const formatted = new Intl.NumberFormat('es-CO', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(amount)
+  return `$${formatted}`
 }
 
 export function isIngreso(tipo: TipoTransaccion): boolean {
