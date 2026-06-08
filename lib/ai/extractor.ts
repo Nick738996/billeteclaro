@@ -1,11 +1,9 @@
-import Groq from 'groq-sdk'
+import { GoogleGenerativeAI } from '@google/generative-ai'
 import type { Banco, ExtractedTransaction } from '@/lib/types'
 
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY,
-})
+const genai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY ?? '')
 
-const MODEL = 'llama-3.3-70b-versatile'
+const MODEL = 'gemini-2.0-flash'
 
 const SYSTEM_PROMPT = `Eres un extractor de transacciones financieras colombianas.
 Analizas correos de notificación de bancos y fintechs de Colombia y extraes los datos de transacción.
@@ -18,9 +16,11 @@ export async function extractWithGroq(params: {
   body: string
   banco: Banco
 }): Promise<ExtractedTransaction | null> {
-  const snippet = params.body.slice(0, 600)
+  const snippet = params.body.slice(0, 800)
 
-  const userPrompt = `Extrae los datos de esta transacción bancaria colombiana.
+  const prompt = `${SYSTEM_PROMPT}
+
+Extrae los datos de esta transacción bancaria colombiana.
 
 CORREO:
 Remitente: ${params.from}
@@ -34,7 +34,7 @@ REGLAS:
 - monto: siempre positivo, en COP (pesos colombianos). "$45.000" o "$45,000" = 45000
 - Si hay monto en USD, ponlo en monto_usd y calcula el equivalente en COP si aparece
 - fecha: ISO 8601. Si no hay fecha específica, usa la del correo
-- comercio: nombre del establecimiento o persona (no el nombre del banco)
+- comercio: nombre real del establecimiento o persona (no el nombre del banco ni de Rappi)
 - Para transferencias, comercio = nombre del destinatario u origen
 
 BANCOS posibles: RAPPICARD (tarjeta crédito Rappi) | RAPPIPAY (cuenta débito Rappi)
@@ -42,7 +42,7 @@ TIPOS válidos: COMPRA | TRANSFERENCIA_ENVIADA | TRANSFERENCIA_RECIBIDA | PAGO_S
 
 CATEGORÍAS válidas: HOGAR | TRANSPORTE | SALIDAS | SALUD | SUSCRIPCIONES | COMPRAS_ONLINE | INVERSION | DONACIONES | EDUCACION | REEMBOLSABLE | TRANSFERENCIA | INGRESO | OTRO
 
-Responde con este JSON exacto (sin markdown):
+Responde con este JSON exacto:
 {
   "fecha": "ISO timestamp o null",
   "monto": number,
@@ -60,24 +60,20 @@ Responde con este JSON exacto (sin markdown):
 Si el correo NO contiene una transacción, responde: {"error": "not_a_transaction"}`
 
   try {
-    const response = await groq.chat.completions.create({
+    const model = genai.getGenerativeModel({
       model: MODEL,
-      max_tokens: 512,
-      temperature: 0.1,
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: userPrompt },
-      ],
+      generationConfig: {
+        temperature: 0.1,
+        maxOutputTokens: 512,
+        responseMimeType: 'application/json',
+      },
     })
 
-    const text = response.choices[0].message.content?.trim() ?? ''
-
-    // Strip markdown code blocks if present
-    const cleaned = text.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '')
-    const parsed = JSON.parse(cleaned)
+    const result = await model.generateContent(prompt)
+    const text = result.response.text().trim()
+    const parsed = JSON.parse(text)
 
     if (parsed.error === 'not_a_transaction') return null
-
     if (!parsed.monto || parsed.monto <= 0) return null
 
     return {
@@ -94,7 +90,7 @@ Si el correo NO contiene una transacción, responde: {"error": "not_a_transactio
       flags: Array.isArray(parsed.flags) ? parsed.flags : [],
     }
   } catch (err) {
-    console.error('Groq extraction error:', err)
+    console.error('Gemini extraction error:', err)
     return null
   }
 }
