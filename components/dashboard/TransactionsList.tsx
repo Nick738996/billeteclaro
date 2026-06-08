@@ -6,12 +6,18 @@ import { es } from 'date-fns/locale'
 import {
   type Transaction,
   type Categoria,
+  type Banco,
   CATEGORIA_LABELS,
   CATEGORIA_COLORS,
-  BANCO_LABELS,
   formatCOP,
   isIngreso,
 } from '@/lib/types'
+
+const BANCO_CHIP: Record<Banco, { label: string; bg: string; color: string }> = {
+  RAPPICARD: { label: 'Crédito', bg: '#fff7ed', color: '#ea580c' },
+  RAPPIPAY:  { label: 'Débito',  bg: '#f0fdfa', color: '#0d9488' },
+  OTRO:      { label: 'Otro',    bg: '#f8fafc', color: '#64748b' },
+}
 
 interface Props {
   transactions: Transaction[]
@@ -49,19 +55,28 @@ function TransactionRow({ t }: { t: Transaction }) {
         <p className="text-sm font-medium text-slate-800 truncate">
           {t.comercio ?? t.descripcion ?? 'Transacción'}
         </p>
-        <div className="flex items-center gap-1.5 mt-0.5">
+        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
           <span
             className="text-xs px-1.5 py-0.5 rounded-md font-medium"
             style={{ color, backgroundColor: `${color}18` }}
           >
             {CATEGORIA_LABELS[t.categoria]}
           </span>
+          {(() => {
+            const chip = BANCO_CHIP[t.banco]
+            return (
+              <span
+                className="text-xs px-1.5 py-0.5 rounded-md font-medium"
+                style={{ color: chip.color, backgroundColor: chip.bg }}
+              >
+                {chip.label}
+              </span>
+            )
+          })()}
           <span className="text-xs text-slate-400">·</span>
           <span className="text-xs text-slate-400">
             {formatDistanceToNow(date, { addSuffix: true, locale: es })}
           </span>
-          <span className="text-xs text-slate-400">·</span>
-          <span className="text-xs text-slate-400">{BANCO_LABELS[t.banco]}</span>
         </div>
       </div>
 
@@ -130,19 +145,26 @@ export default function TransactionsList({ transactions }: Props) {
 
       {/* Category filter chips */}
       <div className="flex gap-2 px-4 py-3 overflow-x-auto scrollbar-hide border-b border-slate-50">
-        {CATEGORY_FILTERS.map((f) => (
-          <button
-            key={f.key}
-            onClick={() => setActiveFilter(f.key as Categoria | 'TODOS')}
-            className={`flex-shrink-0 text-xs font-medium px-3 py-1.5 rounded-full transition-colors ${
-              activeFilter === f.key
-                ? 'bg-brand-500 text-white'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
+        {CATEGORY_FILTERS.map((f) => {
+          const isActive = activeFilter === f.key
+          const catColor = f.key !== 'TODOS' ? CATEGORIA_COLORS[f.key as Categoria] : null
+          return (
+            <button
+              key={f.key}
+              onClick={() => setActiveFilter(f.key as Categoria | 'TODOS')}
+              className="flex-shrink-0 text-xs font-medium px-3 py-1.5 rounded-full transition-colors"
+              style={catColor ? {
+                backgroundColor: isActive ? catColor : `${catColor}22`,
+                color: isActive ? '#fff' : catColor,
+              } : {
+                backgroundColor: isActive ? '#10b981' : '#f1f5f9',
+                color: isActive ? '#fff' : '#475569',
+              }}
+            >
+              {f.label}
+            </button>
+          )
+        })}
       </div>
 
       {/* Transaction rows */}

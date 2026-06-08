@@ -1,6 +1,7 @@
 'use client'
 
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
+import { useMemo } from 'react'
+import { PieChart, Pie, Cell, Tooltip } from 'recharts'
 import { CATEGORIA_COLORS, CATEGORIA_LABELS, formatCOP, type Categoria, type Transaction } from '@/lib/types'
 
 interface Props {
@@ -14,20 +15,25 @@ interface ChartEntry {
   categoria: Categoria
 }
 
+const TIPOS_GASTO = new Set(['COMPRA', 'PAGO_SERVICIO', 'RETIRO', 'TRANSFERENCIA_ENVIADA', 'ABONO_DEUDA'])
+
 function buildChartData(transactions: Transaction[]): ChartEntry[] {
   const totals: Partial<Record<Categoria, number>> = {}
 
   for (const t of transactions) {
-    // Only count expenses
-    if (t.tipo === 'INGRESO' || t.tipo === 'TRANSFERENCIA_RECIBIDA') continue
+    // Solo gastos reales — excluye ingresos y transferencias recibidas
+    if (!TIPOS_GASTO.has(t.tipo)) continue
+    // Excluye categorías que no son gastos de consumo
+    if (t.categoria === 'INGRESO') continue
     totals[t.categoria] = (totals[t.categoria] ?? 0) + t.monto
   }
 
   return Object.entries(totals)
+    .filter(([, value]) => value! > 0)
     .map(([cat, value]) => ({
-      name: CATEGORIA_LABELS[cat as Categoria],
+      name: CATEGORIA_LABELS[cat as Categoria] ?? cat,
       value: value!,
-      fill: CATEGORIA_COLORS[cat as Categoria],
+      fill: CATEGORIA_COLORS[cat as Categoria] ?? '#94a3b8',
       categoria: cat as Categoria,
     }))
     .sort((a, b) => b.value - a.value)
@@ -51,7 +57,7 @@ function CustomTooltip({ active, payload }: TooltipProps) {
 }
 
 export default function SpendingChart({ transactions }: Props) {
-  const data = buildChartData(transactions)
+  const data = useMemo(() => buildChartData(transactions), [transactions])
 
   if (data.length === 0) {
     return (
@@ -70,24 +76,23 @@ export default function SpendingChart({ transactions }: Props) {
 
       <div className="flex gap-4 items-center">
         <div className="w-36 h-36 flex-shrink-0">
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={data}
-                cx="50%"
-                cy="50%"
-                innerRadius={36}
-                outerRadius={62}
-                paddingAngle={2}
-                dataKey="value"
-              >
-                {data.map((entry) => (
-                  <Cell key={entry.categoria} fill={entry.fill} />
-                ))}
-              </Pie>
-              <Tooltip content={<CustomTooltip />} />
-            </PieChart>
-          </ResponsiveContainer>
+          <PieChart width={144} height={144}>
+            <Pie
+              data={data}
+              cx="50%"
+              cy="50%"
+              innerRadius={38}
+              outerRadius={64}
+              paddingAngle={2}
+              dataKey="value"
+              isAnimationActive={false}
+            >
+              {data.map((entry) => (
+                <Cell key={entry.categoria} fill={entry.fill} />
+              ))}
+            </Pie>
+            <Tooltip content={<CustomTooltip />} />
+          </PieChart>
         </div>
 
         <div className="flex-1 space-y-2 overflow-hidden">
