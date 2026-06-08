@@ -1,72 +1,33 @@
 'use client'
 
 import { useMemo } from 'react'
-import {
-  CATEGORIA_COLORS,
-  CATEGORIA_LABELS,
-  formatCOPCompact,
-  type Categoria,
-  type Transaction,
-} from '@/lib/types'
-
-// MEJORA ②: donut interactivo (toca un slice → filtra la lista)
-//           + barras proporcionales con % en la leyenda
-// Antes: PieChart 144×144 de Recharts, leyenda solo dot+nombre+monto
-// Después: SVG propio 168×168, slices clickeables, barras proporcionales
+import { PieChart, Pie, Cell, Tooltip } from 'recharts'
+import { CATEGORIA_COLORS, CATEGORIA_LABELS, formatCOP, type Categoria, type Transaction } from '@/lib/types'
 
 interface Props {
   transactions: Transaction[]
-  activeFilter: string
-  onFilterChange: (key: string) => void
 }
-
-// ── SVG helpers ─────────────────────────────────────────────────────────────
-
-function polar(cx: number, cy: number, r: number, deg: number): [number, number] {
-  const rad = ((deg - 90) * Math.PI) / 180
-  return [cx + r * Math.cos(rad), cy + r * Math.sin(rad)]
-}
-
-function donutArc(
-  cx: number, cy: number,
-  oR: number, iR: number,
-  a0: number, a1: number,
-): string {
-  if (a1 - a0 >= 360) a1 = a0 + 359.99
-  const [x0, y0] = polar(cx, cy, oR, a0)
-  const [x1, y1] = polar(cx, cy, oR, a1)
-  const [x2, y2] = polar(cx, cy, iR, a1)
-  const [x3, y3] = polar(cx, cy, iR, a0)
-  const lg = a1 - a0 > 180 ? 1 : 0
-  const f = (v: number) => v.toFixed(2)
-  return `M${f(x0)},${f(y0)} A${oR},${oR} 0 ${lg},1 ${f(x1)},${f(y1)} L${f(x2)},${f(y2)} A${iR},${iR} 0 ${lg},0 ${f(x3)},${f(y3)} Z`
-}
-
-// ── Chart data builder (same logic as original) ──────────────────────────────
-
-const TIPOS_GASTO = new Set([
-  'COMPRA', 'PAGO_SERVICIO', 'RETIRO', 'TRANSFERENCIA_ENVIADA', 'ABONO_DEUDA',
-])
 
 interface ChartEntry {
   name: string
   value: number
   fill: string
   categoria: Categoria
-  a0: number
-  a1: number
-  pct: number
 }
+
+const TIPOS_GASTO = new Set(['COMPRA', 'PAGO_SERVICIO', 'RETIRO', 'TRANSFERENCIA_ENVIADA', 'ABONO_DEUDA'])
 
 function buildChartData(transactions: Transaction[]): ChartEntry[] {
   const totals: Partial<Record<Categoria, number>> = {}
+
   for (const t of transactions) {
     if (!TIPOS_GASTO.has(t.tipo)) continue
     if (t.categoria === 'INGRESO') continue
     totals[t.categoria] = (totals[t.categoria] ?? 0) + t.monto
   }
-  const sorted = Object.entries(totals)
-    .filter(([, v]) => (v ?? 0) > 0)
+
+  return Object.entries(totals)
+    .filter(([, value]) => value! > 0)
     .map(([cat, value]) => ({
       name: CATEGORIA_LABELS[cat as Categoria] ?? cat,
       value: value!,
@@ -75,27 +36,33 @@ function buildChartData(transactions: Transaction[]): ChartEntry[] {
     }))
     .sort((a, b) => b.value - a.value)
     .slice(0, 8)
-
-  const total = sorted.reduce((s, d) => s + d.value, 0)
-  let ang = 0
-  return sorted.map(d => {
-    const pct = total > 0 ? d.value / total : 0
-    const a0 = ang
-    const a1 = ang + pct * 360
-    ang = a1
-    return { ...d, a0, a1, pct } as ChartEntry
-  })
 }
 
-// ── Component ────────────────────────────────────────────────────────────────
+interface TooltipProps {
+  active?: boolean
+  payload?: Array<{ payload: ChartEntry }>
+}
 
-export default function SpendingChart({ transactions, activeFilter, onFilterChange }: Props) {
+function CustomTooltip({ active, payload }: TooltipProps) {
+  if (!active || !payload?.length) return null
+  const entry = payload[0].payload
+  return (
+    <div
+      className="rounded-[var(--radius-md)] px-3 py-2"
+      style={{
+        background: 'var(--surface-2)',
+        border: '1px solid var(--border)',
+        fontSize: 'var(--text-sm)',
+      }}
+    >
+      <p className="font-medium" style={{ color: 'var(--text)' }}>{entry.name}</p>
+      <p style={{ color: 'var(--text-muted)' }}>{formatCOP(entry.value)}</p>
+    </div>
+  )
+}
+
+export default function SpendingChart({ transactions }: Props) {
   const data = useMemo(() => buildChartData(transactions), [transactions])
-  const total = data.reduce((s, d) => s + d.value, 0)
-  const S = 168, cx = S / 2, cy = S / 2, oR = 70, iR = 46
-
-  const catActive = activeFilter !== 'TODOS' && !activeFilter.startsWith('BANCO:')
-  const selEntry  = catActive ? data.find(d => d.categoria === (activeFilter as Categoria)) : null
 
   if (data.length === 0) {
     return (
@@ -103,7 +70,10 @@ export default function SpendingChart({ transactions, activeFilter, onFilterChan
         className="rounded-[var(--radius-lg)] p-6"
         style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
       >
-        <h2 className="font-medium mb-4" style={{ fontSize: 'var(--text-sm)', color: 'var(--text)' }}>
+        <h2
+          className="font-medium mb-4"
+          style={{ fontSize: 'var(--text-sm)', color: 'var(--text)' }}
+        >
           Gastos por categoría
         </h2>
         <p className="text-center py-6" style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>
@@ -118,92 +88,53 @@ export default function SpendingChart({ transactions, activeFilter, onFilterChan
       className="rounded-[var(--radius-lg)] p-4"
       style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
     >
-      <h2 className="font-medium mb-4" style={{ fontSize: 'var(--text-sm)', color: 'var(--text)' }}>
+      <h2
+        className="font-medium mb-3"
+        style={{ fontSize: 'var(--text-sm)', color: 'var(--text)' }}
+      >
         Gastos por categoría
       </h2>
 
       <div className="flex gap-4 items-center">
-
-        {/* Donut interactivo */}
-        <div className="flex-shrink-0 relative" style={{ width: S, height: S }}>
-          <svg width={S} height={S} viewBox={`0 0 ${S} ${S}`}>
-            {data.map((sl, i) => {
-              const isSel    = catActive && sl.categoria === (activeFilter as Categoria)
-              const isDimmed = catActive && sl.categoria !== (activeFilter as Categoria)
-              return (
-                <path
-                  key={i}
-                  d={donutArc(cx, cy, isSel ? oR + 7 : oR, iR, sl.a0, sl.a1)}
-                  fill={sl.fill}
-                  stroke="#0A0A0A"
-                  strokeWidth="2.5"
-                  opacity={isDimmed ? 0.28 : 1}
-                  className="cursor-pointer transition-opacity duration-150"
-                  onClick={() => onFilterChange(
-                    sl.categoria === activeFilter ? 'TODOS' : sl.categoria
-                  )}
-                />
-              )
-            })}
-          </svg>
-
-          {/* Centro: total o categoría seleccionada. Toca para limpiar filtro. */}
-          <div
-            className="absolute inset-0 flex flex-col items-center justify-center"
-            style={{ gap: 2, cursor: catActive ? 'pointer' : 'default' }}
-            onClick={() => catActive && onFilterChange('TODOS')}
-          >
-            <span style={{ fontSize: 9, color: 'var(--text-muted)', letterSpacing: '0.07em', textTransform: 'uppercase' }}>
-              {selEntry ? selEntry.name : 'total'}
-            </span>
-            <span
-              className="tabular-nums font-bold"
-              style={{ fontSize: 16, color: selEntry ? selEntry.fill : 'var(--text)' }}
+        <div className="w-36 h-36 flex-shrink-0">
+          <PieChart width={144} height={144}>
+            <Pie
+              data={data}
+              cx="50%"
+              cy="50%"
+              innerRadius={38}
+              outerRadius={64}
+              paddingAngle={2}
+              dataKey="value"
+              isAnimationActive={false}
             >
-              {selEntry ? formatCOPCompact(selEntry.value) : formatCOPCompact(total)}
-            </span>
-            {catActive && (
-              <span style={{ fontSize: 9, color: 'var(--text-subtle)', marginTop: 2 }}>
-                toca para limpiar
-              </span>
-            )}
-          </div>
+              {data.map((entry) => (
+                <Cell key={entry.categoria} fill={entry.fill} />
+              ))}
+            </Pie>
+            <Tooltip content={<CustomTooltip />} />
+          </PieChart>
         </div>
 
-        {/* Leyenda con barras proporcionales */}
-        <div className="flex-1 flex flex-col gap-2.5 overflow-hidden">
-          {data.map((entry, i) => (
-            <div
-              key={i}
-              className="cursor-pointer"
-              onClick={() => onFilterChange(
-                entry.categoria === activeFilter ? 'TODOS' : entry.categoria
-              )}
-            >
-              <div className="flex items-center justify-between mb-1">
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <div
-                    className="w-2 h-2 rounded-full flex-shrink-0"
-                    style={{ backgroundColor: entry.fill }}
-                  />
-                  <span className="truncate" style={{ fontSize: 'var(--text-xs)', color: 'var(--text)' }}>
-                    {entry.name}
-                  </span>
-                </div>
-                <span
-                  className="tabular-nums flex-shrink-0 ml-2"
-                  style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}
-                >
-                  {Math.round(entry.pct * 100)}%
-                </span>
-              </div>
-              {/* Barra proporcional */}
-              <div className="rounded-full" style={{ height: 3, background: 'var(--border)' }}>
-                <div
-                  className="h-full rounded-full"
-                  style={{ width: `${entry.pct * 100}%`, background: entry.fill }}
-                />
-              </div>
+        <div className="flex-1 space-y-2.5 overflow-hidden">
+          {data.map((entry) => (
+            <div key={entry.categoria} className="flex items-center gap-2">
+              <div
+                className="w-2 h-2 rounded-full flex-shrink-0"
+                style={{ backgroundColor: entry.fill }}
+              />
+              <span
+                className="truncate flex-1"
+                style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}
+              >
+                {entry.name}
+              </span>
+              <span
+                className="font-medium tabular-nums flex-shrink-0"
+                style={{ fontSize: 'var(--text-xs)', color: 'var(--text)' }}
+              >
+                {formatCOP(entry.value)}
+              </span>
             </div>
           ))}
         </div>

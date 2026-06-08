@@ -53,7 +53,7 @@ npx tsc --noEmit   # type check (no hay test runner configurado aún)
 | Auth | Supabase Auth + Google OAuth |
 | Email | Gmail API v1 (`gmail.readonly`) |
 | IA / extracción | Gemini API — modelo `gemini-2.0-flash-lite` |
-| UI | Tailwind CSS + CSS variables (Recharts eliminado — donut SVG propio) |
+| UI | Tailwind CSS + CSS variables + Recharts (PieChart) |
 | Iconos | lucide-react |
 | Temas | next-themes (`data-theme` attribute, defaultTheme: "dark") |
 | Fuente | Inter via `next/font/google` (variable `--font-inter`) |
@@ -191,13 +191,10 @@ Login solicita scopes `email profile gmail.readonly` con `access_type: offline` 
 
 ### Componentes UI (`components/dashboard/`)
 
-- **`StatsCards`** — Balance como hero card full-width (número grande, badge "positivo"/"negativo") + Gastos/Ingresos en fila secundaria de 2 columnas
-- **`SpendingChart`** — donut SVG propio (sin Recharts), slices y leyenda clickeables → filtra `TransactionsList` via `activeFilter` compartido en `DashboardClient`. Barras proporcionales con % en leyenda. Top 8 categorías de gasto
+- **`StatsCards`** — 3 cards: Gastos (rojo), Ingresos (verde), Balance
+- **`SpendingChart`** — donut chart con leyenda (Recharts). Solo gastos reales, top 8 categorías
 - **`SyncButton`** — estados: idle / syncing / done / error. Botón de reset separado con confirmación de 4s
-- **`TransactionsList`** — buscador + 3 chips fijos (Todos / RappiCard / RappiPay) + bottom sheet de categorías (`▾`) + barra de resumen + lista agrupada por fecha. `activeFilter` recibido como prop desde `DashboardClient`
-
-### Estado compartido: `activeFilter`
-`DashboardClient` gestiona `useState<string>('TODOS')` y lo pasa a `SpendingChart` y `TransactionsList`. Tocar un slice del donut o un chip de categoría actualiza ambos componentes. Se resetea a `'TODOS'` al cambiar de mes.
+- **`TransactionsList`** — buscador minimalista + carrusel de filtros (16 chips) + barra de resumen con totales por filtro + lista agrupada por fecha con separadores finos
 
 ### Lógica de display en TransactionsList
 
