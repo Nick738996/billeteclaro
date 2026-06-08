@@ -21,9 +21,7 @@ function buildChartData(transactions: Transaction[]): ChartEntry[] {
   const totals: Partial<Record<Categoria, number>> = {}
 
   for (const t of transactions) {
-    // Solo gastos reales — excluye ingresos y transferencias recibidas
     if (!TIPOS_GASTO.has(t.tipo)) continue
-    // Excluye categorías que no son gastos de consumo
     if (t.categoria === 'INGRESO') continue
     totals[t.categoria] = (totals[t.categoria] ?? 0) + t.monto
   }
@@ -33,7 +31,7 @@ function buildChartData(transactions: Transaction[]): ChartEntry[] {
     .map(([cat, value]) => ({
       name: CATEGORIA_LABELS[cat as Categoria] ?? cat,
       value: value!,
-      fill: CATEGORIA_COLORS[cat as Categoria] ?? '#94a3b8',
+      fill: CATEGORIA_COLORS[cat as Categoria] ?? '#606060',
       categoria: cat as Categoria,
     }))
     .sort((a, b) => b.value - a.value)
@@ -49,9 +47,16 @@ function CustomTooltip({ active, payload }: TooltipProps) {
   if (!active || !payload?.length) return null
   const entry = payload[0].payload
   return (
-    <div className="bg-white border border-slate-200 rounded-xl px-3 py-2 shadow-lg text-sm">
-      <p className="font-medium text-slate-800">{entry.name}</p>
-      <p className="text-slate-600">{formatCOP(entry.value)}</p>
+    <div
+      className="rounded-[var(--radius-md)] px-3 py-2"
+      style={{
+        background: 'var(--surface-2)',
+        border: '1px solid var(--border)',
+        fontSize: 'var(--text-sm)',
+      }}
+    >
+      <p className="font-medium" style={{ color: 'var(--text)' }}>{entry.name}</p>
+      <p style={{ color: 'var(--text-muted)' }}>{formatCOP(entry.value)}</p>
     </div>
   )
 }
@@ -61,9 +66,17 @@ export default function SpendingChart({ transactions }: Props) {
 
   if (data.length === 0) {
     return (
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-        <h2 className="text-sm font-semibold text-slate-700 mb-4">Gastos por categoría</h2>
-        <p className="text-slate-400 text-sm text-center py-6">
+      <div
+        className="rounded-[var(--radius-lg)] p-6"
+        style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
+      >
+        <h2
+          className="font-medium mb-4"
+          style={{ fontSize: 'var(--text-sm)', color: 'var(--text)' }}
+        >
+          Gastos por categoría
+        </h2>
+        <p className="text-center py-6" style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>
           Sin datos este mes. Sincroniza para ver tus gastos.
         </p>
       </div>
@@ -71,8 +84,16 @@ export default function SpendingChart({ transactions }: Props) {
   }
 
   return (
-    <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
-      <h2 className="text-sm font-semibold text-slate-700 mb-3">Gastos por categoría</h2>
+    <div
+      className="rounded-[var(--radius-lg)] p-4"
+      style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
+    >
+      <h2
+        className="font-medium mb-3"
+        style={{ fontSize: 'var(--text-sm)', color: 'var(--text)' }}
+      >
+        Gastos por categoría
+      </h2>
 
       <div className="flex gap-4 items-center">
         <div className="w-36 h-36 flex-shrink-0">
@@ -95,15 +116,23 @@ export default function SpendingChart({ transactions }: Props) {
           </PieChart>
         </div>
 
-        <div className="flex-1 space-y-2 overflow-hidden">
+        <div className="flex-1 space-y-2.5 overflow-hidden">
           {data.map((entry) => (
             <div key={entry.categoria} className="flex items-center gap-2">
               <div
-                className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                className="w-2 h-2 rounded-full flex-shrink-0"
                 style={{ backgroundColor: entry.fill }}
               />
-              <span className="text-xs text-slate-600 truncate flex-1">{entry.name}</span>
-              <span className="text-xs font-medium text-slate-800 tabular-nums flex-shrink-0">
+              <span
+                className="truncate flex-1"
+                style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}
+              >
+                {entry.name}
+              </span>
+              <span
+                className="font-medium tabular-nums flex-shrink-0"
+                style={{ fontSize: 'var(--text-xs)', color: 'var(--text)' }}
+              >
                 {formatCOP(entry.value)}
               </span>
             </div>

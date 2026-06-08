@@ -12,7 +12,8 @@
 
 ## Estado de las etapas
 
-- [x] **Etapa 1 — Recolección de datos** ← en curso, casi completa
+- [x] **Etapa 1 — Recolección de datos** ← completa (pendientes menores de UX)
+- [x] **UI/UX base** ← completa (dark/light mode, sistema de diseño)
 - [ ] **Etapa 2 — Categorización** (pendiente confirmación)
 - [ ] **Etapa 3 — Asesor financiero IA** (pendiente confirmación)
 
@@ -21,7 +22,7 @@
 | Criterio | Estado |
 |---|---|
 | Todos los correos Rappi en Supabase sin duplicados | ✅ dedup por `gmail_message_id UNIQUE` |
-| Uber sin doble cobro | ✅ `deduplicateUber()` en sync route |
+| Uber sin doble cobro | ✅ `deduplicateUber()` — pre-auths guardados en `sync_log.skipped_ids` |
 | Datos persisten al cambiar sesión y mes | ✅ Supabase, no localStorage |
 | Cada transacción tiene ID único MMDD-NN | ✅ `generateAuditId()` |
 | Nombre del comercio es legible | ✅ `toTitleCase()` en parsers y en UI |
@@ -41,8 +42,6 @@ npm run setup      # aplica schema.sql a Supabase + valida env vars
 npx tsc --noEmit   # type check (no hay test runner configurado aún)
 ```
 
-El setup script (`scripts/setup.mjs`) valida `.env.local`, conecta vía `DATABASE_URL` al Supabase Pooler y ejecuta `supabase/schema.sql`. Requiere todas las variables de `REQUIRED` para continuar; `GOOGLE_CLIENT_ID/SECRET` son opcionales (solo advierten).
-
 ---
 
 ## Stack
@@ -54,8 +53,52 @@ El setup script (`scripts/setup.mjs`) valida `.env.local`, conecta vía `DATABAS
 | Auth | Supabase Auth + Google OAuth |
 | Email | Gmail API v1 (`gmail.readonly`) |
 | IA / extracción | Gemini API — modelo `gemini-2.0-flash-lite` |
-| UI | Tailwind CSS + Recharts (PieChart) |
+| UI | Tailwind CSS + CSS variables + Recharts (PieChart) |
+| Iconos | lucide-react |
+| Temas | next-themes (`data-theme` attribute, defaultTheme: "dark") |
+| Fuente | Inter via `next/font/google` (variable `--font-inter`) |
 | PWA | @ducanh2912/next-pwa (deshabilitado en dev) |
+
+---
+
+## Sistema de diseño (`styles/tokens.css`)
+
+CSS variables para dark (default) y light. Importado en `globals.css` antes de Tailwind.
+
+**Modo oscuro (`:root`):**
+- `--bg #0A0A0A` / `--surface #1C1C1C` / `--surface-2 #242424`
+- `--border #2E2E2E` / `--border-soft #222222`
+- `--text #FFFFFF` / `--text-muted #888888` / `--text-subtle #444444`
+- `--green #4ADE80` / `--red #FF6B6B` / `--yellow #FCD34D` / `--blue #60A5FA` / `--purple #A78BFA`
+- Cada color tiene su `*-soft` (~18% opacidad) para fondos de badges
+
+**Modo claro (`[data-theme="light"]`):**
+- `--bg #FFFFFF` / `--surface #F8F8F8` / `--surface-2 #F0F0F0`
+- `--border #E8E8E8`
+- `--green #16A34A` / `--red #DC2626`
+
+**Tipografía:** variables `--text-xs` (11px) a `--text-3xl` (30px)
+**Radio:** `--radius-sm` (6px) a `--radius-xl` (20px)
+
+**Regla de diseño:** sin sombras (`box-shadow: none`), sin gradientes. Solo bordes `var(--border)`.
+
+### ThemeToggle (`components/ui/ThemeToggle.tsx`)
+Pill 72×32px con círculo deslizante. Sol (izquierda = light) / Luna (derecha = dark). Visible en header de `/dashboard` y en `/` (esquina superior derecha). Persiste en `localStorage` key `billeteclaro-theme`. Sin flash gracias a `suppressHydrationWarning` en `<html>`.
+
+### Colores semánticos por categoría (UI)
+```
+TRANSPORTE    → --blue   / --blue-soft
+SALIDAS       → --red    / --red-soft
+HOGAR         → --green  / --green-soft
+SALUD         → --green  / --green-soft
+SUSCRIPCIONES → --purple / --purple-soft
+COMPRAS_ONLINE→ --yellow / --yellow-soft
+INVERSION     → --purple / --purple-soft
+DONACIONES    → --blue   / --blue-soft
+EDUCACION     → --yellow / --yellow-soft
+INGRESO       → --green  / --green-soft
+OTRO          → --text-muted / --surface-2
+```
 
 ---
 
@@ -65,25 +108,31 @@ El flujo completo vive en `app/api/sync/route.ts` (POST):
 
 ```
 Gmail OAuth refresh → listBankMessageIds() → filtrar ya procesados
-→ por cada email nuevo:
+  (processedIds incluye gmail_message_ids de transactions + skipped_ids de sync_log)
+→ FASE 1: por cada email nuevo:
     trySpecificParser(banco, email)  ← rápido, sin costo
-    └─ null → extractWithGroq()      ← fallback IA, concurrencia=3
-→ deduplicateUber()                  ← descartar pre-autorizaciones
-→ upsert en transactions (dedup por gmail_message_id UNIQUE)
-→ actualizar sync_log
+    └─ null → extractWithGroq()      ← fallback Gemini, concurrencia=3
+→ FASE 2: deduplicateUber() sobre TODAS las transacciones
+    → pre-auths de Uber → guardados en sync_log.skipped_ids (no en transactions)
+→ FASE 3: upsert en transactions
+→ console.log resumen: "X emails — Y parser | Z Gemini | W omitidos | ..."
+→ actualizar sync_log (con skipped_ids)
 ```
 
-**Deduplicación:** constraint `UNIQUE(user_id, gmail_message_id)` en la BD. El upsert usa `ignoreDuplicates: true`. Re-sincronizar es seguro.
+**Deduplicación de emails:** constraint `UNIQUE(user_id, gmail_message_id)`. Upsert con `ignoreDuplicates: true`. Re-sincronizar es seguro.
 
-**Límites:** máx 2000 emails por sync, búsqueda desde `2026/05/01` (fecha fija), paginación hasta 2000 mensajes.
+**Deduplicación Uber:** si 2 Uber en el mismo sync con diferencia < 2h y montos < 20% de diferencia → la más temprana es pre-autorización. Su ID se guarda en `sync_log.skipped_ids`, nunca entra en `transactions`. El próximo sync lo excluye automáticamente.
 
-**Uber dedup:** si 2 transacciones de Uber en mismo batch con diferencia de tiempo < 2h y montos < 20% de diferencia, se descarta la más temprana (pre-autorización).
+**Logging de sync:** el servidor imprime cuántos emails procesó cada fuente:
+```
+[sync] 143 emails — 140 parser | 3 Gemini | 2 omitidos | 1 Uber preauth | 0 errores
+```
+
+**Límites:** máx 2000 emails por sync, búsqueda desde `after:2026/05/01` (fecha fija).
 
 ---
 
 ## Detección de bancos (`lib/gmail/client.ts`)
-
-El banco se detecta por el header `From` del email **antes** de parsear:
 
 | Email sender | Banco |
 |---|---|
@@ -95,81 +144,64 @@ El banco se detecta por el header `From` del email **antes** de parsear:
 
 ## Parsers específicos (`lib/parsers/`)
 
-Dos bancos Rappi tienen parsers de regex (sin costo de IA):
+- `rappicard.ts` — `parsePurchase` (tipo=`COMPRA`) + `parsePayment` (tipo=`ABONO_DEUDA`)
+- `rappipay.ts` — `parseTransferenciaRecibida`, `parseTransferenciaEnviada`, `parseIngresoBancario`, `parsePagoServicio`, `parseRentabilidad`
+- `commerceCategories.ts` — `guessCategoria(comercio)`: 120+ patrones de comercios colombianos. SALIDAS antes de TRANSPORTE para que "rappi" no matchee TRANSPORTE.
 
-- `rappicard.ts` — dos tipos:
-  - `parsePurchase`: extrae `Monto $X`, `Comercio`, fecha ISO. tipo=`COMPRA`
-  - `parsePayment`: extrae monto sin $, fecha `DD mmm YYYY HH:MM`. tipo=`ABONO_DEUDA`
-- `rappipay.ts` — cinco tipos:
-  - `parseTransferenciaRecibida`: `Monto recibido $X` + `tu RappiCuenta`. tipo=`TRANSFERENCIA_RECIBIDA`
-  - `parseTransferenciaEnviada`: `Monto transferido $X` + `Llave destino @handle`. tipo=`TRANSFERENCIA_ENVIADA`
-  - `parseIngresoBancario`: subject contiene "transferencia bancaria". tipo=`INGRESO`
-  - `parsePagoServicio`: `Convenio [name]`, `Pago total $X`. tipo=`PAGO_SERVICIO`
-  - `parseRentabilidad`: `Rentabilidad de [Mes] $X`. tipo=`INGRESO`, subcategoria=`rendimiento`
+`trySpecificParser(banco, email)` devuelve `null` si el banco no tiene parser → señal para Gemini.
 
-`lib/parsers/index.ts` exporta `trySpecificParser(banco, email)` que devuelve `null` si el banco no tiene parser — señal para usar Groq.
-
-**Para agregar un banco nuevo:** crear `lib/parsers/mibanaco.ts` que exporte una función `(email: EmailInput) => ParseResult`, registrarla en `lib/parsers/index.ts`, y agregar el sender en `BANK_SENDERS` en `lib/gmail/client.ts`.
-
-### Utilidades de parsers (`lib/parsers/utils.ts`)
-
-- `parseCOPAmount(raw)` — maneja `$45.000`, `$45,000`, `400.000,00`
-- `parseSpanishDate(dateStr, timeStr?)` — parsea `"02 de mayo de 2026"` + `"03:18 pm"`
-- `parseISOLikeDate(s)` — parsea `"2026-06-07 12:25:21"`
-- `toTitleCase(str)` — convierte ALL_CAPS → Title Case, respeta mixed-case y @handles
+**Para agregar un banco nuevo:** crear `lib/parsers/mibanaco.ts`, registrar en `lib/parsers/index.ts`, agregar sender en `BANK_SENDERS` en `lib/gmail/client.ts`.
 
 ---
 
 ## Extractor IA (`lib/ai/extractor.ts`)
 
-Recibe `{from, subject, date, body, banco}`, manda los primeros 600 chars del body a Groq con `temperature: 0.1`, espera JSON con campos `{fecha, monto, comercio, descripcion, tipo, categoria, ...}`. Si Groq devuelve `{"error": "not_a_transaction"}`, la función retorna `null` y el email se ignora.
-
-El prompt está en español colombiano y tiene reglas explícitas para el formato COP (`$45.000` = 45000).
+Función `extractWithGroq` (nombre histórico, usa Gemini internamente). Recibe `{from, subject, date, body, banco}`, manda 800 chars del body a `gemini-2.0-flash-lite` con `responseMimeType: 'application/json'` y `temperature: 0.1`. Retorna `null` si Gemini responde `{"error": "not_a_transaction"}` o si `monto <= 0`.
 
 ---
 
 ## Base de datos — puntos clave
 
-- Todos los valores enumerados (`banco`, `tipo`, `categoria`) tienen CHECK constraints en la BD **y** tipos TypeScript en `lib/types.ts`. Si se agrega un valor nuevo hay que actualizar ambos + crear una migración en `supabase/migrations/`.
-- `user_tokens` guarda el `gmail_refresh_token` obtenido en el OAuth callback. El `provider_refresh_token` de Supabase solo está disponible justo después del login — se persiste en el callback (`app/api/auth/callback/route.ts`) usando el admin client.
-- Todas las tablas tienen RLS habilitado con política `auth.uid() = user_id`.
-- `id_auditoria` formato `MMDD-NN` se genera en `generateAuditId()` dentro del sync route contando transacciones del mismo día.
+- `sync_log` tiene columna `skipped_ids text[] DEFAULT '{}'` (migración manual aplicada). Guarda IDs de Gmail ignorados (Uber pre-auths) para que el siguiente sync no los reprocese.
+- Todos los enums (`banco`, `tipo`, `categoria`) tienen CHECK constraints en BD **y** tipos TypeScript en `lib/types.ts`. Cambios requieren migración en `supabase/migrations/`.
+- `user_tokens` guarda `gmail_refresh_token`. El `provider_refresh_token` de Supabase solo está disponible justo después del login — se persiste en el callback usando el admin client.
+- RLS habilitado en todas las tablas con política `auth.uid() = user_id`.
+- `id_auditoria` formato `MMDD-NN` — puede tener gaps si se borra y re-sincroniza.
 
 ---
 
 ## Auth y tokens Gmail
 
-El login (`app/page.tsx`) solicita scopes: `email profile https://www.googleapis.com/auth/gmail.readonly` con `access_type: offline` y `prompt: consent` para garantizar refresh token.
-
-El callback (`app/api/auth/callback/route.ts`) persiste `session.provider_refresh_token` en `user_tokens`. Durante el sync, el token se refresca con `google.auth.OAuth2` usando `GOOGLE_CLIENT_ID` y `GOOGLE_CLIENT_SECRET`.
-
-El middleware protege `/dashboard/**` y redirige `/` si ya hay sesión.
+Login solicita scopes `email profile gmail.readonly` con `access_type: offline` y `prompt: consent`. El middleware protege `/dashboard/**` y redirige `/` si ya hay sesión.
 
 ---
 
 ## Clientes Supabase
 
-- `lib/supabase/client.ts` — browser client (`createBrowserClient`), usado en componentes `'use client'`
-- `lib/supabase/server.ts` — server client (`createServerClient` con cookies, **async** en Next.js 16) + `createAdminClient()` con service role para operaciones que bypasean RLS (sync, callback)
+- `lib/supabase/client.ts` — browser client, usado en `'use client'`
+- `lib/supabase/server.ts` — server client (async, cookies) + `createAdminClient()` con service role
 
 ---
 
 ## Dashboard
 
-`app/dashboard/page.tsx` es un Server Component que fetcha transacciones del mes y calcula stats. Pasa todo a `app/dashboard/DashboardClient.tsx` (Client Component) que maneja navegación por mes, logout y refresco post-sync.
+`app/dashboard/page.tsx` — Server Component, fetcha transacciones del mes, pasa a `DashboardClient.tsx`.
 
-Los componentes de UI (`components/dashboard/`) son todos Client Components porque usan estado o Recharts.
+`app/dashboard/DashboardClient.tsx` — Client Component. Maneja navegación de mes, logout, refresco post-sync. `buildStats()` deriva gastos/ingresos/balance con `useMemo`.
 
-`app/demo/page.tsx` es una página pública (sin auth) con 12 transacciones hardcodeadas para mostrar el dashboard sin configuración.
+### Componentes UI (`components/dashboard/`)
+
+- **`StatsCards`** — 3 cards: Gastos (rojo), Ingresos (verde), Balance
+- **`SpendingChart`** — donut chart con leyenda (Recharts). Solo gastos reales, top 8 categorías
+- **`SyncButton`** — estados: idle / syncing / done / error. Botón de reset separado con confirmación de 4s
+- **`TransactionsList`** — buscador minimalista + carrusel de filtros (16 chips) + barra de resumen con totales por filtro + lista agrupada por fecha con separadores finos
 
 ### Lógica de display en TransactionsList
 
-`getDisplayName(t)` genera nombre contextual según `tipo`:
-- `TRANSFERENCIA_ENVIADA` → `"Transferencia a @handle"`
-- `TRANSFERENCIA_RECIBIDA` → `"Transferencia de Bancolombia"`
-- `ABONO_DEUDA` → `"Pago a RappiCard"`
-- `PAGO_SERVICIO` → `"Pago Enel"`
-- Default → `toTitleCase(comercio)` (corrige ALL_CAPS de datos históricos en DB)
+- `getDisplayName(t)` — nombres contextuales según `tipo`
+- `efectivoBanco(t)` — `ABONO_DEUDA` mapea a RAPPIPAY (el pago sale de la RappiCuenta)
+- `groupByDate(txs)` — agrupa por `"d de MMMM"` para los headers de fecha
+- Barra de resumen muestra total gastos y/o ingresos del filtro activo
 
 ---
 
@@ -186,11 +218,10 @@ type Categoria = 'HOGAR' | 'TRANSPORTE' | 'SALIDAS' | 'SALUD' | 'SUSCRIPCIONES'
 type Banco = 'RAPPICARD' | 'RAPPIPAY' | 'OTRO'
 ```
 
-Funciones de formato:
-- `formatCOP(amount)` — sin decimales: `$45.000`
-- `formatCOPCompact(amount)` — abreviado: `$1.2M`, `$450K`
-- `isIngreso(tipo)` — true para INGRESO y TRANSFERENCIA_RECIBIDA
-- `isGasto(tipo)` — true para todo excepto ingresos y ABONO_DEUDA
+- `formatCOP(amount)` → `$45.000`
+- `formatCOPCompact(amount)` → `$1.2M` / `$450K`
+- `isIngreso(tipo)` → true para INGRESO y TRANSFERENCIA_RECIBIDA
+- `isGasto(tipo)` → true para todo excepto ingresos y ABONO_DEUDA
 
 ---
 
@@ -200,8 +231,8 @@ Funciones de formato:
 NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY
 SUPABASE_SERVICE_ROLE_KEY
-DATABASE_URL          # Supabase Session Pooler: postgresql://postgres.REF:PASS@aws-1-us-east-1.pooler.supabase.com:5432/postgres
-GOOGLE_CLIENT_ID      # Google Cloud Console — OAuth 2.0
+DATABASE_URL          # Supabase Session Pooler
+GOOGLE_CLIENT_ID
 GOOGLE_CLIENT_SECRET
 GEMINI_API_KEY        # aistudio.google.com — gratis, gemini-2.0-flash-lite
 NEXT_PUBLIC_APP_URL
@@ -220,7 +251,6 @@ feature/<nombre>   ← una rama por mejora, PR a main
 - Nunca hacer commit ni push automáticamente
 - Siempre trabajar en ramas `feature/<nombre>`, nunca directo en `main`
 - Al terminar un bloque de cambios coherente, avisar: *"Buen momento para commit en `feature/xxx` — ¿lo hacemos?"*
-- El merge a `main` y el push los decide el usuario
 
 ---
 
@@ -228,46 +258,46 @@ feature/<nombre>   ← una rama por mejora, PR a main
 
 | Decisión | Razón |
 |---|---|
-| Gemini 2.0 Flash Lite para extracción | Misma cuenta Google del OAuth, gratis 1500 req/día, JSON nativo con `responseMimeType` |
-| Parsers de regex primero, Groq como fallback | Sin costo para RappiCard/RappiPay que son el 100% del MVP |
-| Fecha fija `after:2026/05/01` en Gmail search | Evita sync lenta de 365 días; el usuario solo tiene datos desde mayo |
-| `ABONO_DEUDA` excluido de gastos | Pago de tarjeta de crédito no es gasto real; inflaba el balance |
-| `toTitleCase` aplicado en parsers Y en UI | Parsers limpian datos nuevos; UI limpia datos históricos en DB |
-| Botón de borrar separado del sync | Evitar que delete+sync pasen juntos accidentalmente |
-| `cookies()` async en Next.js 15+ | Cambio de API rompía `createClient`; se resolvió con `await` |
+| Gemini 2.0 Flash Lite para extracción | Misma cuenta Google del OAuth, gratis 1500 req/día, JSON nativo |
+| Parsers regex primero, Gemini como fallback | Sin costo para RappiCard/RappiPay (100% del MVP) |
+| Fecha fija `after:2026/05/01` en Gmail | Evita sync lenta de 365 días |
+| `ABONO_DEUDA` excluido de gastos | Pago de tarjeta no es gasto real |
+| `toTitleCase` en parsers Y en UI | Parsers limpian datos nuevos; UI limpia históricos en BD |
+| Botón borrar separado del sync | Evitar delete+sync accidental |
+| `cookies()` async en Next.js 15+ | Cambio de API rompía `createClient` |
+| Uber pre-auths en `sync_log.skipped_ids` | Evita filas fantasma en `transactions`; IDs excluidos en próximos syncs |
+| Dark mode como default | Preferencia del usuario; se persiste en localStorage |
+| CSS variables en lugar de clases Tailwind hardcodeadas | Permite cambio de tema sin rerender; un solo punto de verdad para colores |
+| Demo page eliminada | Sin usuarios externos aún; simplifica el codebase |
 
 ---
 
 ## Bugs conocidos
 
-- **`scrollbar-hide` no funciona en Safari/Chrome sin el plugin Tailwind**: resuelto con inline `scrollbarWidth: 'none'` + clase CSS en globals.css
-- **Uber dedup solo funciona dentro del mismo batch**: si la pre-autorización y el cobro real caen en batches distintos (de 10 emails), no se comparan. Riesgo bajo porque los dos emails llegan con poca diferencia.
-- **`id_auditoria` puede tener gaps**: si se borra y re-sincroniza, el contador de `generateAuditId` ve la BD vacía y reinicia desde -01.
+- **`id_auditoria` puede tener gaps**: si se borra y re-sincroniza, el contador reinicia desde -01.
+- **Uber dedup solo opera dentro del mismo sync**: si pre-auth y cobro caen en syncs distintos, no se comparan. Riesgo bajo porque ambos emails llegan casi juntos.
 
 ---
 
-## Próximos pasos (Etapa 1 — pendientes menores)
+## Pendientes Etapa 1 (UX menores)
 
-1. **"Sincronizado hace X minutos"** — agregar timestamp del último sync en el header del dashboard
-2. **Sync automática al abrir app** — solo si `last_sync` tiene más de 15 minutos
-3. **Cooldown explícito en sync** — deshabilitar botón 30s después de cada sync
-
-Una vez confirmados: avanzar a **Etapa 2 — Categorización**.
+1. **"Sincronizado hace X minutos"** — timestamp del último sync en el header
+2. **Sync automática al abrir** — solo si `last_sync` tiene más de 15 min
+3. **Cooldown en botón sync** — deshabilitar 30s después de cada sync
 
 ---
 
-## Plan Etapa 2 (cuando se confirme)
+## Plan Etapa 2 — Categorización (cuando se confirme)
 
-Estrategia híbrida sin costo adicional de API:
+Categorización automática ya está parcialmente implementada via `guessCategoria()` en `lib/parsers/commerceCategories.ts` (120+ patrones). Lo que falta:
 
-1. **Nivel 1 — Mapa estático** (`lib/parsers/categories.ts`): Uber→TRANSPORTE, Netflix→SUSCRIPCIONES, etc.
-2. **Nivel 2 — Regex** sobre nombre del comercio: `FARM|DROG`→SALUD, `REST|BAR`→SALIDAS, etc.
-3. **Nivel 3 — Groq** solo si los dos anteriores fallan; resultado se cachea por comercio.
-4. **Edición manual** con opción de aplicar en bulk al mismo comercio.
+1. **Edición manual de categoría** por transacción, con opción de aplicar al mismo comercio en bulk
+2. **Caché por comercio** — si el usuario cambia la categoría de "Uber" una vez, se aplica a todas las futuras
+3. **Gemini como último recurso** — para comercios no reconocidos por los patrones
 
-## Plan Etapa 3 (cuando se confirme)
+## Plan Etapa 3 — Asesor financiero IA (cuando se confirme)
 
 - Presupuesto mensual por categoría (configurable)
 - Alertas: 80%/100% de presupuesto, fragmentación Uber, gastos nocturnos
-- IA conversacional con Groq (mismo modelo) — contexto: gastos vs presupuesto por mes
+- IA conversacional con Gemini — contexto: gastos vs presupuesto por mes
 - Tono: directo, colombiano, máximo 3 bullets por respuesta
