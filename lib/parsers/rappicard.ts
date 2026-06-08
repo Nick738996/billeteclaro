@@ -1,6 +1,6 @@
 import type { EmailInput, ParseResult } from './types'
 import type { Categoria } from '@/lib/types'
-import { parseCOPAmount, parseSpanishDate, parseISOLikeDate } from './utils'
+import { parseCOPAmount, parseSpanishDate, parseISOLikeDate, toTitleCase } from './utils'
 
 export function parseRappiCard(email: EmailInput): ParseResult {
   const body = email.body
@@ -32,7 +32,7 @@ function parsePurchase(email: EmailInput): ParseResult {
 
   // "Comercio\nUber\nFecha de la transacción" → "Comercio Uber Fecha de la transacción"
   const comercioMatch = body.match(/\bComercio\s+([^\n$]{1,80}?)(?=\s+(?:Fecha|¿|Escr|$))/i)
-  const comercio = comercioMatch ? comercioMatch[1].trim() : null
+  const comercio = comercioMatch ? toTitleCase(comercioMatch[1].trim()) : null
 
   // "Fecha de la transacción\n2026-06-07 12:25:21"
   const fechaISOMatch = body.match(/Fecha de la transacci[oó]n\s+(\d{4}-\d{2}-\d{2}(?:[\sT]\d{2}:\d{2}(?::\d{2})?)?)/i)

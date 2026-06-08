@@ -7,6 +7,7 @@ import {
   type Transaction,
   type Categoria,
   type Banco,
+  type TipoTransaccion,
   CATEGORIA_LABELS,
   CATEGORIA_COLORS,
   formatCOP,
@@ -24,16 +25,51 @@ interface Props {
 }
 
 const CATEGORY_FILTERS: Array<{ key: Categoria | 'TODOS'; label: string }> = [
-  { key: 'TODOS', label: 'Todos' },
-  { key: 'SALIDAS', label: 'Salidas' },
-  { key: 'TRANSPORTE', label: 'Transporte' },
-  { key: 'HOGAR', label: 'Hogar' },
-  { key: 'SALUD', label: 'Salud' },
-  { key: 'SUSCRIPCIONES', label: 'Suscripciones' },
+  { key: 'TODOS',          label: 'Todos' },
+  { key: 'SALIDAS',        label: 'Salidas' },
+  { key: 'TRANSPORTE',     label: 'Transporte' },
+  { key: 'HOGAR',          label: 'Hogar' },
+  { key: 'SALUD',          label: 'Salud' },
+  { key: 'SUSCRIPCIONES',  label: 'Suscripciones' },
   { key: 'COMPRAS_ONLINE', label: 'Online' },
-  { key: 'INVERSION', label: 'Inversión' },
-  { key: 'INGRESO', label: 'Ingresos' },
+  { key: 'TRANSFERENCIA',  label: 'Transferencias' },
+  { key: 'INVERSION',      label: 'Inversión' },
+  { key: 'INGRESO',        label: 'Ingresos' },
+  { key: 'DONACIONES',     label: 'Donaciones' },
+  { key: 'EDUCACION',      label: 'Educación' },
+  { key: 'REEMBOLSABLE',   label: 'Reembolsable' },
+  { key: 'OTRO',           label: 'Otro' },
 ]
+
+const LOWERCASE_ES = new Set(['y', 'e', 'o', 'de', 'del', 'la', 'el', 'los', 'las', 'en', 'a', 'con', 'por', 'al'])
+
+function toTitleCase(str: string): string {
+  if (!str) return str
+  if (str.startsWith('@') || str.includes('@')) return str
+  if (str !== str.toUpperCase() && str !== str.toLowerCase()) return str
+  return str
+    .toLowerCase()
+    .split(' ')
+    .map((word, i) => i > 0 && LOWERCASE_ES.has(word) ? word : word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ')
+}
+
+function getDisplayName(t: Transaction): string {
+  const comercio = t.comercio ? toTitleCase(t.comercio) : null
+
+  switch (t.tipo as TipoTransaccion) {
+    case 'TRANSFERENCIA_ENVIADA':
+      return comercio ? `Transferencia a ${comercio}` : 'Transferencia enviada'
+    case 'TRANSFERENCIA_RECIBIDA':
+      return comercio ? `Transferencia de ${comercio}` : 'Transferencia recibida'
+    case 'ABONO_DEUDA':
+      return comercio ? `Pago a ${comercio}` : 'Pago tarjeta'
+    case 'PAGO_SERVICIO':
+      return comercio ? `Pago ${comercio}` : 'Pago servicio'
+    default:
+      return comercio ?? t.descripcion ?? 'Transacción'
+  }
+}
 
 function TransactionRow({ t }: { t: Transaction }) {
   const income = isIngreso(t.tipo)
@@ -42,7 +78,6 @@ function TransactionRow({ t }: { t: Transaction }) {
 
   return (
     <div className="flex items-center gap-3 py-3 border-b border-slate-50 last:border-0">
-      {/* Category color dot */}
       <div
         className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
         style={{ backgroundColor: `${color}18` }}
@@ -50,10 +85,9 @@ function TransactionRow({ t }: { t: Transaction }) {
         <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color }} />
       </div>
 
-      {/* Details */}
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-slate-800 truncate">
-          {t.comercio ?? t.descripcion ?? 'Transacción'}
+          {getDisplayName(t)}
         </p>
         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
           <span
@@ -80,7 +114,6 @@ function TransactionRow({ t }: { t: Transaction }) {
         </div>
       </div>
 
-      {/* Amount */}
       <div className="flex-shrink-0 text-right">
         <p
           className={`text-sm font-semibold tabular-nums ${
@@ -143,28 +176,38 @@ export default function TransactionsList({ transactions }: Props) {
         </div>
       </div>
 
-      {/* Category filter chips */}
-      <div className="flex gap-2 px-4 py-3 overflow-x-auto scrollbar-hide border-b border-slate-50">
-        {CATEGORY_FILTERS.map((f) => {
-          const isActive = activeFilter === f.key
-          const catColor = f.key !== 'TODOS' ? CATEGORIA_COLORS[f.key as Categoria] : null
-          return (
-            <button
-              key={f.key}
-              onClick={() => setActiveFilter(f.key as Categoria | 'TODOS')}
-              className="flex-shrink-0 text-xs font-medium px-3 py-1.5 rounded-full transition-colors"
-              style={catColor ? {
-                backgroundColor: isActive ? catColor : `${catColor}22`,
-                color: isActive ? '#fff' : catColor,
-              } : {
-                backgroundColor: isActive ? '#10b981' : '#f1f5f9',
-                color: isActive ? '#fff' : '#475569',
-              }}
-            >
-              {f.label}
-            </button>
-          )
-        })}
+      {/* Category filter carousel */}
+      <div className="relative border-b border-slate-50">
+        <div
+          className="flex gap-2 px-4 py-3 overflow-x-auto scrollbar-hide"
+          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' } as React.CSSProperties}
+        >
+          {CATEGORY_FILTERS.map((f) => {
+            const isActive = activeFilter === f.key
+            const catColor = f.key !== 'TODOS' ? CATEGORIA_COLORS[f.key as Categoria] : null
+            return (
+              <button
+                key={f.key}
+                onClick={() => setActiveFilter(f.key as Categoria | 'TODOS')}
+                className="flex-shrink-0 text-xs font-medium px-3 py-1.5 rounded-full transition-colors"
+                style={catColor ? {
+                  backgroundColor: isActive ? catColor : `${catColor}22`,
+                  color: isActive ? '#fff' : catColor,
+                } : {
+                  backgroundColor: isActive ? '#10b981' : '#f1f5f9',
+                  color: isActive ? '#fff' : '#475569',
+                }}
+              >
+                {f.label}
+              </button>
+            )
+          })}
+        </div>
+        {/* Fade gradient — indicates more chips to the right */}
+        <div
+          className="absolute right-0 top-0 bottom-0 w-8 pointer-events-none"
+          style={{ background: 'linear-gradient(to right, transparent, white)' }}
+        />
       </div>
 
       {/* Transaction rows */}

@@ -140,10 +140,13 @@ export async function POST() {
         }
       }
 
+      // Uber: descartar pre-autorización y conservar solo el cobro real (el último)
+      const dedupedTransactions = deduplicateUber(transactions)
+
       // Build rows for insertion
-      if (transactions.length > 0) {
+      if (dedupedTransactions.length > 0) {
         const rows = await Promise.all(
-          transactions.map(async ({ id, extracted }) => {
+          dedupedTransactions.map(async ({ id, extracted }) => {
             const fecha = extracted.fecha ? new Date(extracted.fecha) : new Date()
             const idAuditoria = await generateAuditId(admin, user.id, fecha)
 
@@ -208,6 +211,40 @@ export async function POST() {
 
     return NextResponse.json({ error: message }, { status: 500 })
   }
+}
+
+function deduplicateUber(
+  txs: Array<{ id: string; extracted: ExtractedTransaction }>
+): Array<{ id: string; extracted: ExtractedTransaction }> {
+  const uberTxs = txs.filter(t => t.extracted.comercio?.toLowerCase() === 'uber')
+  if (uberTxs.length < 2) return txs
+
+  const toRemove = new Set<string>()
+
+  for (let i = 0; i < uberTxs.length; i++) {
+    if (toRemove.has(uberTxs[i].id)) continue
+    for (let j = i + 1; j < uberTxs.length; j++) {
+      if (toRemove.has(uberTxs[j].id)) continue
+
+      const timeA = new Date(uberTxs[i].extracted.fecha ?? '').getTime()
+      const timeB = new Date(uberTxs[j].extracted.fecha ?? '').getTime()
+      const diffHours = Math.abs(timeA - timeB) / 3_600_000
+
+      if (diffHours <= 2) {
+        const amountA = uberTxs[i].extracted.monto
+        const amountB = uberTxs[j].extracted.monto
+        const diff = Math.abs(amountA - amountB) / Math.max(amountA, amountB)
+
+        if (diff <= 0.2) {
+          // Descartar el más temprano (pre-autorización), conservar el más tardío (cobro real)
+          toRemove.add(timeA <= timeB ? uberTxs[i].id : uberTxs[j].id)
+        }
+        // Si los montos difieren >20% son viajes distintos — conservar ambos
+      }
+    }
+  }
+
+  return txs.filter(t => !toRemove.has(t.id))
 }
 
 async function generateAuditId(

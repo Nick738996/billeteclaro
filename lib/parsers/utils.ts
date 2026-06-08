@@ -50,6 +50,23 @@ export function parseSpanishDate(dateStr: string, timeStr?: string): string | nu
   return isNaN(d.getTime()) ? null : d.toISOString()
 }
 
+// Converts "BANCO CITIBANK COLOMBIA" → "Banco Citibank Colombia"
+// Leaves already mixed-case strings (RappiCard, @handle, emails) untouched
+const LOWERCASE_ES = new Set(['y', 'e', 'o', 'de', 'del', 'la', 'el', 'los', 'las', 'en', 'a', 'con', 'por', 'al'])
+
+export function toTitleCase(str: string): string {
+  if (!str) return str
+  // Skip handles and email addresses
+  if (str.startsWith('@') || str.includes('@')) return str
+  // Skip already mixed-case (camelCase, PascalCase)
+  if (str !== str.toUpperCase() && str !== str.toLowerCase()) return str
+  return str
+    .toLowerCase()
+    .split(' ')
+    .map((word, i) => i > 0 && LOWERCASE_ES.has(word) ? word : word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ')
+}
+
 // Parses "2026-06-07 12:25:21" or "2026-06-07"
 export function parseISOLikeDate(s: string): string | null {
   const m = s.match(/(\d{4}-\d{2}-\d{2}(?:[\sT]\d{2}:\d{2}(?::\d{2})?)?)/)

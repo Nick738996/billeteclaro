@@ -1,5 +1,5 @@
 import type { EmailInput, ParseResult } from './types'
-import { parseCOPAmount, parseSpanishDate } from './utils'
+import { parseCOPAmount, parseSpanishDate, toTitleCase } from './utils'
 
 export function parseRappiPay(email: EmailInput): ParseResult {
   const body = email.body
@@ -56,7 +56,7 @@ function parseTransferenciaRecibida(email: EmailInput): ParseResult {
 
   // Banco origen: "Banco\nBancolombia\nNro." → stops before next field
   const bancoMatch = body.match(/\bBanco\s+([^\n$]{1,80}?)(?=\s+(?:Nro|No\.|Fecha|¿|$))/i)
-  const origen = bancoMatch ? bancoMatch[1].trim() : null
+  const origen = bancoMatch ? toTitleCase(bancoMatch[1].trim()) : null
 
   return {
     fecha: extractFechaHora(body, email.date),
@@ -112,7 +112,7 @@ function parseIngresoBancario(email: EmailInput): ParseResult {
 
   // "Banco\nBANCO CITIBANK COLOMBIA\nNo. de transacción"
   const bancoMatch = body.match(/\bBanco\s+([^\n$]{1,80}?)(?=\s+(?:No\.|Nro|Fecha|¿|$))/i)
-  const origen = bancoMatch ? bancoMatch[1].trim() : null
+  const origen = bancoMatch ? toTitleCase(bancoMatch[1].trim()) : null
 
   return {
     fecha: extractFechaHora(body, email.date),
@@ -141,7 +141,7 @@ function parsePagoServicio(email: EmailInput): ParseResult {
 
   // "Convenio\nENEL\nReferencia"
   const convenioMatch = body.match(/\bConvenio\s+([^\n$]{1,60}?)(?=\s+(?:Referencia|M[eé]todo|Monto|$))/i)
-  const comercio = convenioMatch ? convenioMatch[1].trim() : null
+  const comercio = convenioMatch ? toTitleCase(convenioMatch[1].trim()) : null
 
   // Formato especial: "Fecha y hora\n19:36 hrs, 27 Abr. 2026"
   const fechaHoraMatch = body.match(/Fecha y hora\s+(\d{2}:\d{2})\s*hrs?,?\s+(\d{1,2}\s+\w+\.?\s+\d{4})/i)
