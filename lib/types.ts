@@ -144,12 +144,31 @@ export const BANCO_LABELS: Record<Banco, string> = {
 
 export function formatCOP(amount: number): string {
   const formatted = new Intl.NumberFormat('es-CO', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
   }).format(amount)
   return `$${formatted}`
 }
 
+export function formatCOPCompact(amount: number): string {
+  const abs = Math.abs(amount)
+  const sign = amount < 0 ? '-' : ''
+  if (abs >= 1_000_000) {
+    const m = abs / 1_000_000
+    return `${sign}$${m % 1 === 0 ? m.toFixed(0) : m.toFixed(1)}M`
+  }
+  if (abs >= 1_000) {
+    const k = abs / 1_000
+    return `${sign}$${k % 1 === 0 ? k.toFixed(0) : k.toFixed(1)}K`
+  }
+  return `${sign}${formatCOP(abs)}`
+}
+
 export function isIngreso(tipo: TipoTransaccion): boolean {
   return tipo === 'INGRESO' || tipo === 'TRANSFERENCIA_RECIBIDA'
+}
+
+// ABONO_DEUDA = pago de tarjeta desde tu propia cuenta → no es gasto ni ingreso
+export function isGasto(tipo: TipoTransaccion): boolean {
+  return !isIngreso(tipo) && tipo !== 'ABONO_DEUDA'
 }

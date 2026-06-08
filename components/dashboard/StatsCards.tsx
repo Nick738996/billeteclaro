@@ -1,4 +1,4 @@
-import { formatCOP, type MonthlyStats } from '@/lib/types'
+import { formatCOPCompact, type MonthlyStats } from '@/lib/types'
 
 interface Props {
   stats: MonthlyStats
@@ -12,7 +12,7 @@ export default function StatsCards({ stats }: Props) {
       <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
         <p className="text-xs text-slate-400 font-medium uppercase tracking-wide">Gastos</p>
         <p className="text-lg font-bold text-rose-600 mt-1 tabular-nums">
-          {formatCOP(stats.gastos)}
+          {formatCOPCompact(stats.gastos)}
         </p>
         <p className="text-xs text-slate-400 mt-0.5">
           {stats.transacciones} mov.
@@ -22,7 +22,7 @@ export default function StatsCards({ stats }: Props) {
       <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
         <p className="text-xs text-slate-400 font-medium uppercase tracking-wide">Ingresos</p>
         <p className="text-lg font-bold text-brand-600 mt-1 tabular-nums">
-          {formatCOP(stats.ingresos)}
+          {formatCOPCompact(stats.ingresos)}
         </p>
         <p className="text-xs text-slate-400 mt-0.5">este mes</p>
       </div>
@@ -34,7 +34,7 @@ export default function StatsCards({ stats }: Props) {
             isPositive ? 'text-slate-900' : 'text-rose-600'
           }`}
         >
-          {formatCOP(stats.balance)}
+          {formatCOPCompact(stats.balance)}
         </p>
         <p className="text-xs text-slate-400 mt-0.5">
           {isPositive ? 'superávit' : 'déficit'}

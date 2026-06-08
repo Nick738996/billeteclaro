@@ -6,7 +6,7 @@ import { format, parseISO, startOfMonth, endOfMonth, addMonths, subMonths } from
 import { es } from 'date-fns/locale'
 import { createClient } from '@/lib/supabase/client'
 import type { Transaction, MonthlyStats, Categoria } from '@/lib/types'
-import { isIngreso } from '@/lib/types'
+import { isIngreso, isGasto } from '@/lib/types'
 import StatsCards from '@/components/dashboard/StatsCards'
 import SpendingChart from '@/components/dashboard/SpendingChart'
 import TransactionsList from '@/components/dashboard/TransactionsList'
@@ -26,10 +26,10 @@ interface Props {
 }
 
 function buildStats(txs: Transaction[]): MonthlyStats {
-  const gastos = txs.filter(t => !isIngreso(t.tipo)).reduce((s, t) => s + t.monto, 0)
+  const gastos = txs.filter(t => isGasto(t.tipo)).reduce((s, t) => s + t.monto, 0)
   const ingresos = txs.filter(t => isIngreso(t.tipo)).reduce((s, t) => s + t.monto, 0)
   const porCategoria = txs
-    .filter(t => !isIngreso(t.tipo))
+    .filter(t => isGasto(t.tipo))
     .reduce<Record<string, number>>((acc, t) => {
       acc[t.categoria] = (acc[t.categoria] ?? 0) + t.monto
       return acc

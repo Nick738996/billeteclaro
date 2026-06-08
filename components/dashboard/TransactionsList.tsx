@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { formatDistanceToNow } from 'date-fns'
+import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import {
   type Transaction,
@@ -75,7 +75,7 @@ function TransactionRow({ t }: { t: Transaction }) {
           })()}
           <span className="text-xs text-slate-400">·</span>
           <span className="text-xs text-slate-400">
-            {formatDistanceToNow(date, { addSuffix: true, locale: es })}
+            {format(date, "d MMM · HH:mm", { locale: es })}
           </span>
         </div>
       </div>

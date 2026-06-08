@@ -1,13 +1,9 @@
-import { GoogleGenerativeAI } from '@google/generative-ai'
+import Groq from 'groq-sdk'
 import type { Banco, ExtractedTransaction } from '@/lib/types'
 
-const genai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY ?? '')
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
 
-const MODEL = 'gemini-2.0-flash'
-
-const SYSTEM_PROMPT = `Eres un extractor de transacciones financieras colombianas.
-Analizas correos de notificación de bancos y fintechs de Colombia y extraes los datos de transacción.
-Respondes ÚNICAMENTE con JSON válido, sin texto adicional, sin markdown, sin explicaciones.`
+const MODEL = 'llama-3.3-70b-versatile'
 
 export async function extractWithGroq(params: {
   from: string
@@ -18,7 +14,9 @@ export async function extractWithGroq(params: {
 }): Promise<ExtractedTransaction | null> {
   const snippet = params.body.slice(0, 800)
 
-  const prompt = `${SYSTEM_PROMPT}
+  const prompt = `Eres un extractor de transacciones financieras colombianas.
+Analizas correos de notificación de bancos y fintechs de Colombia y extraes los datos de transacción.
+Respondes ÚNICAMENTE con JSON válido, sin texto adicional, sin markdown, sin explicaciones.
 
 Extrae los datos de esta transacción bancaria colombiana.
 
@@ -60,17 +58,15 @@ Responde con este JSON exacto:
 Si el correo NO contiene una transacción, responde: {"error": "not_a_transaction"}`
 
   try {
-    const model = genai.getGenerativeModel({
+    const completion = await groq.chat.completions.create({
       model: MODEL,
-      generationConfig: {
-        temperature: 0.1,
-        maxOutputTokens: 512,
-        responseMimeType: 'application/json',
-      },
+      temperature: 0.1,
+      max_tokens: 512,
+      messages: [{ role: 'user', content: prompt }],
+      response_format: { type: 'json_object' },
     })
 
-    const result = await model.generateContent(prompt)
-    const text = result.response.text().trim()
+    const text = completion.choices[0]?.message?.content?.trim() ?? ''
     const parsed = JSON.parse(text)
 
     if (parsed.error === 'not_a_transaction') return null
@@ -90,7 +86,7 @@ Si el correo NO contiene una transacción, responde: {"error": "not_a_transactio
       flags: Array.isArray(parsed.flags) ? parsed.flags : [],
     }
   } catch (err) {
-    console.error('Gemini extraction error:', err)
+    console.error('Groq extraction error:', err)
     return null
   }
 }

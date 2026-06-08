@@ -16,7 +16,7 @@ const FETCH_BATCH_SIZE = 10
 const GROQ_CONCURRENCY = 3
 
 export async function POST() {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
@@ -64,7 +64,7 @@ export async function POST() {
     const gmail = buildGmailClient(access_token)
 
     // Search 1 year back to ensure full history on first sync
-    const allMessageIds = await listBankMessageIds(gmail, 365)
+    const allMessageIds = await listBankMessageIds(gmail)
 
     // Find which ones we haven't processed yet
     const { data: existing } = await admin

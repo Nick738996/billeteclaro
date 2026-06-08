@@ -9,18 +9,19 @@ import DashboardClient from './DashboardClient'
 export const dynamic = 'force-dynamic'
 
 interface Props {
-  searchParams: { month?: string }
+  searchParams: Promise<{ month?: string }>
 }
 
 export default async function DashboardPage({ searchParams }: Props) {
-  const supabase = createClient()
+  const supabase = await createClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
   if (!user) redirect('/')
 
-  const monthParam = searchParams.month ?? format(new Date(), 'yyyy-MM')
+  const { month } = await searchParams
+  const monthParam = month ?? format(new Date(), 'yyyy-MM')
   const ref = parseISO(`${monthParam}-01`)
   const start = startOfMonth(ref)
   const end = endOfMonth(ref)
