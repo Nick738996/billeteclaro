@@ -14,18 +14,22 @@ export default function StatsCards({ stats }: Props) {
   const bColor  = surplus ? 'var(--green)' : 'var(--red)'
   const bSoft   = surplus ? 'var(--green-soft)' : 'var(--red-soft)'
 
+  const glow = (isIncome: boolean) => ({
+    background:         isIncome ? 'rgba(74,222,128,0.04)' : 'rgba(255,107,107,0.04)',
+    border:             isIncome ? '1px solid rgba(74,222,128,0.28)' : '1px solid rgba(255,107,107,0.28)',
+    backdropFilter:     'var(--glass-blur)',
+    WebkitBackdropFilter:'var(--glass-blur)',
+    borderRadius:       'var(--radius-lg)',
+  })
+
   return (
     <div className="flex flex-col gap-2">
 
       {/* Balance hero */}
       <div
         style={{
-          background: 'var(--surface)',
-          border: '1px solid var(--border)',
-          borderRadius: 'var(--radius-lg)',
+          ...glow(surplus),
           padding: '20px 20px 18px',
-          backdropFilter: 'var(--glass-blur)',
-          WebkitBackdropFilter: 'var(--glass-blur)',
         }}
       >
         <p
@@ -58,7 +62,7 @@ export default function StatsCards({ stats }: Props) {
               marginBottom: 3,
             }}
           >
-            {surplus ? 'superávit' : 'déficit'}
+            {surplus ? 'positivo' : 'negativo'}
           </span>
         </div>
       </div>
@@ -66,15 +70,13 @@ export default function StatsCards({ stats }: Props) {
       {/* Gastos + Ingresos secundarios */}
       <div className="grid grid-cols-2 gap-2">
         {[
-          { label: 'Gastos',   arrow: '↓', value: formatCOPCompact(gastos),   color: 'var(--red)',   sub: `${transacciones} mov.` },
-          { label: 'Ingresos', arrow: '↑', value: formatCOPCompact(ingresos), color: 'var(--green)', sub: 'este mes' },
-        ].map(({ label, arrow, value, color, sub }) => (
+          { label: 'Gastos',   arrow: '↓', value: formatCOPCompact(gastos),   color: 'var(--red)',   sub: `${transacciones} mov.`,  isIncome: false },
+          { label: 'Ingresos', arrow: '↑', value: formatCOPCompact(ingresos), color: 'var(--green)', sub: 'este mes',               isIncome: true  },
+        ].map(({ label, arrow, value, color, sub, isIncome }) => (
           <div
             key={label}
             style={{
-              background: 'var(--surface)',
-              border: '1px solid var(--border)',
-              borderRadius: 'var(--radius-lg)',
+              ...glow(isIncome),
               padding: '14px 16px',
               backdropFilter: 'var(--glass-blur)',
               WebkitBackdropFilter: 'var(--glass-blur)',

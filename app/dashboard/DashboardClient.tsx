@@ -141,7 +141,9 @@ export default function DashboardClient({
               <span style={{ fontWeight: 700, color: 'var(--green)' }}>Claro</span>
             </span>
           </div>
+          <div className="flex items-center gap-2">
           <HeaderPill onSyncComplete={handleSyncComplete} onSignOut={handleSignOut}/>
+          </div>
         </div>
       </header>
 
