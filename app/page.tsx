@@ -38,15 +38,16 @@ export default function LandingPage() {
 
         {/* Logo — ícono + wordmark con contraste de pesos */}
         <div className="flex flex-col items-center gap-4">
-          {/* App icon mark */}
-          <svg viewBox="0 0 100 100" width="64" height="64" aria-hidden="true">
-            <rect width="100" height="100" rx="22" style={{ fill: 'var(--surface)' }}/>
-            <circle cx="50" cy="50" r="31" stroke="#4ADE80" strokeWidth="3.5" fill="none"/>
-            <path
-              d="M31,58 L50,37 L69,58"
-              stroke="#4ADE80" strokeWidth="5" fill="none"
-              strokeLinecap="round" strokeLinejoin="round"
-            />
+          {/* App icon mark — currentColor adapta a dark/light */}
+          <svg viewBox="0 0 100 100" width="64" height="64" aria-hidden="true"
+            style={{ color: 'var(--text)' }}>
+            <rect width="100" height="100" rx="17" style={{ fill: 'var(--surface)' }}/>
+            <line x1="30" y1="18" x2="30" y2="82"
+              stroke="currentColor" strokeWidth="6" strokeLinecap="round"/>
+            <path d="M30,18 Q70,18 70,34 Q70,50 30,50"
+              stroke="currentColor" strokeWidth="6" fill="none" strokeLinecap="round"/>
+            <path d="M30,50 Q78,50 78,66 Q78,82 30,82"
+              stroke="#4ADE80" strokeWidth="6" fill="none" strokeLinecap="round"/>
           </svg>
 
           <div className="text-center">

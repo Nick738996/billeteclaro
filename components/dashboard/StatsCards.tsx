@@ -24,6 +24,8 @@ export default function StatsCards({ stats }: Props) {
           border: '1px solid var(--border)',
           borderRadius: 'var(--radius-lg)',
           padding: '20px 20px 18px',
+          backdropFilter: 'var(--glass-blur)',
+          WebkitBackdropFilter: 'var(--glass-blur)',
         }}
       >
         <p
@@ -56,7 +58,7 @@ export default function StatsCards({ stats }: Props) {
               marginBottom: 3,
             }}
           >
-            {surplus ? 'positivo' : 'negativo'}
+            {surplus ? 'superávit' : 'déficit'}
           </span>
         </div>
       </div>
@@ -74,6 +76,8 @@ export default function StatsCards({ stats }: Props) {
               border: '1px solid var(--border)',
               borderRadius: 'var(--radius-lg)',
               padding: '14px 16px',
+              backdropFilter: 'var(--glass-blur)',
+              WebkitBackdropFilter: 'var(--glass-blur)',
             }}
           >
             <p

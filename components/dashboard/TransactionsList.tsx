@@ -414,7 +414,13 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
   return (
     <div
       className="rounded-[var(--radius-lg)]"
-      style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
+      style={{
+        background: 'var(--surface)',
+        border: '1px solid var(--border)',
+        backdropFilter: 'var(--glass-blur)',
+        WebkitBackdropFilter: 'var(--glass-blur)',
+        overflow: 'hidden',
+      }}
     >
       {/* Buscador */}
       <div className="px-4 pt-4 pb-3">
