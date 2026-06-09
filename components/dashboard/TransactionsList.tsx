@@ -284,7 +284,7 @@ function FilterChips({
   )
 }
 
-// ── TransactionRow (simplificado) ─────────────────────────────────────────────
+// ── TransactionRow (Strip style) ───────────────────────────────────────────
 
 function TransactionRow({ t }: { t: Transaction }) {
   const [expanded, setExpanded] = useState(false)
@@ -296,51 +296,37 @@ function TransactionRow({ t }: { t: Transaction }) {
 
   return (
     <div
-      className="flex items-start gap-3 py-3 cursor-pointer"
-      style={{ borderBottom: '1px solid var(--border-soft)' }}
+      className="flex items-center gap-3 cursor-pointer"
+      style={{
+        padding: '12px 0 12px 14px',
+        borderBottom: '1px solid var(--border-soft)',
+        borderLeft: `2.5px solid ${theme.color}55`,
+        marginLeft: -16,
+      }}
       onClick={() => setExpanded(o => !o)}
     >
-      {/* Icono categoría */}
+      {/* Dot */}
       <div
-        className="w-9 h-9 rounded-[var(--radius-md)] flex items-center justify-center flex-shrink-0"
-        style={{ background: theme.bg }}
-      >
-        <div className="w-2 h-2 rounded-full" style={{ background: theme.color }} />
-      </div>
+        className="rounded-full flex-shrink-0"
+        style={{ width: 8, height: 8, background: theme.color }}
+      />
 
       {/* Nombre + meta */}
       <div className="flex-1 min-w-0">
         <p
           className="font-medium truncate"
-          style={{ fontSize: 'var(--text-sm)', color: 'var(--text)', marginBottom: 5 }}
+          style={{ fontSize: 'var(--text-sm)', color: 'var(--text)' }}
         >
           {getDisplayName(t)}
         </p>
-
-        <div className="flex items-center gap-1.5">
-          {/* 1 chip de categoría */}
-          <span
-            style={{
-              fontSize: 'var(--text-xs)',
-              fontWeight: 500,
-              textTransform: 'uppercase',
-              letterSpacing: '0.04em',
-              color: theme.color,
-              background: theme.bg,
-              padding: '2px 6px',
-              borderRadius: 4,
-              flexShrink: 0,
-              whiteSpace: 'nowrap',
-            }}
-          >
+        <div className="flex items-center gap-1" style={{ marginTop: 3 }}>
+          <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: theme.color }}>
             {CATEGORIA_LABELS[t.categoria]}
           </span>
-
-          {/* Banco y hora como texto plano */}
-          <span style={{ color: 'var(--text-subtle)', fontSize: 'var(--text-xs)' }}>·</span>
-          <span style={{ color: chip.color, fontSize: 'var(--text-xs)' }}>{chip.label}</span>
-          <span style={{ color: 'var(--text-subtle)', fontSize: 'var(--text-xs)' }}>·</span>
-          <span style={{ color: 'var(--text-subtle)', fontSize: 'var(--text-xs)' }}>{time}</span>
+          <span style={{ fontSize: 10, color: 'var(--text-subtle)' }}>·</span>
+          <span style={{ fontSize: 10, color: chip.color }}>{chip.label}</span>
+          <span style={{ fontSize: 10, color: 'var(--text-subtle)' }}>·</span>
+          <span style={{ fontSize: 10, color: 'var(--text-subtle)' }}>{time}</span>
         </div>
 
         {/* id_auditoria — solo visible al expandir */}
@@ -360,8 +346,8 @@ function TransactionRow({ t }: { t: Transaction }) {
         )}
       </div>
 
-      {/* Monto (sin id_auditoria debajo) */}
-      <div className="flex-shrink-0 text-right">
+      {/* Monto */}
+      <div className="flex-shrink-0">
         <p
           className="font-semibold tabular-nums"
           style={{
