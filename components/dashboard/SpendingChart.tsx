@@ -116,7 +116,12 @@ export default function SpendingChart({ transactions, activeFilter, onFilterChan
   return (
     <div
       className="rounded-[var(--radius-lg)] p-4"
-      style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
+      style={{
+        background: 'var(--surface)',
+        border: '1px solid var(--border)',
+        backdropFilter: 'var(--glass-blur)',
+        WebkitBackdropFilter: 'var(--glass-blur)',
+      }}
     >
       <h2 className="font-medium mb-4" style={{ fontSize: 'var(--text-sm)', color: 'var(--text)' }}>
         Gastos por categoría

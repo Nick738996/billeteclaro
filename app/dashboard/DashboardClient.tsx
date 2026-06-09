@@ -8,15 +8,14 @@ import { useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { format, parseISO, startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { ChevronLeft, ChevronRight, LogOut, AlertTriangle } from 'lucide-react'
+import { ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { Transaction, MonthlyStats, Categoria } from '@/lib/types'
 import { isIngreso, isGasto } from '@/lib/types'
 import StatsCards from '@/components/dashboard/StatsCards'
 import SpendingChart from '@/components/dashboard/SpendingChart'
 import TransactionsList from '@/components/dashboard/TransactionsList'
-import SyncButton from '@/components/dashboard/SyncButton'
-import ThemeToggle from '@/components/ui/ThemeToggle'
+import HeaderPill from '@/components/dashboard/HeaderPill'
 
 interface Props {
   user: { name: string }
@@ -114,35 +113,36 @@ export default function DashboardClient({
       {/* Header */}
       <header
         className="sticky top-0 z-10"
-        style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)' }}
+        style={{
+          background: 'var(--surface)',
+          borderBottom: '1px solid var(--border)',
+          backdropFilter: 'var(--glass-blur)',
+          WebkitBackdropFilter: 'var(--glass-blur)',
+        }}
       >
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
-          {/* Logo lockup: ícono + wordmark */}
+          {/* Logo lockup — Variante A (La B)
+               stroke="currentColor" + color:var(--text) = adapta auto en light/dark */}
           <div className="flex items-center gap-2">
-            <svg viewBox="0 0 100 100" width="26" height="26" aria-hidden="true">
-              <circle cx="50" cy="50" r="31" stroke="#4ADE80" strokeWidth="3.5" fill="none"/>
-              <path
-                d="M31,58 L50,37 L69,58"
-                stroke="#4ADE80" strokeWidth="5" fill="none"
-                strokeLinecap="round" strokeLinejoin="round"
-              />
+            <svg
+              viewBox="0 0 100 100" width="26" height="26"
+              aria-hidden="true"
+              style={{ color: 'var(--text)' }}
+            >
+              <line x1="30" y1="18" x2="30" y2="82"
+                stroke="currentColor" strokeWidth="6" strokeLinecap="round"/>
+              <path d="M30,18 Q70,18 70,34 Q70,50 30,50"
+                stroke="currentColor" strokeWidth="6" fill="none" strokeLinecap="round"/>
+              <path d="M30,50 Q78,50 78,66 Q78,82 30,82"
+                stroke="#4ADE80" strokeWidth="6" fill="none" strokeLinecap="round"/>
             </svg>
             <span className="font-semibold tracking-tight" style={{ fontSize: 'var(--text-base)', letterSpacing: '-0.02em' }}>
-              <span style={{ color: 'var(--text)' }}>Billete</span>
-              <span style={{ color: 'var(--green)' }}>Claro</span>
+              <span style={{ fontWeight: 300, color: 'var(--text)' }}>Billete</span>
+              <span style={{ fontWeight: 700, color: 'var(--green)' }}>Claro</span>
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <SyncButton onSyncComplete={handleSyncComplete} />
-            <ThemeToggle />
-            <button
-              onClick={handleSignOut}
-              className="w-8 h-8 rounded-full flex items-center justify-center transition-colors"
-              style={{ background: 'var(--surface-2)', color: 'var(--text-muted)' }}
-              title="Cerrar sesión"
-            >
-              <LogOut size={14} />
-            </button>
+          <HeaderPill onSyncComplete={handleSyncComplete} onSignOut={handleSignOut}/>
           </div>
         </div>
       </header>

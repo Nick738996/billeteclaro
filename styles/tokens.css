@@ -1,10 +1,10 @@
 :root {
-  /* MODO OSCURO — default */
+  /* MODO OSCURO — default (glass + fluido) */
   --bg:           #0A0A0A;
-  --surface:      #1C1C1C;
-  --surface-2:    #242424;
-  --border:       #2E2E2E;
-  --border-soft:  #222222;
+  --surface:      rgba(28, 28, 28, 0.72);
+  --surface-2:    rgba(36, 36, 36, 0.72);
+  --border:       rgba(255, 255, 255, 0.10);
+  --border-soft:  rgba(255, 255, 255, 0.06);
   --text:         #FFFFFF;
   --text-muted:   #888888;
   --text-subtle:  #444444;
@@ -20,10 +20,11 @@
   --purple:       #A78BFA;
   --purple-soft:  #26153D;
 
-  --radius-sm:    6px;
-  --radius-md:    10px;
-  --radius-lg:    14px;
-  --radius-xl:    20px;
+  /* Fluido */
+  --radius-sm:    12px;
+  --radius-md:    18px;
+  --radius-lg:    24px;
+  --radius-xl:    32px;
 
   --text-xs:   11px;
   --text-sm:   13px;
@@ -32,14 +33,17 @@
   --text-xl:   20px;
   --text-2xl:  24px;
   --text-3xl:  30px;
+
+  /* Glass blur — usado como backdrop-filter en las cards */
+  --glass-blur: blur(24px) saturate(160%);
 }
 
 [data-theme="light"] {
   --bg:           #FFFFFF;
-  --surface:      #F8F8F8;
-  --surface-2:    #F0F0F0;
-  --border:       #E8E8E8;
-  --border-soft:  #F2F2F2;
+  --surface:      rgba(248, 248, 248, 0.80);
+  --surface-2:    rgba(240, 240, 240, 0.80);
+  --border:       rgba(0, 0, 0, 0.09);
+  --border-soft:  rgba(0, 0, 0, 0.05);
   --text:         #0A0A0A;
   --text-muted:   #6B6B6B;
   --text-subtle:  #C8C8C8;
