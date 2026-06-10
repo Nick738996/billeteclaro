@@ -4,6 +4,8 @@ import { useState } from 'react'
 import { Plus, Trash2, Check, RefreshCw } from 'lucide-react'
 import { CATEGORIA_LABELS, type Categoria, type TipoTransaccion, type Banco } from '@/lib/types'
 
+const ALL_CATS = Object.keys(CATEGORIA_LABELS) as Categoria[]
+
 interface DraftTx {
   _key:      number
   fecha:     string
@@ -26,11 +28,6 @@ const BANCOS: { value: Banco; label: string }[] = [
   { value: 'RAPPICARD', label: 'RappiCard' },
   { value: 'RAPPIPAY',  label: 'RappiPay' },
   { value: 'OTRO',      label: 'Otro banco' },
-]
-
-const GASTO_CATS: Categoria[] = [
-  'HOGAR','TRANSPORTE','SALIDAS','SALUD','SUSCRIPCIONES',
-  'COMPRAS_ONLINE','INVERSION','DONACIONES','EDUCACION','REEMBOLSABLE','TRANSFERENCIA','INGRESO','OTRO',
 ]
 
 const today = () => new Date().toISOString().slice(0, 10)
@@ -177,7 +174,7 @@ export default function ManualTransactions({ onSaved }: Props) {
                   {BANCOS.map(b => <option key={b.value} value={b.value}>{b.label}</option>)}
                 </select>
                 <select value={item.categoria} onChange={e => update(item._key, 'categoria', e.target.value)} style={{ ...inputStyle, flex: 1 }}>
-                  {GASTO_CATS.map(c => <option key={c} value={c}>{CATEGORIA_LABELS[c]}</option>)}
+                  {ALL_CATS.map(c => <option key={c} value={c}>{CATEGORIA_LABELS[c]}</option>)}
                 </select>
               </div>
             </div>

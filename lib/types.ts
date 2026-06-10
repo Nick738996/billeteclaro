@@ -57,20 +57,6 @@ export interface Budget {
   created_at: string
 }
 
-export interface PatrimonioItem {
-  id: string
-  user_id: string
-  nombre: string
-  institucion: string | null
-  tipo: 'LIQUIDO' | 'BLOQUEADO' | 'CUSTODIA'
-  monto: number
-  moneda: string
-  rendimiento_ea: number | null
-  vence_en: string | null
-  notas: string | null
-  created_at: string
-}
-
 export interface SyncLog {
   id: string
   user_id: string
@@ -79,8 +65,25 @@ export interface SyncLog {
   correos_revisados: number
   transacciones_nuevas: number
   errores: string[]
+  skipped_ids?: string[]
   status: 'RUNNING' | 'DONE' | 'ERROR'
 }
+
+export interface BudgetSubcat {
+  nombre: string
+  monto: number
+}
+
+export interface BudgetEntry {
+  monto: number
+  subcategorias: BudgetSubcat[]
+}
+
+/** Categorías disponibles para presupuesto mensual (excluye TRANSFERENCIA e INGRESO) */
+export const PRESUPUESTO_CATS: Categoria[] = [
+  'HOGAR', 'TRANSPORTE', 'SALIDAS', 'SALUD', 'SUSCRIPCIONES',
+  'COMPRAS_ONLINE', 'INVERSION', 'DONACIONES', 'EDUCACION', 'REEMBOLSABLE', 'OTRO',
+]
 
 export interface ExtractedTransaction {
   fecha: string | null

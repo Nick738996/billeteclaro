@@ -15,11 +15,11 @@ export default function StatsCards({ stats }: Props) {
   const bSoft   = surplus ? 'var(--green-soft)' : 'var(--red-soft)'
 
   const glow = (isIncome: boolean) => ({
-    background:         isIncome ? 'rgba(74,222,128,0.04)' : 'rgba(255,107,107,0.04)',
-    border:             isIncome ? '1px solid rgba(74,222,128,0.28)' : '1px solid rgba(255,107,107,0.28)',
-    backdropFilter:     'var(--glass-blur)',
-    WebkitBackdropFilter:'var(--glass-blur)',
-    borderRadius:       'var(--radius-lg)',
+    background:           isIncome ? 'var(--green-glow-bg)' : 'var(--red-glow-bg)',
+    border:               isIncome ? '1px solid var(--green-glow-border)' : '1px solid var(--red-glow-border)',
+    backdropFilter:       'var(--glass-blur)',
+    WebkitBackdropFilter: 'var(--glass-blur)',
+    borderRadius:         'var(--radius-lg)',
   })
 
   return (
@@ -47,7 +47,7 @@ export default function StatsCards({ stats }: Props) {
         <div className="flex items-end justify-between">
           <span
             className="tabular-nums"
-            style={{ fontSize: 40, fontWeight: 700, color: bColor, letterSpacing: '-0.03em', lineHeight: 1 }}
+            style={{ fontSize: 'var(--text-4xl)', fontWeight: 700, color: bColor, letterSpacing: '-0.03em', lineHeight: 1 }}
           >
             {formatCOPCompact(Math.abs(balance))}
           </span>
@@ -94,7 +94,7 @@ export default function StatsCards({ stats }: Props) {
             >
               {arrow} {label}
             </p>
-            <p className="tabular-nums" style={{ fontSize: 22, fontWeight: 600, color, letterSpacing: '-0.02em' }}>
+            <p className="tabular-nums" style={{ fontSize: 'var(--text-2xl)', fontWeight: 600, color, letterSpacing: '-0.02em' }}>
               {value}
             </p>
             <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginTop: 3 }}>{sub}</p>

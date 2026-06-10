@@ -42,10 +42,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'items requeridos' }, { status: 400 })
   }
 
-  const rows = await Promise.all(items.map(async (tx) => {
+  // Procesar secuencialmente para evitar race condition en generateAuditId:
+  // dos queries concurrentes al mismo día devuelven el mismo count → IDs duplicados.
+  const rows = []
+  for (const tx of items) {
     const fecha = new Date(tx.fecha)
     const auditId = await generateAuditId(admin, user.id, fecha)
-    return {
+    rows.push({
       user_id:         user.id,
       gmail_message_id:`manual_${crypto.randomUUID()}`,
       fecha:           fecha.toISOString(),
@@ -57,8 +60,8 @@ export async function POST(request: Request) {
       categoria:       tx.categoria,
       id_auditoria:    auditId,
       procesado:       true,
-    }
-  }))
+    })
+  }
 
   const { error } = await supabase.from('transactions').insert(rows)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

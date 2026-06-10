@@ -1,16 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import type { Categoria } from '@/lib/types'
-
-export interface BudgetSubcat {
-  nombre: string
-  monto: number
-}
-
-export interface BudgetEntry {
-  monto: number
-  subcategorias: BudgetSubcat[]
-}
+import type { Categoria, BudgetEntry, BudgetSubcat } from '@/lib/types'
 
 // GET /api/budgets?mes=YYYY-MM
 export async function GET(request: Request) {

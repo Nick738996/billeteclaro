@@ -2,13 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { Check, RefreshCw, ChevronRight, Plus, Trash2 } from 'lucide-react'
-import { CATEGORIA_LABELS, formatCOP, formatCOPCompact, type Categoria } from '@/lib/types'
-import type { BudgetEntry, BudgetSubcat } from '@/app/api/budgets/route'
-
-const GASTO_CATS: Categoria[] = [
-  'HOGAR', 'TRANSPORTE', 'SALIDAS', 'SALUD', 'SUSCRIPCIONES',
-  'COMPRAS_ONLINE', 'INVERSION', 'DONACIONES', 'EDUCACION', 'REEMBOLSABLE', 'OTRO',
-]
+import { CATEGORIA_LABELS, formatCOP, formatCOPCompact, PRESUPUESTO_CATS, type Categoria, type BudgetEntry, type BudgetSubcat } from '@/lib/types'
 
 function pctColor(pct: number) {
   if (pct >= 100) return 'var(--red)'
@@ -77,7 +71,7 @@ export default function BudgetManager({ mes, gastosPorCategoria, onBudgetsChange
     setSaving(true)
     setSavedOk(false)
     try {
-      const items = GASTO_CATS.map(cat => ({
+      const items = PRESUPUESTO_CATS.map(cat => ({
         categoria: cat,
         monto: draft[cat]?.monto ?? 0,
         subcategorias: draft[cat]?.subcategorias ?? [],
@@ -97,10 +91,10 @@ export default function BudgetManager({ mes, gastosPorCategoria, onBudgetsChange
     }
   }
 
-  const catsWithActivity = GASTO_CATS.filter(
+  const catsWithActivity = PRESUPUESTO_CATS.filter(
     cat => (gastosPorCategoria[cat] ?? 0) > 0 || (draft[cat]?.monto ?? 0) > 0
   )
-  const catsEmpty = GASTO_CATS.filter(
+  const catsEmpty = PRESUPUESTO_CATS.filter(
     cat => (gastosPorCategoria[cat] ?? 0) === 0 && (draft[cat]?.monto ?? 0) === 0
   )
 
