@@ -92,19 +92,10 @@ export default function ManualTransactions({ onSaved }: Props) {
     }
   }
 
-  const inputStyle = {
-    background: 'var(--surface)',
-    border: '1px solid var(--border)',
-    borderRadius: 6,
-    padding: '5px 8px',
-    fontSize: 'var(--text-xs)',
-    color: 'var(--text)',
-    outline: 'none',
-    width: '100%',
-  }
+  const inputStyle = { padding: '5px 8px', width: '100%' }
 
   return (
-    <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)', overflow: 'hidden' }}>
+    <div className="card">
 
       {/* Header — siempre visible */}
       <button
@@ -141,6 +132,7 @@ export default function ManualTransactions({ onSaved }: Props) {
               {/* Fila 1: fecha + monto */}
               <div className="flex gap-2" style={{ marginBottom: 6 }}>
                 <input
+                  className="input-field"
                   type="date"
                   value={item.fecha}
                   onChange={e => update(item._key, 'fecha', e.target.value)}
@@ -149,6 +141,7 @@ export default function ManualTransactions({ onSaved }: Props) {
                 <div className="flex items-center gap-1" style={{ flex: 1 }}>
                   <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', flexShrink: 0 }}>$</span>
                   <input
+                    className="input-field"
                     value={item.monto}
                     onChange={e => update(item._key, 'monto', e.target.value)}
                     placeholder="0"
@@ -159,6 +152,7 @@ export default function ManualTransactions({ onSaved }: Props) {
 
               {/* Fila 2: comercio */}
               <input
+                className="input-field"
                 value={item.comercio}
                 onChange={e => update(item._key, 'comercio', e.target.value)}
                 placeholder="Comercio o descripción"
@@ -167,13 +161,13 @@ export default function ManualTransactions({ onSaved }: Props) {
 
               {/* Fila 3: tipo + banco + categoría */}
               <div className="flex gap-2">
-                <select value={item.tipo} onChange={e => update(item._key, 'tipo', e.target.value)} style={{ ...inputStyle, flex: 1 }}>
+                <select className="input-field" value={item.tipo} onChange={e => update(item._key, 'tipo', e.target.value)} style={{ ...inputStyle, flex: 1 }}>
                   {TIPOS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                 </select>
-                <select value={item.banco} onChange={e => update(item._key, 'banco', e.target.value)} style={{ ...inputStyle, flex: 1 }}>
+                <select className="input-field" value={item.banco} onChange={e => update(item._key, 'banco', e.target.value)} style={{ ...inputStyle, flex: 1 }}>
                   {BANCOS.map(b => <option key={b.value} value={b.value}>{b.label}</option>)}
                 </select>
-                <select value={item.categoria} onChange={e => update(item._key, 'categoria', e.target.value)} style={{ ...inputStyle, flex: 1 }}>
+                <select className="input-field" value={item.categoria} onChange={e => update(item._key, 'categoria', e.target.value)} style={{ ...inputStyle, flex: 1 }}>
                   {ALL_CATS.map(c => <option key={c} value={c}>{CATEGORIA_LABELS[c]}</option>)}
                 </select>
               </div>

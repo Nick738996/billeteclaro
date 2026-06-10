@@ -1,0 +1,43 @@
+/*
+  utilities.css — clases reutilizables del sistema de diseño BilleteClaro
+  Importado en globals.css. No usar Tailwind aquí, solo CSS variables propias.
+*/
+
+/* ── Glass card ─────────────────────────────────────────────────────────────
+   Superficie estándar del dashboard: glass + border + radio + overflow hidden.
+   Añade padding directamente en el componente (varía por card).
+   Uso: <div className="card"> ─────────────────────────────────────────── */
+.card {
+  background:              var(--surface);
+  border:                  1px solid var(--border);
+  border-radius:           var(--radius-lg);
+  backdrop-filter:         var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  overflow:                hidden;
+}
+
+/* ── Form input ─────────────────────────────────────────────────────────────
+   Base para todos los <input>, <select>, <textarea> del dashboard.
+   Añade padding y width específicos en línea.
+   Uso: <input className="input-field" style={{ padding: '5px 8px' }} /> ── */
+.input-field {
+  background:    var(--surface);
+  border:        1px solid var(--border);
+  border-radius: var(--radius-badge);
+  color:         var(--text);
+  outline:       none;
+  font-size:     var(--text-xs);
+}
+
+.input-field::placeholder {
+  color: var(--text-subtle);
+}
+
+/* ── Skeleton line ──────────────────────────────────────────────────────────
+   Bloque de placeholder animado. Usa junto con SkeletonCard de components/ui.
+   Uso: <div className="skeleton" style={{ width: '60%', height: 12 }} /> ─ */
+.skeleton {
+  background:    var(--surface-2);
+  border-radius: var(--radius-badge);
+  flex-shrink:   0;
+}
