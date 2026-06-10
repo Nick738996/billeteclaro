@@ -1,9 +1,9 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { AlertTriangle, Lightbulb, CheckCircle, TrendingUp, Send, ChevronDown, ChevronUp } from 'lucide-react'
+import { AlertTriangle, Lightbulb, CircleCheck, TrendingUp, Send, ChevronDown, ChevronUp, type LucideIcon } from 'lucide-react'
 import type { Insight, InsightTipo } from '@/lib/types'
-import { formatCOP } from '@/lib/types'
+import { formatCOP, CATEGORIA_LABELS } from '@/lib/types'
 
 interface Props {
   mes: string
@@ -17,26 +17,36 @@ interface ChatMsg {
   content: string
 }
 
-const ICON: Record<InsightTipo, React.ReactNode> = {
-  alerta:     <AlertTriangle  size={15} />,
-  consejo:    <Lightbulb      size={15} />,
-  positivo:   <CheckCircle    size={15} />,
-  proyeccion: <TrendingUp     size={15} />,
+type ColorConfig = {
+  accent: string
+  badgeBg: string
+  badgeText: string
+  Icon: LucideIcon
+  label: string
 }
 
-const COLOR: Record<InsightTipo, { bg: string; text: string }> = {
-  alerta:     { bg: 'var(--red-soft)',    text: 'var(--red)'    },
-  consejo:    { bg: 'var(--blue-soft)',   text: 'var(--blue)'   },
-  positivo:   { bg: 'var(--green-soft)',  text: 'var(--green)'  },
-  proyeccion: { bg: 'var(--yellow-soft)', text: 'var(--yellow)' },
+const COLOR_MAP: Record<InsightTipo, ColorConfig> = {
+  alerta:     { accent: 'var(--red)',    badgeBg: 'var(--red-soft)',    badgeText: 'var(--red)',    Icon: AlertTriangle, label: 'Alerta'     },
+  consejo:    { accent: 'var(--blue)',   badgeBg: 'var(--blue-soft)',   badgeText: 'var(--blue)',   Icon: Lightbulb,     label: 'Consejo'    },
+  positivo:   { accent: 'var(--green)',  badgeBg: 'var(--green-soft)',  badgeText: 'var(--green)',  Icon: CircleCheck,   label: 'Positivo'   },
+  proyeccion: { accent: 'var(--yellow)', badgeBg: 'var(--yellow-soft)', badgeText: 'var(--yellow)', Icon: TrendingUp,    label: 'Proyección' },
 }
 
 function InsightCard({ insight }: { insight: Insight }) {
-  const c = COLOR[insight.tipo]
+  const c = COLOR_MAP[insight.tipo]
+  const categoriaLabel = insight.categoria ? (CATEGORIA_LABELS[insight.categoria as keyof typeof CATEGORIA_LABELS] ?? insight.categoria) : null
+
+  // Only show limite_sugerido badge when the number isn't already visible in the text
+  const limiteStr = insight.limite_sugerido != null ? formatCOP(insight.limite_sugerido) : null
+  const limiteAlreadyInText = limiteStr != null && insight.texto.includes(limiteStr)
+  const showLimiteBadge = limiteStr != null && !limiteAlreadyInText
+
   return (
     <div
       style={{
-        background: c.bg,
+        background: 'var(--surface)',
+        border: '1px solid var(--border)',
+        borderLeft: `3px solid ${c.accent}`,
         borderRadius: 'var(--radius-sm)',
         padding: '10px 12px',
         display: 'flex',
@@ -44,31 +54,56 @@ function InsightCard({ insight }: { insight: Insight }) {
         gap: 6,
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-        <span style={{ color: c.text, flexShrink: 0, marginTop: 1 }}>
-          {ICON[insight.tipo]}
+      {/* Header row: icon + label badge + optional categoria badge */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span style={{ color: c.accent, flexShrink: 0, display: 'flex' }}><c.Icon size={13} /></span>
+        <span
+          style={{
+            fontSize: 'var(--text-xs)',
+            fontWeight: 600,
+            color: c.badgeText,
+            background: c.badgeBg,
+            borderRadius: 6,
+            padding: '1px 7px',
+          }}
+        >
+          {c.label}
         </span>
-        <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text)', lineHeight: 1.4, flex: 1 }}>
-          {insight.texto}
-        </p>
-      </div>
-      {insight.limite_sugerido != null && (
-        <div style={{ paddingLeft: 23 }}>
+        {categoriaLabel && (
           <span
             style={{
               fontSize: 'var(--text-xs)',
-              fontWeight: 600,
-              color: c.text,
-              background: 'transparent',
-              border: `1px solid ${c.text}`,
+              color: 'var(--text-muted)',
+              background: 'var(--surface-2)',
               borderRadius: 6,
-              padding: '2px 7px',
-              opacity: 0.85,
+              padding: '1px 7px',
             }}
           >
-            Límite sugerido: {formatCOP(insight.limite_sugerido)}
+            {categoriaLabel}
           </span>
-        </div>
+        )}
+      </div>
+
+      {/* Text */}
+      <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text)', lineHeight: 1.45, margin: 0 }}>
+        {insight.texto}
+      </p>
+
+      {/* Límite sugerido badge — only when not already mentioned */}
+      {showLimiteBadge && (
+        <span
+          style={{
+            alignSelf: 'flex-start',
+            fontSize: 'var(--text-xs)',
+            fontWeight: 600,
+            color: c.accent,
+            background: c.badgeBg,
+            borderRadius: 6,
+            padding: '2px 8px',
+          }}
+        >
+          Límite: {limiteStr}
+        </span>
       )}
     </div>
   )
