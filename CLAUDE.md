@@ -4,7 +4,7 @@
 
 **BilleteClaro** — PWA de finanzas personales para Colombia. Lee automáticamente correos de notificación de bancos desde Gmail, extrae cada transacción con parsers específicos + IA como fallback, y presenta un dashboard financiero con asesor IA.
 
-- Dominio objetivo: `billeteclaro.app`
+- Dominio: `billeteclaro.com` (comprado en Cloudflare)
 - Mercado: Colombia (MVP)
 - Supabase project ref: `txfnesqouciiiklhsjaw` (us-east-1)
 
@@ -214,13 +214,22 @@ Flujos a cubrir (en orden de prioridad):
 
 ### ⬜ Deploy
 
-| Paso | Descripción |
-| ---- | ----------- |
-| 1 | `npm run build` sin errores |
-| 2 | Crear proyecto Vercel, conectar repo, agregar env vars |
-| 3 | Comprar `billeteclaro.app` (~$15/año en Namecheap) |
-| 4 | Conectar dominio a Vercel |
-| 5 | Actualizar Google OAuth: agregar `https://billeteclaro.app/api/auth/callback` y `.../gmail-callback` |
-| 6 | Probar sync end-to-end en prod |
+**Dominio:** `billeteclaro.com` — comprado en Cloudflare ($10.44/yr). DNS gestionado desde Cloudflare (CDN + SSL + DDoS gratis).
 
-**Hosting recomendado:** Vercel — deploy automático desde `main`, dominio custom en plan Hobby.
+| Paso | Estado | Descripción |
+| ---- | ------ | ----------- |
+| 1 | ⬜ | `npm run build` sin errores |
+| 2 | ⬜ | Crear proyecto en [vercel.com](https://vercel.com) → Import Git Repository → conectar repo |
+| 3 | ⬜ | En Vercel: Settings → Environment Variables → agregar todas las vars de `.env.local` |
+| 4 | ⬜ | En Vercel: Settings → Domains → agregar `billeteclaro.com` y `www.billeteclaro.com` → Vercel muestra los registros DNS a agregar |
+| 5 | ⬜ | En Cloudflare: DNS → agregar los registros que dio Vercel (tipo `A` o `CNAME`). **Desactivar el proxy naranja (nube)** en el registro que apunta a Vercel — dejarlo solo como DNS |
+| 6 | ⬜ | Esperar propagación DNS (5-30 min). Verificar en Vercel que el dominio aparece con ✓ |
+| 7 | ⬜ | Google Cloud Console → APIs → Credenciales → OAuth 2.0 → agregar URIs autorizadas: `https://billeteclaro.com/api/auth/callback` y `https://billeteclaro.com/api/auth/gmail-callback` |
+| 8 | ⬜ | Supabase Dashboard → Authentication → URL Configuration → agregar `https://billeteclaro.com` en Site URL y Redirect URLs |
+| 9 | ⬜ | Probar login con Google en prod |
+| 10 | ⬜ | Probar sync de emails end-to-end en prod |
+
+**Notas:**
+- Vercel plan Hobby es gratis e incluye dominio custom y SSL automático
+- El SSL de Cloudflare no se necesita activar — Vercel lo gestiona. Cloudflare actúa solo como DNS
+- Si en algún paso Vercel da error de SSL, verificar que el proxy de Cloudflare (nube naranja) esté desactivado en el registro DNS
