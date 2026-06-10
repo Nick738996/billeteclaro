@@ -84,6 +84,7 @@ export async function runSync(userId: string, admin: Admin): Promise<SyncResult>
           allTransactions.push({ id: email.id, extracted: { ...parsed, banco: email.banco } })
         } else {
           omitidosCount++
+          console.log(`[sync] omitido ${email.banco} — "${email.subject}"`)
         }
       }
     }
