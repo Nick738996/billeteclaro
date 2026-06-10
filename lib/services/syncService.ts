@@ -6,6 +6,7 @@ import {
 } from '@/lib/gmail/client'
 import { trySpecificParser } from '@/lib/parsers'
 import { extractWithGroq } from '@/lib/ai/extractor'
+import { classifyMerchants } from '@/lib/ai/categorizer'
 import { generateAuditId } from '@/lib/utils/auditId'
 import { asignarMesContable } from '@/lib/utils/mesContable'
 import { deduplicateUber } from '@/lib/utils/deduplicateUber'
@@ -109,7 +110,23 @@ export async function runSync(userId: string, admin: Admin): Promise<SyncResult>
       }
     }
 
-    // 6. FASE 2 — dedup Uber (ver lib/utils/deduplicateUber.ts)
+    // 6. FASE 1.5 — categorización IA para comercios sin categoría
+    const unknownMerchants = [...new Set(
+      allTransactions
+        .filter(({ extracted }) => extracted.categoria === 'OTRO' && extracted.comercio)
+        .map(({ extracted }) => extracted.comercio!)
+    )]
+    if (unknownMerchants.length > 0) {
+      const catMap = await classifyMerchants(unknownMerchants)
+      for (const tx of allTransactions) {
+        if (tx.extracted.categoria === 'OTRO' && tx.extracted.comercio && catMap[tx.extracted.comercio]) {
+          tx.extracted.categoria = catMap[tx.extracted.comercio]
+        }
+      }
+      console.log(`[sync] categorización IA: ${Object.keys(catMap).length}/${unknownMerchants.length} comercios clasificados`)
+    }
+
+    // 7. FASE 2 — dedup Uber (ver lib/utils/deduplicateUber.ts)
     const { transactions: deduped, preauthIds } = deduplicateUber(allTransactions)
 
     // 7. FASE 3 — insertar
