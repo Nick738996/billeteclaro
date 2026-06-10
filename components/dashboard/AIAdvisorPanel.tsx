@@ -204,9 +204,8 @@ export default function AIAdvisorPanel({ mes, budgetCount, txCount, contextVersi
       const res = await fetch(`/api/ai/insights?mes=${mes}`)
       const data = await res.json()
       if (!res.ok) {
-        const isQuota = data?.error === 'quota_exceeded'
-        throw new Error(isQuota
-          ? 'Cupo de Gemini agotado por hoy. Vuelve mañana o activa billing en Google AI Studio.'
+        throw new Error(res.status === 429
+          ? (data?.error ?? 'Límite diario de IA alcanzado — vuelve en unos minutos')
           : 'No se pudieron cargar los insights. Intenta de nuevo.')
       }
       setInsights(data.insights ?? [])

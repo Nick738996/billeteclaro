@@ -209,16 +209,22 @@ export async function getInsights(
     }
   }
 
-  const completion = await groq.chat.completions.create({
-    model: 'llama-3.3-70b-versatile',
-    temperature: 0.1,
-    max_tokens: 1024,
-    response_format: { type: 'json_object' },
-    messages: [
-      { role: 'system', content: INSIGHTS_SYSTEM_PROMPT },
-      { role: 'user',   content: `CONTEXTO DEL USUARIO:\n${buildInsightsContextPrompt(ctx)}` },
-    ],
-  })
+  let completion
+  try {
+    completion = await groq.chat.completions.create({
+      model: 'llama-3.3-70b-versatile',
+      temperature: 0.1,
+      max_tokens: 1024,
+      response_format: { type: 'json_object' },
+      messages: [
+        { role: 'system', content: INSIGHTS_SYSTEM_PROMPT },
+        { role: 'user',   content: `CONTEXTO DEL USUARIO:\n${buildInsightsContextPrompt(ctx)}` },
+      ],
+    })
+  } catch (e: any) {
+    if (e?.status === 429) throw Object.assign(new Error('rate_limit'), { status: 429 })
+    throw e
+  }
 
   const text = completion.choices[0]?.message?.content?.trim() ?? ''
   const insights: Insight[] = Array.isArray(JSON.parse(text).insights) ? JSON.parse(text).insights : []
