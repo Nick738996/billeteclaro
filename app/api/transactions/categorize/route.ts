@@ -1,31 +1,29 @@
-import { NextResponse } from 'next/server'
-import { getAuthUser } from '@/lib/supabase/server'
+import { ok, err } from '@/lib/api/response'
+import { withAuth } from '@/lib/api/withAuth'
+import { batchCategorize } from '@/lib/services/transactionService'
+import type { CategoryChange } from '@/lib/services/transactionService'
 import type { Categoria } from '@/lib/types'
 
-// PATCH /api/transactions/categorize  body: { changes: [{id, categoria}] }
-export async function PATCH(request: Request) {
-  const { user, supabase } = await getAuthUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const { changes } = await request.json() as { changes: { id: string; categoria: Categoria }[] }
-  if (!Array.isArray(changes) || changes.length === 0) {
-    return NextResponse.json({ error: 'changes requeridos' }, { status: 400 })
+// PATCH /api/transactions/categorize  body: { changes: [{ id, categoria }] }
+export const PATCH = withAuth(async (req, user, supabase) => {
+  const body = await req.json() as { changes?: unknown[] }
+  if (!Array.isArray(body.changes) || body.changes.length === 0) {
+    return err('changes requeridos', 400)
   }
 
-  const results = await Promise.all(
-    changes.map(({ id, categoria }) =>
-      supabase
-        .from('transactions')
-        .update({ categoria })
-        .eq('id', id)
-        .eq('user_id', user.id)
-    )
-  )
+  const validated = body.changes.filter((c): c is CategoryChange =>
+    typeof c === 'object' && c !== null &&
+    typeof (c as CategoryChange).id       === 'string' &&
+    typeof (c as CategoryChange).categoria === 'string'
+  ).map(c => ({ id: c.id, categoria: c.categoria as Categoria }))
 
-  const failed = results.filter(r => r.error)
-  if (failed.length > 0) {
-    return NextResponse.json({ error: 'Algunos cambios fallaron', count: failed.length }, { status: 500 })
+  if (!validated.length) return err('Ningún cambio válido', 400)
+
+  try {
+    await batchCategorize(supabase, user.id, validated)
+    return ok({ ok: true, updated: validated.length })
+  } catch (e) {
+    console.error('[PATCH /api/transactions/categorize]', { userId: user.id }, e)
+    return err('Error categorizando transacciones')
   }
-
-  return NextResponse.json({ ok: true, updated: changes.length })
-}
+})

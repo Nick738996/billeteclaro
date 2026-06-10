@@ -1,98 +1,52 @@
-import { NextResponse } from 'next/server'
-import { createClient, createAdminClient } from '@/lib/supabase/server'
-import { startOfMonth, endOfMonth, parseISO } from 'date-fns'
+import { ok, err } from '@/lib/api/response'
+import { withAuth } from '@/lib/api/withAuth'
+import { createAdminClient } from '@/lib/supabase/server'
+import {
+  fetchMonthTransactions,
+  patchTransaction,
+  deleteAllTransactions,
+} from '@/lib/services/transactionService'
+import type { Categoria } from '@/lib/types'
 
-export async function GET(request: Request) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+// GET /api/transactions?month=YYYY-MM
+export const GET = withAuth(async (req, user, supabase) => {
+  const mes = new URL(req.url).searchParams.get('month') ?? new Date().toISOString().slice(0, 7)
+  try {
+    const data = await fetchMonthTransactions(supabase, user.id, mes)
+    return ok(data)
+  } catch (e) {
+    console.error('[GET /api/transactions]', { userId: user.id, mes }, e)
+    return err('Error cargando transacciones')
   }
+})
 
-  const url = new URL(request.url)
-  const monthParam = url.searchParams.get('month') // YYYY-MM
-
-  let start: Date
-  let end: Date
-
-  if (monthParam) {
-    const ref = parseISO(`${monthParam}-01`)
-    start = startOfMonth(ref)
-    end = endOfMonth(ref)
-  } else {
-    const now = new Date()
-    start = startOfMonth(now)
-    end = endOfMonth(now)
-  }
-
-  const { data, error } = await supabase
-    .from('transactions')
-    .select('*')
-    .eq('user_id', user.id)
-    .gte('fecha', start.toISOString())
-    .lte('fecha', end.toISOString())
-    .order('fecha', { ascending: false })
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
-  }
-
-  return NextResponse.json(data)
-}
-
-export async function PATCH(request: Request) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  const body = await request.json()
-  const { id, categoria, subcategoria, comercio } = body
-
-  if (!id) {
-    return NextResponse.json({ error: 'Missing id' }, { status: 400 })
-  }
+// PATCH /api/transactions  body: { id, categoria?, subcategoria?, comercio? }
+export const PATCH = withAuth(async (req, user, supabase) => {
+  const body = await req.json() as { id?: string; categoria?: Categoria; subcategoria?: string; comercio?: string }
+  if (!body.id) return err('id es requerido', 400)
 
   const updates: Record<string, unknown> = {}
-  if (categoria) updates.categoria = categoria
-  if (subcategoria !== undefined) updates.subcategoria = subcategoria
-  if (comercio !== undefined) updates.comercio = comercio
+  if (body.categoria    !== undefined) updates.categoria    = body.categoria
+  if (body.subcategoria !== undefined) updates.subcategoria = body.subcategoria
+  if (body.comercio     !== undefined) updates.comercio     = body.comercio
 
-  const { data, error } = await supabase
-    .from('transactions')
-    .update(updates)
-    .eq('id', id)
-    .eq('user_id', user.id)
-    .select()
-    .single()
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+  try {
+    const data = await patchTransaction(supabase, user.id, body.id, updates)
+    return ok(data)
+  } catch (e) {
+    console.error('[PATCH /api/transactions]', { userId: user.id, id: body.id }, e)
+    return err('Error actualizando transacción')
   }
+})
 
-  return NextResponse.json(data)
-}
-
-export async function DELETE() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
+// DELETE /api/transactions  — borra TODAS las del usuario (reset desde HeaderPill)
+export const DELETE = withAuth(async (_req, user) => {
   const admin = createAdminClient()
-  const { error } = await admin
-    .from('transactions')
-    .delete()
-    .eq('user_id', user.id)
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+  try {
+    await deleteAllTransactions(admin, user.id)
+    return ok({ ok: true })
+  } catch (e) {
+    console.error('[DELETE /api/transactions]', { userId: user.id }, e)
+    return err('Error borrando transacciones')
   }
-
-  return NextResponse.json({ ok: true })
-}
+})

@@ -1,51 +1,32 @@
-import { NextResponse } from 'next/server'
-import { getAuthUser, createAdminClient } from '@/lib/supabase/server'
-import { generateAuditId } from '@/lib/utils/auditId'
-import type { Categoria, Banco, TipoTransaccion } from '@/lib/types'
+import { ok, err } from '@/lib/api/response'
+import { withAuth } from '@/lib/api/withAuth'
+import { createAdminClient } from '@/lib/supabase/server'
+import { createManualTransactions } from '@/lib/services/transactionService'
+import type { ManualTxInput } from '@/lib/services/transactionService'
 
-interface ManualTx {
-  fecha: string
-  monto: number
-  comercio: string
-  categoria: Categoria
-  tipo: TipoTransaccion
-  banco: Banco
-}
+// POST /api/transactions/manual  body: { items: ManualTxInput[] }
+export const POST = withAuth(async (req, user, supabase) => {
+  const body = await req.json() as { items?: unknown[] }
+  if (!Array.isArray(body.items) || body.items.length === 0) {
+    return err('items requeridos', 400)
+  }
 
-// POST /api/transactions/manual  body: { items: ManualTx[] }
-export async function POST(request: Request) {
-  const { user, supabase } = await getAuthUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const validated = body.items.filter((i): i is ManualTxInput =>
+    typeof i === 'object' && i !== null &&
+    typeof (i as ManualTxInput).fecha    === 'string' &&
+    typeof (i as ManualTxInput).monto    === 'number' && (i as ManualTxInput).monto > 0 &&
+    typeof (i as ManualTxInput).categoria === 'string' &&
+    typeof (i as ManualTxInput).tipo     === 'string' &&
+    typeof (i as ManualTxInput).banco    === 'string'
+  )
+  if (!validated.length) return err('Ningún item válido', 400)
+
   const admin = createAdminClient()
-
-  const { items } = await request.json() as { items: ManualTx[] }
-  if (!Array.isArray(items) || items.length === 0) {
-    return NextResponse.json({ error: 'items requeridos' }, { status: 400 })
+  try {
+    const count = await createManualTransactions(supabase, admin, user.id, validated)
+    return ok({ ok: true, count })
+  } catch (e) {
+    console.error('[POST /api/transactions/manual]', { userId: user.id }, e)
+    return err('Error guardando transacciones')
   }
-
-  // Procesar secuencialmente para evitar race condition en generateAuditId:
-  // dos queries concurrentes al mismo día devuelven el mismo count → IDs duplicados.
-  const rows = []
-  for (const tx of items) {
-    const fecha = new Date(tx.fecha)
-    const auditId = await generateAuditId(admin, user.id, fecha)
-    rows.push({
-      user_id:         user.id,
-      gmail_message_id:`manual_${crypto.randomUUID()}`,
-      fecha:           fecha.toISOString(),
-      monto:           tx.monto,
-      comercio:        tx.comercio || null,
-      descripcion:     tx.comercio || null,
-      banco:           tx.banco,
-      tipo:            tx.tipo,
-      categoria:       tx.categoria,
-      id_auditoria:    auditId,
-      procesado:       true,
-    })
-  }
-
-  const { error } = await supabase.from('transactions').insert(rows)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
-  return NextResponse.json({ ok: true, count: rows.length })
-}
+})
