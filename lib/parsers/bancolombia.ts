@@ -70,47 +70,57 @@ export function parseBancolombia(email: EmailInput): ParseResult {
 function parseMovimiento(email: EmailInput): ParseResult {
   const body = email.body
 
-  // Monto: "$ 120,000.00" o "$6.790,00"
-  const montoMatch = body.match(/\$\s*([\d.,]+)/)
-  if (!montoMatch) return null
+  // Monto: busca "Valor: $120,000.00" primero; cae a cualquier "$xxx" si no
+  const valorMatch = body.match(/Valor:\s*\$\s*([\d.,]+)/i)
+    ?? body.match(/\$\s*([\d.,]+)/)
+  if (!valorMatch) return null
 
-  const monto = parseMontoBancolombia(montoMatch[1])
+  const monto = parseMontoBancolombia(valorMatch[1])
   if (!monto || monto <= 0) return null
 
-  // Comercio / establecimiento
-  const comercioMatch = body.match(/(?:establecimiento|comercio|descripci[oó]n)[:\s]+([^\n]{1,80})/i)
+  // Comercio: soporta HTML aplanado (sin \n) y texto plano (con \n)
+  // "Establecimiento: X Valor:" → captura hasta la siguiente clave o fin de línea
+  const comercioMatch = body.match(
+    /(?:establecimiento|cajero|convenio)[:\s]+(.+?)(?=\s+(?:Valor|Fecha|Hora)[:\s]|\n|$)/i
+  )
   const comercio = comercioMatch ? toTitleCase(comercioMatch[1].trim()) : null
 
-  // Fecha: "dd/mm/yyyy" o "dd de mes de yyyy"
+  // Fecha: "07/06/2026" (dd/mm/yyyy) o "07 de junio de 2026"
   let fecha: string | null = null
-  const fechaSlashMatch = body.match(/(\d{2})\/(\d{2})\/(\d{4})/)
+  const fechaSlashMatch = body.match(/Fecha:\s*(\d{2})\/(\d{2})\/(\d{4})/i)
+    ?? body.match(/(\d{2})\/(\d{2})\/(\d{4})/)
   if (fechaSlashMatch) {
-    const [, d, m, y] = fechaSlashMatch
+    const [, d, m, y] = fechaSlashMatch.length === 4
+      ? [, fechaSlashMatch[1], fechaSlashMatch[2], fechaSlashMatch[3]]
+      : [, fechaSlashMatch[1], fechaSlashMatch[2], fechaSlashMatch[3]]
     fecha = `${y}-${m}-${d}T00:00:00`
   } else {
-    const fechaTextoMatch = body.match(/(\d{1,2}\s+de\s+\w+\s+de\s+\d{4})/i)
+    const fechaTextoMatch = body.match(/Fecha:\s*(\d{1,2}\s+de\s+\w+\s+de\s+\d{4})/i)
+      ?? body.match(/(\d{1,2}\s+de\s+\w+\s+de\s+\d{4})/i)
     if (fechaTextoMatch) fecha = parseSpanishDate(fechaTextoMatch[1])
   }
 
   // Tipo de transacción
-  const bodyLow = body.toLowerCase()
+  const haystack = (body + ' ' + email.subject).toLowerCase()
   let tipo: ParseResult extends null ? never : NonNullable<ParseResult>['tipo'] = 'COMPRA'
-  if (/retiro/i.test(bodyLow))                                      tipo = 'RETIRO'
-  else if (/transferencia enviada|transfiri[oó]|enviaste/i.test(bodyLow)) tipo = 'TRANSFERENCIA_ENVIADA'
-  else if (/transferencia recibida|recibiste/i.test(bodyLow))       tipo = 'TRANSFERENCIA_RECIBIDA'
-  else if (/pago de servicio|recaudo/i.test(bodyLow))               tipo = 'PAGO_SERVICIO'
+  if (/retiro/i.test(haystack))                                            tipo = 'RETIRO'
+  else if (/transferencia enviada|transfiri[oó]|enviaste/i.test(haystack)) tipo = 'TRANSFERENCIA_ENVIADA'
+  else if (/transferencia recibida|recibiste/i.test(haystack))             tipo = 'TRANSFERENCIA_RECIBIDA'
+  else if (/pago de servicio|recaudo/i.test(haystack))                     tipo = 'PAGO_SERVICIO'
 
   return {
-    fecha:       fecha ?? new Date(email.date).toISOString(),
+    fecha:        fecha ?? new Date(email.date).toISOString(),
     monto,
     comercio,
-    descripcion: comercio ? `${tipo === 'COMPRA' ? 'Compra en' : 'Pago a'} ${comercio}` : 'Transacción Bancolombia',
-    banco:       'BANCOLOMBIA',
+    descripcion:  comercio
+      ? `${tipo === 'COMPRA' ? 'Compra en' : 'Pago a'} ${comercio}`
+      : 'Transacción Bancolombia',
+    banco:        'BANCOLOMBIA',
     tipo,
-    categoria:   guessCategoria(comercio ?? ''),
+    categoria:    guessCategoria(comercio ?? ''),
     subcategoria: null,
-    moneda:      'COP',
-    monto_usd:   null,
-    flags:       [],
+    moneda:       'COP',
+    monto_usd:    null,
+    flags:        [],
   }
 }
