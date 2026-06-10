@@ -52,7 +52,13 @@ export function buildAdvisorContext(
 }
 
 export function hashContext(ctx: AdvisorContext): string {
-  const str = JSON.stringify(ctx)
+  // Solo datos financieros — el tiempo (días transcurridos/restantes) no cambia los insights
+  const financial = {
+    gastos:      ctx.gastos_por_categoria,
+    presupuesto: ctx.presupuesto_por_categoria,
+    ingresos:    ctx.ingreso_estimado,
+  }
+  const str = JSON.stringify(financial)
   let hash = 0
   for (let i = 0; i < str.length; i++) {
     hash = (hash * 31 + str.charCodeAt(i)) >>> 0
