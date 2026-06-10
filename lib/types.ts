@@ -21,6 +21,8 @@ export type Categoria =
   | 'SUSCRIPCIONES'
   | 'COMPRAS_ONLINE'
   | 'INVERSION'
+  | 'AHORROS'
+  | 'DEUDA'
   | 'DONACIONES'
   | 'EDUCACION'
   | 'REEMBOLSABLE'
@@ -85,7 +87,7 @@ export interface BudgetEntry {
 /** Categorías disponibles para presupuesto mensual (excluye TRANSFERENCIA e INGRESO) */
 export const PRESUPUESTO_CATS: Categoria[] = [
   'HOGAR', 'TRANSPORTE', 'SALIDAS', 'SALUD', 'SUSCRIPCIONES',
-  'COMPRAS_ONLINE', 'INVERSION', 'DONACIONES', 'EDUCACION', 'REEMBOLSABLE', 'OTRO',
+  'COMPRAS_ONLINE', 'INVERSION', 'AHORROS', 'DEUDA', 'DONACIONES', 'EDUCACION', 'REEMBOLSABLE', 'OTRO',
 ]
 
 export interface ExtractedTransaction {
@@ -118,6 +120,8 @@ export const CATEGORIA_LABELS: Record<Categoria, string> = {
   SUSCRIPCIONES: 'Suscripciones',
   COMPRAS_ONLINE: 'Compras Online',
   INVERSION: 'Inversión',
+  AHORROS: 'Ahorros',
+  DEUDA: 'Deuda',
   DONACIONES: 'Donaciones',
   EDUCACION: 'Educación',
   REEMBOLSABLE: 'Reembolsable',
@@ -133,7 +137,9 @@ export const CATEGORIA_COLORS: Record<Categoria, string> = {
   SALUD: '#10b981',       // emerald  — salud
   SUSCRIPCIONES: '#d946ef', // fuchsia — Netflix/Spotify
   COMPRAS_ONLINE: '#0ea5e9', // sky   — compras digitales
-  INVERSION: '#14b8a6',   // teal     — ahorro/inversión
+  INVERSION: '#14b8a6',   // teal     — inversión
+  AHORROS: '#06b6d4',     // cyan     — ahorros
+  DEUDA: '#ef4444',       // red      — deudas/créditos
   DONACIONES: '#f97316',  // orange   — donaciones
   EDUCACION: '#84cc16',   // lime     — educación
   REEMBOLSABLE: '#38bdf8', // light-blue — reembolsable
