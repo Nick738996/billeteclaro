@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/client'
 import { Lock, Mail, BarChart2 } from 'lucide-react'
 import ThemeToggle from '@/components/ui/ThemeToggle'
+import { TEST_IDS } from '@/lib/testIds'
 
 const GoogleIcon = () => (
   <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24">
@@ -91,6 +92,8 @@ export default function LandingPage() {
           </p>
           <button
             onClick={handleLogin}
+            data-testid={TEST_IDS.AUTH_GOOGLE_BUTTON}
+            aria-label="Entrar con Google"
             className="w-full flex items-center justify-center gap-3 font-medium transition-opacity hover:opacity-90 active:scale-95"
             style={{
               background: 'var(--text)',

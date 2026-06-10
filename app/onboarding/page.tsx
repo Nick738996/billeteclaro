@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ChevronRight } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { TEST_IDS } from '@/lib/testIds'
 
 export default function OnboardingStep1() {
   const router = useRouter()
@@ -67,6 +68,7 @@ export default function OnboardingStep1() {
 
       <button
         onClick={() => router.push('/onboarding/step-2')}
+        data-testid={TEST_IDS.ONBOARDING_STEP1_CTA}
         className="w-full flex items-center justify-center gap-2 font-semibold transition-opacity hover:opacity-90 active:scale-95"
         style={{
           background: 'var(--green)',

@@ -12,6 +12,7 @@ import { ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { Transaction, MonthlyStats, Categoria } from '@/lib/types'
 import { isIngreso, isGasto } from '@/lib/types'
+import { TEST_IDS } from '@/lib/testIds'
 import StatsCards from '@/components/dashboard/StatsCards'
 import SpendingChart from '@/components/dashboard/SpendingChart'
 import TransactionsList from '@/components/dashboard/TransactionsList'
@@ -166,6 +167,8 @@ export default function DashboardClient({
             {/* MEJORA ⑤: w-8 h-8 → w-11 h-11 para touch target de 44px */}
             <button
               onClick={() => navigate(prevMonth)}
+              data-testid={TEST_IDS.DASHBOARD_MONTH_PREV}
+              aria-label="Mes anterior"
               className="w-11 h-11 rounded-full flex items-center justify-center transition-colors"
               style={{ color: 'var(--text-muted)' }}
             >
@@ -174,6 +177,7 @@ export default function DashboardClient({
 
             <h1
               className="font-semibold capitalize"
+              aria-live="polite"
               style={{ fontSize: 'var(--text-xl)', color: 'var(--text)' }}
             >
               {label}
@@ -182,6 +186,9 @@ export default function DashboardClient({
             <button
               onClick={() => navigate(nextMonth)}
               disabled={isCurrent}
+              data-testid={TEST_IDS.DASHBOARD_MONTH_NEXT}
+              aria-label="Mes siguiente"
+              aria-disabled={isCurrent}
               className="w-11 h-11 rounded-full flex items-center justify-center transition-colors disabled:opacity-30"
               style={{ color: 'var(--text-muted)' }}
             >

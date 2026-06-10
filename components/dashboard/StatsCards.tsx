@@ -1,4 +1,5 @@
 import { formatCOPCompact, type MonthlyStats } from '@/lib/types'
+import { TEST_IDS } from '@/lib/testIds'
 
 interface Props {
   stats: MonthlyStats
@@ -47,6 +48,8 @@ export default function StatsCards({ stats }: Props) {
         <div className="flex items-end justify-between">
           <span
             className="tabular-nums"
+            data-testid={TEST_IDS.DASHBOARD_BALANCE_AMOUNT}
+            aria-label={`Balance neto: ${surplus ? 'positivo' : 'negativo'} ${formatCOPCompact(Math.abs(balance))}`}
             style={{ fontSize: 'var(--text-4xl)', fontWeight: 700, color: bColor, letterSpacing: '-0.03em', lineHeight: 1 }}
           >
             {formatCOPCompact(Math.abs(balance))}
@@ -70,9 +73,9 @@ export default function StatsCards({ stats }: Props) {
       {/* Gastos + Ingresos secundarios */}
       <div className="grid grid-cols-2 gap-2">
         {[
-          { label: 'Gastos',   arrow: '↓', value: formatCOPCompact(gastos),   color: 'var(--red)',   sub: `${transacciones} mov.`,  isIncome: false },
-          { label: 'Ingresos', arrow: '↑', value: formatCOPCompact(ingresos), color: 'var(--green)', sub: 'este mes',               isIncome: true  },
-        ].map(({ label, arrow, value, color, sub, isIncome }) => (
+          { label: 'Gastos',   arrow: '↓', value: formatCOPCompact(gastos),   color: 'var(--red)',   sub: `${transacciones} mov.`,  isIncome: false, testId: TEST_IDS.DASHBOARD_GASTOS_AMOUNT },
+          { label: 'Ingresos', arrow: '↑', value: formatCOPCompact(ingresos), color: 'var(--green)', sub: 'este mes',               isIncome: true,  testId: TEST_IDS.DASHBOARD_INGRESOS_AMOUNT },
+        ].map(({ label, arrow, value, color, sub, isIncome, testId }) => (
           <div
             key={label}
             style={{
@@ -94,7 +97,7 @@ export default function StatsCards({ stats }: Props) {
             >
               {arrow} {label}
             </p>
-            <p className="tabular-nums" style={{ fontSize: 'var(--text-2xl)', fontWeight: 600, color, letterSpacing: '-0.02em' }}>
+            <p className="tabular-nums" data-testid={testId} style={{ fontSize: 'var(--text-2xl)', fontWeight: 600, color, letterSpacing: '-0.02em' }}>
               {value}
             </p>
             <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginTop: 3 }}>{sub}</p>

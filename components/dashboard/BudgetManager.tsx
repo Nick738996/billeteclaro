@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Check, RefreshCw, ChevronRight, Plus, Trash2, Copy } from 'lucide-react'
 import { CATEGORIA_LABELS, formatCOP, formatCOPCompact, PRESUPUESTO_CATS, type Categoria, type BudgetEntry, type BudgetSubcat } from '@/lib/types'
+import { TEST_IDS } from '@/lib/testIds'
 
 function pctColor(pct: number) {
   if (pct >= 100) return 'var(--red)'
@@ -124,7 +125,7 @@ export default function BudgetManager({ mes, gastosPorCategoria, onBudgetsChange
   )
 
   return (
-    <div className="card">
+    <div className="card" data-testid={TEST_IDS.BUDGET_MANAGER}>
 
       {/* Header */}
       <div className="flex items-center justify-between" style={{ padding: '16px 16px 12px' }}>
@@ -149,6 +150,8 @@ export default function BudgetManager({ mes, gastosPorCategoria, onBudgetsChange
         <button
           onClick={handleSave}
           disabled={saving || !isDirty}
+          data-testid={TEST_IDS.BUDGET_SAVE_BUTTON}
+          aria-label={saving ? 'Guardando presupuesto' : savedOk ? 'Presupuesto guardado' : 'Guardar presupuesto'}
           style={{
             display: 'flex', alignItems: 'center', gap: 5,
             padding: '6px 14px',
@@ -253,9 +256,14 @@ function CategoryRow({ cat, entry, savedEntry, gasto, isExpanded, onToggle, onCh
 
       {/* Fila principal */}
       <div
+        role="button"
+        tabIndex={0}
         className="flex items-center gap-2"
+        aria-expanded={isExpanded}
+        aria-label={`${CATEGORIA_LABELS[cat]}: ${limite > 0 ? `límite ${formatCOP(limite)}` : 'sin límite'}${isExpanded ? ', expandido' : ''}`}
         style={{ padding: '12px 16px', cursor: 'pointer' }}
         onClick={onToggle}
+        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle() } }}
       >
         {/* Chevron */}
         <ChevronRight
@@ -384,19 +392,21 @@ function SubcatRow({ sub, onNameChange, onMontoChange, onRemove }: {
         value={sub.nombre}
         onChange={e => onNameChange(e.target.value)}
         placeholder="Nombre (ej. Mercado)"
+        aria-label="Nombre de la subcategoría"
         style={{ flex: 1, padding: '4px 8px' }}
       />
       <div className="flex items-center gap-1" style={{ flexShrink: 0 }}>
-        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>$</span>
+        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }} aria-hidden="true">$</span>
         <input
           className="input-field"
           value={sub.monto > 0 ? sub.monto.toLocaleString('es-CO') : ''}
           onChange={e => onMontoChange(e.target.value)}
           placeholder="0"
+          aria-label="Monto de la subcategoría"
           style={{ width: 88, padding: '4px 8px', textAlign: 'right' }}
         />
       </div>
-      <button onClick={onRemove} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-subtle)', display: 'flex', padding: 0 }}>
+      <button onClick={onRemove} aria-label="Eliminar subcategoría" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-subtle)', display: 'flex', padding: 0 }}>
         <Trash2 size={12} />
       </button>
     </div>
@@ -416,6 +426,8 @@ function DirectInput({ value, onChange }: { value: number; onChange: (v: string)
       value={local}
       onChange={e => { setLocal(e.target.value); onChange(e.target.value) }}
       placeholder="0"
+      data-testid={TEST_IDS.BUDGET_CATEGORY_INPUT}
+      aria-label="Monto del presupuesto"
       style={{ width: 110, padding: '4px 8px', fontSize: 'var(--text-sm)', textAlign: 'right' }}
     />
   )

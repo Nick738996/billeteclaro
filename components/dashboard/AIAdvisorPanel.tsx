@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { AlertTriangle, Lightbulb, CircleCheck, TrendingUp, Eye, Send, ChevronDown, ChevronUp, type LucideIcon } from 'lucide-react'
 import type { Insight, InsightTipo } from '@/lib/types'
 import { formatCOP, CATEGORIA_LABELS } from '@/lib/types'
+import { TEST_IDS } from '@/lib/testIds'
 
 interface Props {
   mes: string
@@ -45,6 +46,9 @@ function InsightCard({ insight }: { insight: Insight }) {
 
   return (
     <div
+      data-testid={TEST_IDS.ADVISOR_INSIGHT_CARD}
+      role="article"
+      aria-label={`${c.label}${insight.categoria ? ` — ${CATEGORIA_LABELS[insight.categoria as keyof typeof CATEGORIA_LABELS] ?? insight.categoria}` : ''}`}
       style={{
         background: 'var(--surface)',
         border: '1px solid var(--border)',
@@ -284,7 +288,7 @@ export default function AIAdvisorPanel({ mes, budgetCount, txCount, contextVersi
         @keyframes bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }
       `}</style>
 
-      <div className="card">
+      <div className="card" data-testid={TEST_IDS.ADVISOR_PANEL} aria-label="Asesor financiero">
         {/* Header */}
         <div style={{ padding: '14px 16px 0' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
@@ -294,6 +298,8 @@ export default function AIAdvisorPanel({ mes, budgetCount, txCount, contextVersi
             {!loadingInsights && insights.length === 0 && !insightsError && (
               <button
                 onClick={fetchInsights}
+                data-testid={TEST_IDS.ADVISOR_REFRESH_BUTTON}
+                aria-label="Analizar mis finanzas"
                 style={{
                   fontSize: 'var(--text-xs)',
                   fontWeight: 600,
@@ -311,6 +317,8 @@ export default function AIAdvisorPanel({ mes, budgetCount, txCount, contextVersi
             {!loadingInsights && insights.length > 0 && (
               <button
                 onClick={fetchInsights}
+                data-testid={TEST_IDS.ADVISOR_REFRESH_BUTTON}
+                aria-label="Actualizar análisis"
                 style={{
                   fontSize: 'var(--text-xs)',
                   color: 'var(--text-muted)',
@@ -350,6 +358,9 @@ export default function AIAdvisorPanel({ mes, budgetCount, txCount, contextVersi
               setChatOpen(o => !o)
               if (!chatOpen) setTimeout(() => inputRef.current?.focus(), 100)
             }}
+            data-testid={TEST_IDS.ADVISOR_CHAT_TOGGLE}
+            aria-expanded={chatOpen}
+            aria-controls="advisor-chat-section"
             style={{
               width: '100%',
               display: 'flex',
@@ -376,7 +387,7 @@ export default function AIAdvisorPanel({ mes, budgetCount, txCount, contextVersi
 
         {/* Chat */}
         {chatOpen && (
-          <div style={{ borderTop: '1px solid var(--border-soft)' }}>
+          <div id="advisor-chat-section" role="region" aria-label="Chat con el asesor" style={{ borderTop: '1px solid var(--border-soft)' }}>
             {/* Historial */}
             <div
               style={{
@@ -396,6 +407,9 @@ export default function AIAdvisorPanel({ mes, budgetCount, txCount, contextVersi
               {history.map((msg, i) => (
                 <div
                   key={i}
+                  data-testid={TEST_IDS.ADVISOR_CHAT_MESSAGE}
+                  role={msg.role === 'assistant' ? 'status' : undefined}
+                  aria-label={msg.role === 'user' ? 'Tú' : 'Asesor'}
                   style={{
                     display: 'flex',
                     justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
@@ -448,8 +462,10 @@ export default function AIAdvisorPanel({ mes, budgetCount, txCount, contextVersi
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() } }}
-                placeholder="Pregúntame algo…"
+                placeholder="Pregúntame algo… (Enter para enviar)"
                 disabled={sending}
+                aria-label="Mensaje para el asesor"
+                data-testid={TEST_IDS.ADVISOR_CHAT_INPUT}
                 style={{
                   flex: 1,
                   background: 'var(--surface-2)',
@@ -464,6 +480,8 @@ export default function AIAdvisorPanel({ mes, budgetCount, txCount, contextVersi
               <button
                 onClick={sendMessage}
                 disabled={!input.trim() || sending}
+                aria-label="Enviar mensaje"
+                data-testid={TEST_IDS.ADVISOR_CHAT_SEND}
                 style={{
                   width: 36, height: 36,
                   borderRadius: 'var(--radius-pill)',

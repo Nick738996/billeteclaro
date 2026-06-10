@@ -7,6 +7,7 @@
 import { useState } from 'react'
 import { useTheme } from 'next-themes'
 import { RefreshCw, Check, AlertCircle, Trash2, Sun, Moon, LogOut } from 'lucide-react'
+import { TEST_IDS } from '@/lib/testIds'
 
 interface Props {
   onSyncComplete: () => void
@@ -99,7 +100,7 @@ export default function HeaderPill({ onSyncComplete, onSignOut }: Props) {
 
   /* ── Single pill button ─────────────────────────── */
   const PillBtn = ({
-    onClick, icon, color, disabled = false, title, ariaLabel,
+    onClick, icon, color, disabled = false, title, ariaLabel, 'data-testid': testId,
   }: {
     onClick: () => void
     icon: React.ReactNode
@@ -107,12 +108,14 @@ export default function HeaderPill({ onSyncComplete, onSignOut }: Props) {
     disabled?: boolean
     title?: string
     ariaLabel?: string
+    'data-testid'?: string
   }) => (
     <button
       onClick={onClick}
       disabled={disabled}
       title={title}
       aria-label={ariaLabel ?? title}
+      data-testid={testId}
       style={{
         background: 'none',
         border: 'none',
@@ -154,6 +157,7 @@ export default function HeaderPill({ onSyncComplete, onSignOut }: Props) {
         disabled={isBusy}
         title={syncTitle}
         ariaLabel="Sincronizar correos"
+        data-testid={TEST_IDS.DASHBOARD_SYNC_BUTTON}
       />
       <Divider/>
       <PillBtn
@@ -163,6 +167,7 @@ export default function HeaderPill({ onSyncComplete, onSignOut }: Props) {
         disabled={isBusy || syncState !== 'idle'}
         title={resetTitle}
         ariaLabel="Borrar todos los datos"
+        data-testid={TEST_IDS.DASHBOARD_RESET_BUTTON}
       />
       <Divider/>
       <PillBtn
@@ -179,6 +184,7 @@ export default function HeaderPill({ onSyncComplete, onSignOut }: Props) {
         color="var(--text-muted)"
         title="Cerrar sesión"
         ariaLabel="Cerrar sesión"
+        data-testid={TEST_IDS.AUTH_LOGOUT_BUTTON}
       />
     </div>
   )

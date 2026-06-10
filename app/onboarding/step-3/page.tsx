@@ -6,6 +6,7 @@ import { ChevronRight } from 'lucide-react'
 import { format } from 'date-fns'
 import { createClient } from '@/lib/supabase/client'
 import { CATEGORIA_LABELS, formatCOPCompact, isGasto, type Categoria, type Transaction } from '@/lib/types'
+import { TEST_IDS } from '@/lib/testIds'
 
 const ONBOARDING_CATS: Categoria[] = ['TRANSPORTE', 'SALIDAS', 'HOGAR', 'SUSCRIPCIONES']
 
@@ -93,6 +94,8 @@ export default function OnboardingStep3() {
                 placeholder="0"
                 value={budgets[cat]}
                 onChange={e => setBudgets(prev => ({ ...prev, [cat]: e.target.value.replace(/\D/g, '') }))}
+                aria-label={`Presupuesto para ${CATEGORIA_LABELS[cat]}`}
+                data-testid={`${TEST_IDS.BUDGET_CATEGORY_INPUT}-${cat.toLowerCase()}`}
                 className="input-field"
                 style={{ flex: 1, padding: '6px 10px', fontSize: 'var(--text-sm)' }}
               />
@@ -105,6 +108,7 @@ export default function OnboardingStep3() {
         <button
           onClick={() => handleComplete(false)}
           disabled={saving}
+          data-testid={TEST_IDS.ONBOARDING_STEP3_CONTINUE}
           className="w-full flex items-center justify-center gap-2 font-semibold transition-opacity hover:opacity-90 active:scale-95 disabled:opacity-60"
           style={{ background: 'var(--green)', color: '#000', padding: '14px 24px', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-base)', border: 'none', cursor: saving ? 'not-allowed' : 'pointer' }}
         >
