@@ -1,5 +1,5 @@
 import Groq from 'groq-sdk'
-import { startOfMonth, endOfMonth, parseISO, subHours } from 'date-fns'
+import { startOfMonth, endOfMonth, parseISO } from 'date-fns'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { buildAdvisorContext, hashContext } from '@/lib/ai/buildAdvisorContext'
 import { CATEGORIA_LABELS } from '@/lib/types'
@@ -204,21 +204,27 @@ export async function getInsights(
       .eq('mes', mes)
       .single()
 
-    if (cached && cached.context_hash === hash && new Date(cached.generated_at) > subHours(new Date(), 6)) {
+    if (cached && cached.context_hash === hash) {
       return { insights: cached.insights as Insight[], cached: true }
     }
   }
 
-  const completion = await groq.chat.completions.create({
-    model: 'llama-3.3-70b-versatile',
-    temperature: 0.1,
-    max_tokens: 1024,
-    response_format: { type: 'json_object' },
-    messages: [
-      { role: 'system', content: INSIGHTS_SYSTEM_PROMPT },
-      { role: 'user',   content: `CONTEXTO DEL USUARIO:\n${buildInsightsContextPrompt(ctx)}` },
-    ],
-  })
+  let completion
+  try {
+    completion = await groq.chat.completions.create({
+      model: 'llama-3.3-70b-versatile',
+      temperature: 0.1,
+      max_tokens: 1024,
+      response_format: { type: 'json_object' },
+      messages: [
+        { role: 'system', content: INSIGHTS_SYSTEM_PROMPT },
+        { role: 'user',   content: `CONTEXTO DEL USUARIO:\n${buildInsightsContextPrompt(ctx)}` },
+      ],
+    })
+  } catch (e: any) {
+    if (e?.status === 429) throw Object.assign(new Error('rate_limit'), { status: 429 })
+    throw e
+  }
 
   const text = completion.choices[0]?.message?.content?.trim() ?? ''
   const insights: Insight[] = Array.isArray(JSON.parse(text).insights) ? JSON.parse(text).insights : []

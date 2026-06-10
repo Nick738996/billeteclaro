@@ -8,6 +8,7 @@ import {
   type Categoria,
   type Transaction,
 } from '@/lib/types'
+import { TEST_IDS } from '@/lib/testIds'
 
 // MEJORA ②: donut interactivo (toca un slice → filtra la lista)
 //           + barras proporcionales con % en la leyenda
@@ -130,11 +131,18 @@ export default function SpendingChart({ transactions, activeFilter, onFilterChan
       <div className="flex gap-4 items-center">
 
         {/* Donut interactivo */}
-        <div className="flex-shrink-0 relative" style={{ width: S, height: S }}>
-          <svg width={S} height={S} viewBox={`0 0 ${S} ${S}`}>
+        <div
+          className="flex-shrink-0 relative"
+          style={{ width: S, height: S }}
+          data-testid={TEST_IDS.DASHBOARD_DONUT_CHART}
+          role="img"
+          aria-label="Gráfico de gastos por categoría"
+        >
+          <svg width={S} height={S} viewBox={`0 0 ${S} ${S}`} aria-hidden="true">
             {data.map((sl, i) => {
               const isSel    = catActive && sl.categoria === (activeFilter as Categoria)
               const isDimmed = catActive && sl.categoria !== (activeFilter as Categoria)
+              const isSelected = sl.categoria === activeFilter
               return (
                 <path
                   key={i}
@@ -144,9 +152,18 @@ export default function SpendingChart({ transactions, activeFilter, onFilterChan
                   strokeWidth="2.5"
                   opacity={isDimmed ? 0.28 : 1}
                   className="cursor-pointer transition-opacity duration-150"
-                  onClick={() => onFilterChange(
-                    sl.categoria === activeFilter ? 'TODOS' : sl.categoria
-                  )}
+                  role="button"
+                  tabIndex={0}
+                  data-testid={TEST_IDS.DASHBOARD_DONUT_SLICE}
+                  aria-label={`${sl.name}: ${Math.round(sl.pct * 100)}%${isSelected ? ' — activo, presiona para limpiar filtro' : ' — presiona para filtrar'}`}
+                  aria-pressed={isSelected}
+                  onClick={() => onFilterChange(isSelected ? 'TODOS' : sl.categoria)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      onFilterChange(isSelected ? 'TODOS' : sl.categoria)
+                    }
+                  }}
                 />
               )
             })}
@@ -157,6 +174,10 @@ export default function SpendingChart({ transactions, activeFilter, onFilterChan
             className="absolute inset-0 flex flex-col items-center justify-center"
             style={{ gap: 2, cursor: catActive ? 'pointer' : 'default' }}
             onClick={() => catActive && onFilterChange('TODOS')}
+            role={catActive ? 'button' : undefined}
+            aria-label={catActive ? 'Limpiar filtro de categoría' : undefined}
+            tabIndex={catActive ? 0 : undefined}
+            onKeyDown={catActive ? e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onFilterChange('TODOS') } } : undefined}
           >
             <span style={{ fontSize: 9, color: 'var(--text-muted)', letterSpacing: '0.07em', textTransform: 'uppercase' }}>
               {selEntry ? selEntry.name : 'total'}
@@ -180,10 +201,20 @@ export default function SpendingChart({ transactions, activeFilter, onFilterChan
           {data.map((entry, i) => (
             <div
               key={i}
+              role="button"
+              tabIndex={0}
               className="cursor-pointer"
+              aria-pressed={entry.categoria === activeFilter}
+              aria-label={`${entry.name}: ${Math.round(entry.pct * 100)}%`}
               onClick={() => onFilterChange(
                 entry.categoria === activeFilter ? 'TODOS' : entry.categoria
               )}
+              onKeyDown={e => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  onFilterChange(entry.categoria === activeFilter ? 'TODOS' : entry.categoria)
+                }
+              }}
             >
               <div className="flex items-center justify-between mb-1">
                 <div className="flex items-center gap-1.5 min-w-0">

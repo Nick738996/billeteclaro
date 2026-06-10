@@ -2,15 +2,19 @@ import { google } from 'googleapis'
 import type { Banco } from '@/lib/types'
 
 const BANK_SENDERS: Record<string, Banco> = {
-  'noreply@rappicard.co': 'RAPPICARD',
-  'noreply@rappipay.co': 'RAPPIPAY',
-  'noreply@holdingrappipay.co': 'RAPPIPAY',
+  'noreply@rappicard.co':                                        'RAPPICARD',
+  'noreply@rappipay.co':                                         'RAPPIPAY',
+  'noreply@holdingrappipay.co':                                  'RAPPIPAY',
+  'alertasynotificaciones@an.notificacionesbancolombia.com':     'BANCOLOMBIA',
+  'alertasynotificaciones@notificacionesbancolombia.com':        'BANCOLOMBIA',
 }
 
 const GMAIL_SEARCH_QUERY = [
   'from:noreply@rappicard.co',
   'from:noreply@rappipay.co',
   'from:noreply@holdingrappipay.co',
+  'from:alertasynotificaciones@an.notificacionesbancolombia.com',
+  'from:alertasynotificaciones@notificacionesbancolombia.com',
 ].join(' OR ')
 
 export function detectBank(fromHeader: string): Banco {

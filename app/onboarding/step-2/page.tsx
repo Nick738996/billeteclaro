@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { RefreshCw, CheckCircle2, ChevronRight, Mail } from 'lucide-react'
 import SyncErrorCard, { type SyncErrorType } from '@/components/ui/SyncErrorCard'
+import { TEST_IDS } from '@/lib/testIds'
 
 const LOADING_MESSAGES = [
   'Conectando con Gmail...',
@@ -67,9 +68,9 @@ export default function OnboardingStep2() {
           className="flex items-center justify-center"
           style={{ width: 64, height: 64, borderRadius: '50%', background: 'var(--green-soft)', color: 'var(--green)' }}
         >
-          <RefreshCw size={28} className="animate-spin" />
+          <RefreshCw size={28} className="animate-spin" aria-hidden="true" />
         </div>
-        <div className="text-center">
+        <div className="text-center" data-testid={TEST_IDS.ONBOARDING_STEP2_STATUS} aria-live="polite" aria-label="Estado de sincronización">
           <p className="font-semibold" style={{ fontSize: 'var(--text-lg)', color: 'var(--text)', marginBottom: 8 }}>
             Sincronizando...
           </p>
@@ -205,10 +206,11 @@ export default function OnboardingStep2() {
       <div className="flex flex-col gap-3">
         <button
           onClick={handleSync}
+          data-testid={TEST_IDS.ONBOARDING_STEP2_SYNC}
           className="w-full flex items-center justify-center gap-2 font-semibold transition-opacity hover:opacity-90 active:scale-95"
           style={{ background: 'var(--green)', color: '#000', padding: '14px 24px', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-base)', border: 'none', cursor: 'pointer' }}
         >
-          <RefreshCw size={18} />
+          <RefreshCw size={18} aria-hidden="true" />
           Sincronizar mis correos
         </button>
         <button

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Plus, Trash2, Check, RefreshCw } from 'lucide-react'
 import { CATEGORIA_LABELS, type Categoria, type TipoTransaccion, type Banco } from '@/lib/types'
+import { TEST_IDS } from '@/lib/testIds'
 
 const ALL_CATS = Object.keys(CATEGORIA_LABELS) as Categoria[]
 
@@ -45,10 +46,10 @@ const newDraft = (): DraftTx => ({
 
 interface Props {
   onSaved: () => void
+  onClose: () => void
 }
 
-export default function ManualTransactions({ onSaved }: Props) {
-  const [open,    setOpen]    = useState(false)
+export default function ManualTransactions({ onSaved, onClose }: Props) {
   const [items,   setItems]   = useState<DraftTx[]>([newDraft()])
   const [saving,  setSaving]  = useState(false)
   const [savedOk, setSavedOk] = useState(false)
@@ -84,7 +85,7 @@ export default function ManualTransactions({ onSaved }: Props) {
       setSavedOk(true)
       setItems([newDraft()])
       onSaved()
-      setTimeout(() => { setSavedOk(false); setOpen(false) }, 2000)
+      setTimeout(() => { setSavedOk(false); onClose() }, 2000)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error')
     } finally {
@@ -96,24 +97,7 @@ export default function ManualTransactions({ onSaved }: Props) {
 
   return (
     <div className="card">
-
-      {/* Header — siempre visible */}
-      <button
-        onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center justify-between"
-        style={{ padding: '14px 16px', background: 'none', border: 'none', cursor: 'pointer' }}
-      >
-        <div className="flex items-center gap-2">
-          <Plus size={14} style={{ color: 'var(--text-muted)' }} />
-          <span style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text)' }}>
-            Agregar transacciones
-          </span>
-        </div>
-        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', transform: open ? 'rotate(180deg)' : 'none', display: 'inline-block', transition: 'transform 0.15s' }}>▾</span>
-      </button>
-
-      {open && (
-        <div style={{ borderTop: '1px solid var(--border-soft)', padding: '12px 16px 16px' }}>
+      <div style={{ padding: '12px 16px 16px' }}>
 
           {/* Filas de transacciones */}
           {items.map((item, idx) => (
@@ -123,7 +107,7 @@ export default function ManualTransactions({ onSaved }: Props) {
                   Transacción {idx + 1}
                 </span>
                 {items.length > 1 && (
-                  <button onClick={() => remove(item._key)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-subtle)', display: 'flex' }}>
+                  <button onClick={() => remove(item._key)} aria-label={`Eliminar transacción ${idx + 1}`} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-subtle)', display: 'flex' }}>
                     <Trash2 size={12} />
                   </button>
                 )}
@@ -136,15 +120,17 @@ export default function ManualTransactions({ onSaved }: Props) {
                   type="date"
                   value={item.fecha}
                   onChange={e => update(item._key, 'fecha', e.target.value)}
+                  aria-label={`Fecha de la transacción ${idx + 1}`}
                   style={{ ...inputStyle, flex: 1 }}
                 />
                 <div className="flex items-center gap-1" style={{ flex: 1 }}>
-                  <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', flexShrink: 0 }}>$</span>
+                  <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', flexShrink: 0 }} aria-hidden="true">$</span>
                   <input
                     className="input-field"
                     value={item.monto}
                     onChange={e => update(item._key, 'monto', e.target.value)}
                     placeholder="0"
+                    aria-label={`Monto de la transacción ${idx + 1}`}
                     style={{ ...inputStyle }}
                   />
                 </div>
@@ -156,18 +142,19 @@ export default function ManualTransactions({ onSaved }: Props) {
                 value={item.comercio}
                 onChange={e => update(item._key, 'comercio', e.target.value)}
                 placeholder="Comercio o descripción"
+                aria-label={`Comercio de la transacción ${idx + 1}`}
                 style={{ ...inputStyle, marginBottom: 6 }}
               />
 
               {/* Fila 3: tipo + banco + categoría */}
               <div className="flex gap-2">
-                <select className="input-field" value={item.tipo} onChange={e => update(item._key, 'tipo', e.target.value)} style={{ ...inputStyle, flex: 1 }}>
+                <select className="input-field" value={item.tipo} onChange={e => update(item._key, 'tipo', e.target.value)} aria-label={`Tipo de la transacción ${idx + 1}`} style={{ ...inputStyle, flex: 1 }}>
                   {TIPOS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                 </select>
-                <select className="input-field" value={item.banco} onChange={e => update(item._key, 'banco', e.target.value)} style={{ ...inputStyle, flex: 1 }}>
+                <select className="input-field" value={item.banco} onChange={e => update(item._key, 'banco', e.target.value)} aria-label={`Banco de la transacción ${idx + 1}`} style={{ ...inputStyle, flex: 1 }}>
                   {BANCOS.map(b => <option key={b.value} value={b.value}>{b.label}</option>)}
                 </select>
-                <select className="input-field" value={item.categoria} onChange={e => update(item._key, 'categoria', e.target.value)} style={{ ...inputStyle, flex: 1 }}>
+                <select className="input-field" value={item.categoria} onChange={e => update(item._key, 'categoria', e.target.value)} aria-label={`Categoría de la transacción ${idx + 1}`} style={{ ...inputStyle, flex: 1 }}>
                   {ALL_CATS.map(c => <option key={c} value={c}>{CATEGORIA_LABELS[c]}</option>)}
                 </select>
               </div>
@@ -206,7 +193,6 @@ export default function ManualTransactions({ onSaved }: Props) {
                         `Guardar ${items.filter(i => parseFloat(i.monto.replace(/\D/g,'')) > 0).length || ''} transacción${items.filter(i => parseFloat(i.monto.replace(/\D/g,'')) > 0).length !== 1 ? 'es' : ''}`}
           </button>
         </div>
-      )}
     </div>
   )
 }

@@ -1,22 +1,19 @@
 'use client'
 
-// MEJORAS aplicadas en este archivo:
-// ⑤ MonthNav: botones w-8 h-8 (32px) → w-11 h-11 (44px) [touch target mínimo]
-// Estado `activeFilter` compartido entre SpendingChart y TransactionsList
-
 import { useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { format, parseISO, addMonths, subMonths } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react'
+import { ChevronLeft, ChevronRight, AlertTriangle, Plus } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { Transaction, MonthlyStats, Categoria } from '@/lib/types'
 import { isIngreso, isGasto } from '@/lib/types'
-import StatsCards from '@/components/dashboard/StatsCards'
+import { TEST_IDS } from '@/lib/testIds'
+import MonthHero from '@/components/dashboard/MonthHero'
+import BudgetOverview from '@/components/dashboard/BudgetOverview'
 import SpendingChart from '@/components/dashboard/SpendingChart'
 import TransactionsList from '@/components/dashboard/TransactionsList'
 import HeaderPill from '@/components/dashboard/HeaderPill'
-import BudgetManager from '@/components/dashboard/BudgetManager'
 import AIAdvisorPanel from '@/components/dashboard/AIAdvisorPanel'
 import ManualTransactions from '@/components/dashboard/ManualTransactions'
 
@@ -32,18 +29,19 @@ interface Props {
 }
 
 function buildStats(txs: Transaction[]): MonthlyStats {
-  const gastos = txs.filter(t => isGasto(t.tipo)).reduce((s, t) => s + t.monto, 0)
-  const ingresos = txs.filter(t => isIngreso(t.tipo)).reduce((s, t) => s + t.monto, 0)
-  const porCategoria = txs
-    .filter(t => isGasto(t.tipo))
-    .reduce<Record<string, number>>((acc, t) => {
-      acc[t.categoria] = (acc[t.categoria] ?? 0) + t.monto
-      return acc
-    }, {})
+  const gastosTxs    = txs.filter(t => isGasto(t.tipo))
+  const gastos       = gastosTxs.reduce((s, t) => s + t.monto, 0)
+  const gastosReales = gastos
+  const ingresos     = txs.filter(t => isIngreso(t.tipo)).reduce((s, t) => s + t.monto, 0)
+  const porCategoria = gastosTxs.reduce<Record<string, number>>((acc, t) => {
+    acc[t.categoria] = (acc[t.categoria] ?? 0) + t.monto
+    return acc
+  }, {})
   return {
     gastos,
+    gastosReales,
     ingresos,
-    balance: ingresos - gastos,
+    balance: ingresos - gastosReales,
     transacciones: txs.length,
     porCategoria: porCategoria as Record<Categoria, number>,
   }
@@ -67,11 +65,10 @@ export default function DashboardClient({
   const [isCurrent, setIsCurrent] = useState(initIsCurrent)
   const [loading, setLoading] = useState(false)
 
-  // Estado compartido entre SpendingChart y TransactionsList
   const [activeFilter, setActiveFilter] = useState<string>('TODOS')
-
-  // Presupuestos — se cargan en BudgetManager y se comparten con AIAdvisor
   const [budgets, setBudgets] = useState<Record<string, number>>({})
+  const [showChart, setShowChart] = useState(false)
+  const [manualOpen, setManualOpen] = useState(false)
 
   // Versión de contexto: sube cada vez que cambian datos relevantes para el asesor
   const [contextVersion, setContextVersion] = useState(0)
@@ -166,6 +163,8 @@ export default function DashboardClient({
             {/* MEJORA ⑤: w-8 h-8 → w-11 h-11 para touch target de 44px */}
             <button
               onClick={() => navigate(prevMonth)}
+              data-testid={TEST_IDS.DASHBOARD_MONTH_PREV}
+              aria-label="Mes anterior"
               className="w-11 h-11 rounded-full flex items-center justify-center transition-colors"
               style={{ color: 'var(--text-muted)' }}
             >
@@ -174,6 +173,7 @@ export default function DashboardClient({
 
             <h1
               className="font-semibold capitalize"
+              aria-live="polite"
               style={{ fontSize: 'var(--text-xl)', color: 'var(--text)' }}
             >
               {label}
@@ -182,6 +182,9 @@ export default function DashboardClient({
             <button
               onClick={() => navigate(nextMonth)}
               disabled={isCurrent}
+              data-testid={TEST_IDS.DASHBOARD_MONTH_NEXT}
+              aria-label="Mes siguiente"
+              aria-disabled={isCurrent}
               className="w-11 h-11 rounded-full flex items-center justify-center transition-colors disabled:opacity-30"
               style={{ color: 'var(--text-muted)' }}
             >
@@ -215,16 +218,25 @@ export default function DashboardClient({
           </a>
         )}
 
-        <StatsCards stats={stats} />
-
-        {/* SpendingChart y TransactionsList comparten activeFilter */}
-        <SpendingChart
-          transactions={txs}
-          activeFilter={activeFilter}
-          onFilterChange={setActiveFilter}
+        <MonthHero
+          gastos={stats.gastos}
+          ingresos={stats.ingresos}
+          totalPresupuestado={Object.values(budgets).reduce((s, v) => s + v, 0)}
+          transacciones={stats.transacciones}
+          mes={month}
+          showChart={showChart}
+          onChartToggle={() => setShowChart(v => !v)}
         />
 
-        <BudgetManager
+        {showChart && (
+          <SpendingChart
+            transactions={txs}
+            activeFilter={activeFilter}
+            onFilterChange={setActiveFilter}
+          />
+        )}
+
+        <BudgetOverview
           mes={month}
           gastosPorCategoria={stats.porCategoria}
           onBudgetsChange={setBudgets}
@@ -242,12 +254,26 @@ export default function DashboardClient({
           <h2 className="font-medium" style={{ fontSize: 'var(--text-sm)', color: 'var(--text)' }}>
             Transacciones
           </h2>
-          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
-            {txs.length} en total
-          </span>
+          <button
+            onClick={() => setManualOpen(v => !v)}
+            className="flex items-center gap-1"
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              fontSize: 'var(--text-xs)', color: 'var(--text-muted)',
+              padding: '4px 0',
+            }}
+          >
+            <Plus size={12} />
+            Agregar
+          </button>
         </div>
 
-        <ManualTransactions onSaved={() => { loadMonth(month); bumpContext() }} />
+        {manualOpen && (
+          <ManualTransactions
+            onSaved={() => { loadMonth(month); bumpContext() }}
+            onClose={() => setManualOpen(false)}
+          />
+        )}
 
         <TransactionsList
           transactions={txs}

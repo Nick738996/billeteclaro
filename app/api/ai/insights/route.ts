@@ -11,7 +11,8 @@ export const GET = withAuth(async (req, user, supabase) => {
   try {
     const result = await getInsights(supabase, user.id, mes, force)
     return ok(result)
-  } catch (e) {
+  } catch (e: any) {
+    if (e?.status === 429) return err('Límite diario de IA alcanzado — vuelve en unos minutos', 429)
     console.error('[GET /api/ai/insights]', { userId: user.id, mes }, e)
     return err('Error generando insights')
   }

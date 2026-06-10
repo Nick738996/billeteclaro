@@ -5,7 +5,6 @@ import {
   getMessageDetails,
 } from '@/lib/gmail/client'
 import { trySpecificParser } from '@/lib/parsers'
-import { extractWithGroq } from '@/lib/ai/extractor'
 import { generateAuditId } from '@/lib/utils/auditId'
 import { asignarMesContable } from '@/lib/utils/mesContable'
 import { deduplicateUber } from '@/lib/utils/deduplicateUber'
@@ -14,17 +13,15 @@ import type { ExtractedTransaction } from '@/lib/types'
 
 type Admin = ReturnType<typeof createAdminClient>
 
-const MAX_EMAILS   = 2000
-const BATCH_SIZE   = 10
-const GROQ_CONCURR = 3
+const MAX_EMAILS  = 2000
+const BATCH_SIZE  = 10
 
 export interface SyncResult {
   correos_revisados:    number
   transacciones_nuevas: number
-  parser:    number
-  groq:      number
-  omitidos:  number
-  errores:   string[]
+  parser:   number
+  omitidos: number
+  errores:  string[]
 }
 
 export async function runSync(userId: string, admin: Admin): Promise<SyncResult> {
@@ -70,14 +67,13 @@ export async function runSync(userId: string, admin: Admin): Promise<SyncResult>
     const newIds = allMessageIds.filter(id => !processedIds.has(id)).slice(0, MAX_EMAILS)
 
     const errores: string[] = []
-    let parserCount = 0, groqCount = 0, omitidosCount = 0
+    let parserCount = 0, omitidosCount = 0
     const allTransactions: Array<{ id: string; extracted: ExtractedTransaction }> = []
 
-    // 5. FASE 1 — parsers + Groq por batch
+    // 5. FASE 1 — parsers específicos (sin fallback IA)
     for (let i = 0; i < newIds.length; i += BATCH_SIZE) {
       const batch = newIds.slice(i, i + BATCH_SIZE)
       const emailDetails = await Promise.allSettled(batch.map(id => getMessageDetails(gmail, id)))
-      const needsGroq: typeof emailDetails[number][] = []
 
       for (const result of emailDetails) {
         if (result.status === 'rejected') { errores.push(`Fetch error: ${result.reason}`); continue }
@@ -87,24 +83,8 @@ export async function runSync(userId: string, admin: Admin): Promise<SyncResult>
           parserCount++
           allTransactions.push({ id: email.id, extracted: { ...parsed, banco: email.banco } })
         } else {
-          needsGroq.push(result)
-        }
-      }
-
-      for (let j = 0; j < needsGroq.length; j += GROQ_CONCURR) {
-        const groqBatch = needsGroq.slice(j, j + GROQ_CONCURR)
-        const groqResults = await Promise.allSettled(
-          groqBatch.map(r => {
-            if (r.status === 'rejected') return Promise.resolve(null)
-            const email = r.value
-            return extractWithGroq({ from: email.from, subject: email.subject, date: email.date, body: email.body, banco: email.banco })
-              .then(extracted => extracted ? { id: email.id, extracted: { ...extracted, banco: email.banco } } : null)
-          })
-        )
-        for (const res of groqResults) {
-          if (res.status === 'fulfilled' && res.value)       { groqCount++; allTransactions.push(res.value) }
-          else if (res.status === 'fulfilled' && !res.value) { omitidosCount++ }
-          else if (res.status === 'rejected')                { errores.push(`Groq error: ${res.reason}`) }
+          omitidosCount++
+          console.log(`[sync] omitido ${email.banco} — "${email.subject}"`)
         }
       }
     }
@@ -173,7 +153,7 @@ export async function runSync(userId: string, admin: Admin): Promise<SyncResult>
       }
     }
 
-    console.log(`[sync] ${newIds.length} emails — ${parserCount} parser | ${groqCount} Groq | ${omitidosCount} omitidos | ${preauthIds.length} Uber preauth | ${errores.length} errores`)
+    console.log(`[sync] ${newIds.length} emails — ${parserCount} parser | ${omitidosCount} omitidos | ${preauthIds.length} Uber preauth | ${errores.length} errores`)
 
     await admin.from('sync_log').update({
       finished_at: new Date().toISOString(),
@@ -184,7 +164,7 @@ export async function runSync(userId: string, admin: Admin): Promise<SyncResult>
       status: errores.length > 0 && transaccionesNuevas === 0 ? 'ERROR' : 'DONE',
     }).eq('id', syncId)
 
-    return { correos_revisados: newIds.length, transacciones_nuevas: transaccionesNuevas, parser: parserCount, groq: groqCount, omitidos: omitidosCount, errores }
+    return { correos_revisados: newIds.length, transacciones_nuevas: transaccionesNuevas, parser: parserCount, omitidos: omitidosCount, errores }
 
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)

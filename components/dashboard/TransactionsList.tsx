@@ -12,6 +12,7 @@ import {
   formatCOP,
   isIngreso,
 } from '@/lib/types'
+import { TEST_IDS } from '@/lib/testIds'
 
 // MEJORA ③: rows simplificados (divulgación progresiva)
 //   Antes: [CAT chip][BANCO chip] · hora  +  id_auditoria debajo del monto
@@ -31,6 +32,8 @@ const CATEGORIA_THEME: Record<Categoria, { color: string; bg: string }> = {
   SUSCRIPCIONES:  { color: 'var(--purple)',      bg: 'var(--purple-soft)' },
   COMPRAS_ONLINE: { color: 'var(--yellow)',      bg: 'var(--yellow-soft)' },
   INVERSION:      { color: 'var(--purple)',      bg: 'var(--purple-soft)' },
+  AHORROS:        { color: 'var(--blue)',        bg: 'var(--blue-soft)' },
+  DEUDA:          { color: 'var(--red)',         bg: 'var(--red-soft)' },
   DONACIONES:     { color: 'var(--blue)',        bg: 'var(--blue-soft)' },
   EDUCACION:      { color: 'var(--yellow)',      bg: 'var(--yellow-soft)' },
   REEMBOLSABLE:   { color: 'var(--yellow)',      bg: 'var(--yellow-soft)' },
@@ -40,12 +43,13 @@ const CATEGORIA_THEME: Record<Categoria, { color: string; bg: string }> = {
 }
 
 const BANCO_LABEL: Record<Banco, { label: string; color: string }> = {
-  RAPPICARD: { label: 'RappiCard', color: 'var(--yellow)' },
-  RAPPIPAY:  { label: 'RappiPay',  color: 'var(--blue)' },
-  OTRO:      { label: 'Otro',      color: 'var(--text-muted)' },
+  RAPPICARD:   { label: 'RappiCard',   color: 'var(--yellow)' },
+  RAPPIPAY:    { label: 'RappiPay',    color: 'var(--blue)' },
+  BANCOLOMBIA: { label: 'Bancolombia', color: 'var(--green)' },
+  OTRO:        { label: 'Otro',        color: 'var(--text-muted)' },
 }
 
-type FilterKey = Categoria | 'TODOS' | 'BANCO:RAPPICARD' | 'BANCO:RAPPIPAY'
+type FilterKey = Categoria | 'TODOS' | 'BANCO:RAPPICARD' | 'BANCO:RAPPIPAY' | 'BANCO:BANCOLOMBIA'
 
 // Solo las categorías (para el bottom sheet)
 const CAT_FILTER_KEYS: Array<{ key: FilterKey; label: string }> = [
@@ -57,6 +61,8 @@ const CAT_FILTER_KEYS: Array<{ key: FilterKey; label: string }> = [
   { key: 'COMPRAS_ONLINE', label: 'Online' },
   { key: 'TRANSFERENCIA',  label: 'Transferencias' },
   { key: 'INVERSION',      label: 'Inversión' },
+  { key: 'AHORROS',        label: 'Ahorros' },
+  { key: 'DEUDA',          label: 'Deuda' },
   { key: 'INGRESO',        label: 'Ingresos' },
   { key: 'DONACIONES',     label: 'Donaciones' },
   { key: 'EDUCACION',      label: 'Educación' },
@@ -121,9 +127,14 @@ function CategorySheet({
         className="fixed inset-0 z-50"
         style={{ background: 'var(--overlay)' }}
         onClick={onClose}
+        aria-hidden="true"
       />
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Filtrar por categoría"
         className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-lg z-50"
+        onKeyDown={e => { if (e.key === 'Escape') onClose() }}
         style={{
           background: 'var(--surface-2)',
           borderTop: '1px solid var(--border)',
@@ -178,13 +189,14 @@ function FilterChips({
   const activeCatInfo  = isCatActive ? CAT_FILTER_KEYS.find(f => f.key === active) : null
   const activeCatTheme = isCatActive ? (CATEGORIA_THEME[active as Categoria] ?? CATEGORIA_THEME['OTRO']) : null
 
-  const FIXED: Array<{ key: FilterKey; label: string; bg: string; color: string; border: string }> = [
+  const FIXED: Array<{ key: FilterKey; label: string; bg: string; color: string; border: string; testId: string }> = [
     {
       key: 'TODOS',
       label: 'Todos',
       bg:     active === 'TODOS' ? 'var(--text)' : 'transparent',
       color:  active === 'TODOS' ? 'var(--bg)'   : 'var(--text-muted)',
       border: active === 'TODOS' ? 'none'         : '1px solid var(--border)',
+      testId: TEST_IDS.DASHBOARD_FILTER_TODOS,
     },
     {
       key: 'BANCO:RAPPICARD',
@@ -192,6 +204,7 @@ function FilterChips({
       bg:     active === 'BANCO:RAPPICARD' ? 'var(--yellow)'      : 'var(--yellow-soft)',
       color:  active === 'BANCO:RAPPICARD' ? 'var(--bg)'          : 'var(--yellow)',
       border: 'none',
+      testId: TEST_IDS.DASHBOARD_FILTER_RAPPICARD,
     },
     {
       key: 'BANCO:RAPPIPAY',
@@ -199,6 +212,15 @@ function FilterChips({
       bg:     active === 'BANCO:RAPPIPAY' ? 'var(--blue)'         : 'var(--blue-soft)',
       color:  active === 'BANCO:RAPPIPAY' ? 'var(--bg)'           : 'var(--blue)',
       border: 'none',
+      testId: TEST_IDS.DASHBOARD_FILTER_RAPPIPAY,
+    },
+    {
+      key: 'BANCO:BANCOLOMBIA',
+      label: 'Bancolombia',
+      bg:     active === 'BANCO:BANCOLOMBIA' ? 'var(--green)'      : 'var(--green-soft)',
+      color:  active === 'BANCO:BANCOLOMBIA' ? 'var(--bg)'         : 'var(--green)',
+      border: 'none',
+      testId: 'filter-bancolombia',
     },
   ]
 
@@ -210,6 +232,8 @@ function FilterChips({
           <button
             key={f.key}
             onClick={() => onChange(f.key)}
+            data-testid={f.testId}
+            aria-pressed={active === f.key}
             className="flex-shrink-0 rounded-full"
             style={{
               padding: '5px 12px',
@@ -294,11 +318,11 @@ function CategoryPicker({ current, onSelect, onClose }: {
   const cats = Object.keys(CATEGORIA_LABELS) as Categoria[]
   return (
     <>
-      <div className="fixed inset-0 z-50" style={{ background: 'var(--overlay)' }} onClick={onClose} />
-      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-lg z-50" style={{ background: 'var(--surface-2)', borderTop: '1px solid var(--border)', borderRadius: 'var(--radius-xl) var(--radius-xl) 0 0', padding: '16px 20px 40px' }}>
+      <div className="fixed inset-0 z-50" style={{ background: 'var(--overlay)' }} onClick={onClose} aria-hidden="true" />
+      <div role="dialog" aria-modal="true" aria-label="Cambiar categoría" className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-lg z-50" onKeyDown={e => { if (e.key === 'Escape') onClose() }} style={{ background: 'var(--surface-2)', borderTop: '1px solid var(--border)', borderRadius: 'var(--radius-xl) var(--radius-xl) 0 0', padding: '16px 20px 40px' }}>
         <div className="flex items-center justify-between mb-4">
           <p className="font-semibold" style={{ fontSize: 'var(--text-sm)', color: 'var(--text)' }}>Cambiar categoría</p>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', padding: 4 }}>
+          <button onClick={onClose} aria-label="Cerrar selector de categoría" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', padding: 4 }}>
             <X size={16} />
           </button>
         </div>
@@ -374,6 +398,7 @@ function TransactionRow({ t, pendingCat, onCategoryClick, onDelete }: {
         <div className="flex items-center gap-1" style={{ marginTop: 3 }}>
           <button
             onClick={onCategoryClick}
+            aria-label={`Cambiar categoría: ${CATEGORIA_LABELS[displayCat]}`}
             style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}
           >
             <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: isDirty ? 'var(--yellow)' : theme.color }}>
@@ -399,6 +424,7 @@ function TransactionRow({ t, pendingCat, onCategoryClick, onDelete }: {
         {deletePhase === 'idle' && (
           <button
             onClick={startConfirm}
+            aria-label={`Eliminar transacción: ${getDisplayName(t)}`}
             style={{ background: 'none', border: 'none', padding: 4, cursor: 'pointer', color: 'var(--text-subtle)', display: 'flex' }}
           >
             <Trash2 size={13} />
@@ -408,12 +434,14 @@ function TransactionRow({ t, pendingCat, onCategoryClick, onDelete }: {
           <>
             <button
               onClick={cancelConfirm}
+              aria-label="Cancelar eliminación"
               style={{ background: 'none', border: 'none', padding: 4, cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' }}
             >
               <X size={13} />
             </button>
             <button
               onClick={confirmDelete}
+              aria-label={`Confirmar eliminación de: ${getDisplayName(t)}`}
               style={{
                 background: 'var(--red-soft)',
                 border: '1px solid var(--red)',
@@ -501,6 +529,8 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
       matchesCategory = efectivoBanco(t) === 'RAPPICARD'
     } else if (activeFilter === 'BANCO:RAPPIPAY') {
       matchesCategory = efectivoBanco(t) === 'RAPPIPAY'
+    } else if (activeFilter === 'BANCO:BANCOLOMBIA') {
+      matchesCategory = efectivoBanco(t) === 'BANCOLOMBIA'
     } else {
       matchesCategory = t.categoria === activeFilter || (activeFilter === 'INGRESO' && isIngreso(t.tipo))
     }
@@ -535,6 +565,8 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Buscar comercio..."
+            aria-label="Buscar transacciones"
+            data-testid={TEST_IDS.DASHBOARD_SEARCH_INPUT}
             className="flex-1 bg-transparent outline-none"
             style={{ fontSize: 'var(--text-sm)', color: 'var(--text)' }}
           />
@@ -570,32 +602,9 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
         </div>
       )}
 
-      {/* Resumen */}
-      {filtered.length > 0 && (
-        <div
-          className="px-4 py-2.5 flex items-center justify-between"
-          style={{ borderBottom: '1px solid var(--border-soft)', background: 'var(--surface-2)' }}
-        >
-          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
-            {filtered.length} transacción{filtered.length !== 1 ? 'es' : ''}
-          </span>
-          <div className="flex items-center gap-3">
-            {totalIngresos > 0 && (
-              <span className="font-semibold tabular-nums" style={{ fontSize: 'var(--text-sm)', color: 'var(--green)' }}>
-                +{formatCOP(totalIngresos)}
-              </span>
-            )}
-            {totalGastos > 0 && (
-              <span className="font-semibold tabular-nums" style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>
-                -{formatCOP(totalGastos)}
-              </span>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* Lista agrupada por fecha */}
-      <div className="px-4">
+      <div className="px-4" data-testid={TEST_IDS.DASHBOARD_TRANSACTIONS_LIST} role="list" aria-label="Lista de transacciones">
         {filtered.length === 0 ? (
           <p className="text-center py-8" style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>
             {search ? 'Sin resultados para tu búsqueda' : 'Sin transacciones este mes'}
@@ -610,7 +619,7 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
                 {dateLabel}
               </p>
               {items.map((t, i) => (
-                <div key={t.id} style={i === items.length - 1 ? { borderBottom: 'none' } : {}}>
+                <div key={t.id} role="listitem" data-testid={TEST_IDS.DASHBOARD_TRANSACTION_ITEM} style={i === items.length - 1 ? { borderBottom: 'none' } : {}}>
                   <TransactionRow
                     t={t}
                     pendingCat={pendingCats[t.id]}

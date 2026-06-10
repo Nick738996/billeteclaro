@@ -30,7 +30,7 @@ REGLAS:
 
 BANCOS: RAPPICARD (tarjeta crédito Rappi) | RAPPIPAY (cuenta débito Rappi)
 TIPOS válidos: COMPRA | TRANSFERENCIA_ENVIADA | TRANSFERENCIA_RECIBIDA | PAGO_SERVICIO | RETIRO | ABONO_DEUDA | INGRESO
-CATEGORÍAS válidas: HOGAR | TRANSPORTE | SALIDAS | SALUD | SUSCRIPCIONES | COMPRAS_ONLINE | INVERSION | DONACIONES | EDUCACION | REEMBOLSABLE | TRANSFERENCIA | INGRESO | OTRO
+CATEGORÍAS válidas: HOGAR | TRANSPORTE | SALIDAS | SALUD | SUSCRIPCIONES | COMPRAS_ONLINE | INVERSION | AHORROS | DEUDA | DONACIONES | EDUCACION | REEMBOLSABLE | TRANSFERENCIA | INGRESO | OTRO
 
 Responde con este JSON exacto:
 {
@@ -56,7 +56,7 @@ export async function extractWithGroq(params: {
   body: string
   banco: Banco
 }): Promise<ExtractedTransaction | null> {
-  const snippet = params.body.slice(0, 800)
+  const snippet = params.body.slice(0, 400)
 
   try {
     const completion = await groq.chat.completions.create({
