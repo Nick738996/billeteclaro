@@ -47,7 +47,7 @@ const BANCO_LABEL: Record<Banco, { label: string; color: string }> = {
   OTRO:        { label: 'Otro',        color: 'var(--text-muted)' },
 }
 
-type FilterKey = Categoria | 'TODOS' | 'BANCO:RAPPICARD' | 'BANCO:RAPPIPAY'
+type FilterKey = Categoria | 'TODOS' | 'BANCO:RAPPICARD' | 'BANCO:RAPPIPAY' | 'BANCO:BANCOLOMBIA'
 
 // Solo las categorías (para el bottom sheet)
 const CAT_FILTER_KEYS: Array<{ key: FilterKey; label: string }> = [
@@ -209,6 +209,14 @@ function FilterChips({
       color:  active === 'BANCO:RAPPIPAY' ? 'var(--bg)'           : 'var(--blue)',
       border: 'none',
       testId: TEST_IDS.DASHBOARD_FILTER_RAPPIPAY,
+    },
+    {
+      key: 'BANCO:BANCOLOMBIA',
+      label: 'Bancolombia',
+      bg:     active === 'BANCO:BANCOLOMBIA' ? 'var(--green)'      : 'var(--green-soft)',
+      color:  active === 'BANCO:BANCOLOMBIA' ? 'var(--bg)'         : 'var(--green)',
+      border: 'none',
+      testId: 'filter-bancolombia',
     },
   ]
 
@@ -517,6 +525,8 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
       matchesCategory = efectivoBanco(t) === 'RAPPICARD'
     } else if (activeFilter === 'BANCO:RAPPIPAY') {
       matchesCategory = efectivoBanco(t) === 'RAPPIPAY'
+    } else if (activeFilter === 'BANCO:BANCOLOMBIA') {
+      matchesCategory = efectivoBanco(t) === 'BANCOLOMBIA'
     } else {
       matchesCategory = t.categoria === activeFilter || (activeFilter === 'INGRESO' && isIngreso(t.tipo))
     }
