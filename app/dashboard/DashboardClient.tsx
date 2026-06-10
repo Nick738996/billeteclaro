@@ -18,6 +18,7 @@ import TransactionsList from '@/components/dashboard/TransactionsList'
 import HeaderPill from '@/components/dashboard/HeaderPill'
 import BudgetManager from '@/components/dashboard/BudgetManager'
 import AIAdvisor from '@/components/dashboard/AIAdvisor'
+import ManualTransactions from '@/components/dashboard/ManualTransactions'
 
 interface Props {
   user: { name: string }
@@ -130,7 +131,7 @@ export default function DashboardClient({
                stroke="currentColor" + color:var(--text) = adapta auto en light/dark */}
           <div className="flex items-center gap-2">
             <svg
-              viewBox="0 0 100 100" width="26" height="26"
+              viewBox="0 0 100 100" width="45" height="45"
               aria-hidden="true"
               style={{ color: 'var(--text)' }}
             >
@@ -141,8 +142,8 @@ export default function DashboardClient({
               <path d="M30,50 Q78,50 78,66 Q78,82 30,82"
                 stroke="#4ADE80" strokeWidth="6" fill="none" strokeLinecap="round"/>
             </svg>
-            <span className="font-semibold tracking-tight" style={{ fontSize: 'var(--text-base)', letterSpacing: '-0.02em' }}>
-              <span style={{ fontWeight: 300, color: 'var(--text)' }}>Billete</span>
+            <span className="tracking-tight" style={{ fontSize: 'var(--text-lg)', letterSpacing: '-0.02em' }}>
+              <span style={{ fontWeight: 400, color: 'var(--text)' }}>Billete</span>
               <span style={{ fontWeight: 700, color: 'var(--green)' }}>Claro</span>
             </span>
           </div>
@@ -244,10 +245,13 @@ export default function DashboardClient({
           </span>
         </div>
 
+        <ManualTransactions onSaved={() => loadMonth(month)} />
+
         <TransactionsList
           transactions={txs}
           activeFilter={activeFilter}
           onFilterChange={setActiveFilter}
+          onCategoriesUpdated={() => loadMonth(month)}
         />
       </main>
     </div>

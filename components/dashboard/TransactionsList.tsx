@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { Search } from 'lucide-react'
+import { Search, Check, RefreshCw, X } from 'lucide-react'
 import {
   type Transaction,
   type Categoria,
@@ -284,77 +284,97 @@ function FilterChips({
   )
 }
 
-// ── TransactionRow (Strip style) ───────────────────────────────────────────
+// ── CategoryPicker bottom sheet ────────────────────────────────────────────
 
-function TransactionRow({ t }: { t: Transaction }) {
-  const [expanded, setExpanded] = useState(false)
-  const income = isIngreso(t.tipo)
-  const theme  = CATEGORIA_THEME[t.categoria]
-  const banco  = efectivoBanco(t)
-  const chip   = BANCO_LABEL[banco]
-  const time   = format(new Date(t.fecha), 'HH:mm', { locale: es })
+function CategoryPicker({ current, onSelect, onClose }: {
+  current: Categoria
+  onSelect: (c: Categoria) => void
+  onClose: () => void
+}) {
+  const cats = Object.keys(CATEGORIA_LABELS) as Categoria[]
+  return (
+    <>
+      <div className="fixed inset-0 z-50" style={{ background: 'rgba(0,0,0,0.55)' }} onClick={onClose} />
+      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-lg z-50" style={{ background: 'var(--surface-2)', borderTop: '1px solid var(--border)', borderRadius: 'var(--radius-xl) var(--radius-xl) 0 0', padding: '16px 20px 40px' }}>
+        <div className="flex items-center justify-between mb-4">
+          <p className="font-semibold" style={{ fontSize: 'var(--text-sm)', color: 'var(--text)' }}>Cambiar categoría</p>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', padding: 4 }}>
+            <X size={16} />
+          </button>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {cats.map(cat => {
+            const on    = cat === current
+            const theme = CATEGORIA_THEME[cat] ?? CATEGORIA_THEME['OTRO']
+            return (
+              <button key={cat} onClick={() => onSelect(cat)} className="rounded-full" style={{ padding: '7px 14px', background: on ? theme.color : theme.bg, color: on ? 'var(--bg)' : theme.color, border: 'none', fontSize: 'var(--text-xs)', fontWeight: on ? 600 : 400, cursor: 'pointer' }}>
+                {CATEGORIA_LABELS[cat]}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+    </>
+  )
+}
+
+// ── TransactionRow ─────────────────────────────────────────────────────────
+
+function TransactionRow({ t, pendingCat, onCategoryClick }: {
+  t: Transaction
+  pendingCat?: Categoria
+  onCategoryClick: () => void
+}) {
+  const [expanded] = useState(false)
+  const income    = isIngreso(t.tipo)
+  const displayCat = pendingCat ?? t.categoria
+  const theme     = CATEGORIA_THEME[displayCat] ?? CATEGORIA_THEME['OTRO']
+  const banco     = efectivoBanco(t)
+  const chip      = BANCO_LABEL[banco]
+  const time      = format(new Date(t.fecha), 'HH:mm', { locale: es })
+  const isDirty   = pendingCat !== undefined
 
   return (
     <div
-      className="flex items-center gap-3 cursor-pointer"
+      className="flex items-center gap-3"
       style={{
         padding: '12px 0 12px 14px',
         borderBottom: '1px solid var(--border-soft)',
         borderLeft: `2.5px solid ${theme.color}55`,
         marginLeft: -16,
       }}
-      onClick={() => setExpanded(o => !o)}
     >
-      {/* Dot */}
-      <div
-        className="rounded-full flex-shrink-0"
-        style={{ width: 8, height: 8, background: theme.color }}
-      />
+      <div className="rounded-full flex-shrink-0" style={{ width: 8, height: 8, background: theme.color }} />
 
-      {/* Nombre + meta */}
       <div className="flex-1 min-w-0">
-        <p
-          className="font-medium truncate"
-          style={{ fontSize: 'var(--text-sm)', color: 'var(--text)' }}
-        >
+        <p className="font-medium truncate" style={{ fontSize: 'var(--text-sm)', color: 'var(--text)' }}>
           {getDisplayName(t)}
         </p>
         <div className="flex items-center gap-1" style={{ marginTop: 3 }}>
-          <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: theme.color }}>
-            {CATEGORIA_LABELS[t.categoria]}
-          </span>
+          {/* Chip de categoría — toca para cambiar */}
+          <button
+            onClick={onCategoryClick}
+            style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}
+          >
+            <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: isDirty ? 'var(--yellow)' : theme.color }}>
+              {CATEGORIA_LABELS[displayCat]}
+            </span>
+            {isDirty && <span style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--yellow)', display: 'inline-block' }} />}
+          </button>
           <span style={{ fontSize: 10, color: 'var(--text-subtle)' }}>·</span>
           <span style={{ fontSize: 10, color: chip.color }}>{chip.label}</span>
           <span style={{ fontSize: 10, color: 'var(--text-subtle)' }}>·</span>
           <span style={{ fontSize: 10, color: 'var(--text-subtle)' }}>{time}</span>
         </div>
-
-        {/* id_auditoria — solo visible al expandir */}
         {expanded && t.id_auditoria && (
-          <p
-            className="font-mono mt-2"
-            style={{
-              fontSize: 'var(--text-xs)',
-              color: 'var(--text-muted)',
-              background: 'var(--surface-2)',
-              padding: '4px 8px',
-              borderRadius: 'var(--radius-sm)',
-            }}
-          >
+          <p className="font-mono mt-2" style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', background: 'var(--surface-2)', padding: '4px 8px', borderRadius: 'var(--radius-sm)' }}>
             {t.id_auditoria}
           </p>
         )}
       </div>
 
-      {/* Monto */}
       <div className="flex-shrink-0">
-        <p
-          className="font-semibold tabular-nums"
-          style={{
-            fontSize: 'var(--text-sm)',
-            color: income ? 'var(--green)' : 'var(--text)',
-          }}
-        >
+        <p className="font-semibold tabular-nums" style={{ fontSize: 'var(--text-sm)', color: income ? 'var(--green)' : 'var(--text)' }}>
           {income ? '+' : '-'}{formatCOP(t.monto)}
         </p>
       </div>
@@ -368,11 +388,39 @@ interface Props {
   transactions: Transaction[]
   activeFilter: string
   onFilterChange: (key: string) => void
+  onCategoriesUpdated?: () => void
 }
 
-export default function TransactionsList({ transactions, activeFilter, onFilterChange }: Props) {
-  const [search, setSearch] = useState('')
+export default function TransactionsList({ transactions, activeFilter, onFilterChange, onCategoriesUpdated }: Props) {
+  const [search,          setSearch]          = useState('')
+  const [pendingCats,     setPendingCats]      = useState<Record<string, Categoria>>({})
+  const [pickerTxId,      setPickerTxId]       = useState<string | null>(null)
+  const [savingCats,      setSavingCats]       = useState(false)
+  const [savedCatsOk,     setSavedCatsOk]      = useState(false)
   const activeFilterKey = activeFilter as FilterKey
+
+  const hasPendingCats = Object.keys(pendingCats).length > 0
+
+  const saveCategoryChanges = async () => {
+    setSavingCats(true)
+    try {
+      const changes = Object.entries(pendingCats).map(([id, categoria]) => ({ id, categoria }))
+      const res = await fetch('/api/transactions/categorize', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ changes }),
+      })
+      if (!res.ok) throw new Error('Error')
+      setPendingCats({})
+      setSavedCatsOk(true)
+      onCategoriesUpdated?.()
+      setTimeout(() => setSavedCatsOk(false), 2500)
+    } finally {
+      setSavingCats(false)
+    }
+  }
+
+  const pickerTx = pickerTxId ? transactions.find(t => t.id === pickerTxId) : null
 
   const filtered = useMemo(() => transactions.filter(t => {
     let matchesCategory: boolean
@@ -398,6 +446,7 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
   const groups        = useMemo(() => groupByDate(filtered), [filtered])
 
   return (
+    <>
     <div
       className="rounded-[var(--radius-lg)]"
       style={{
@@ -430,13 +479,34 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
         </div>
       </div>
 
-      {/* Chips colapsados */}
-      <div className="px-4 pb-3" style={{ borderBottom: '1px solid var(--border-soft)' }}>
-        <FilterChips
-          active={activeFilterKey}
-          onChange={key => onFilterChange(key)}
-        />
+      {/* Chips */}
+      <div className="px-4 pb-3" style={{ borderBottom: (hasPendingCats || savingCats || savedCatsOk) ? 'none' : '1px solid var(--border-soft)' }}>
+        <FilterChips active={activeFilterKey} onChange={key => onFilterChange(key)} />
       </div>
+
+      {/* Botón guardar categorías — fila separada, solo visible cuando hay cambios */}
+      {(hasPendingCats || savingCats || savedCatsOk) && (
+        <div className="px-4 pb-3" style={{ borderBottom: '1px solid var(--border-soft)' }}>
+          <button
+            onClick={saveCategoryChanges}
+            disabled={savingCats || !hasPendingCats}
+            className="w-full flex items-center justify-center gap-2"
+            style={{
+              padding: '7px 0',
+              background: savedCatsOk ? 'var(--green-soft)' : 'var(--surface-2)',
+              border: `1px solid ${savedCatsOk ? 'var(--green)' : 'var(--yellow)'}`,
+              borderRadius: 'var(--radius-sm)',
+              color: savedCatsOk ? 'var(--green)' : 'var(--yellow)',
+              fontSize: 'var(--text-xs)', fontWeight: 500,
+              cursor: savingCats || !hasPendingCats ? 'default' : 'pointer',
+            }}
+          >
+            {savingCats  ? <><RefreshCw size={10} className="animate-spin" /> Guardando categorías…</> :
+             savedCatsOk ? <><Check size={10} /> Categorías guardadas</> :
+                           `Guardar ${Object.keys(pendingCats).length} cambio${Object.keys(pendingCats).length !== 1 ? 's' : ''} de categoría`}
+          </button>
+        </div>
+      )}
 
       {/* Resumen */}
       {filtered.length > 0 && (
@@ -479,7 +549,11 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
               </p>
               {items.map((t, i) => (
                 <div key={t.id} style={i === items.length - 1 ? { borderBottom: 'none' } : {}}>
-                  <TransactionRow t={t} />
+                  <TransactionRow
+                    t={t}
+                    pendingCat={pendingCats[t.id]}
+                    onCategoryClick={() => setPickerTxId(t.id)}
+                  />
                 </div>
               ))}
             </div>
@@ -489,5 +563,24 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
 
       {filtered.length > 0 && <div className="pb-2" />}
     </div>
+
+    {/* CategoryPicker fuera del contenedor backdrop-filter para que position:fixed funcione */}
+    {pickerTx && (
+      <CategoryPicker
+        current={pendingCats[pickerTx.id] ?? pickerTx.categoria}
+        onSelect={cat => {
+          if (cat === pickerTx.categoria) {
+            const next = { ...pendingCats }
+            delete next[pickerTx.id]
+            setPendingCats(next)
+          } else {
+            setPendingCats(prev => ({ ...prev, [pickerTx.id]: cat }))
+          }
+          setPickerTxId(null)
+        }}
+        onClose={() => setPickerTxId(null)}
+      />
+    )}
+    </>
   )
 }
