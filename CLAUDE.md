@@ -104,8 +104,7 @@ NEXT_PUBLIC_APP_URL
 ```
 Gmail OAuth refresh → listBankMessageIds() → filtrar ya procesados
   (processedIds = gmail_message_ids de transactions + todos los skipped_ids de sync_log)
-→ FASE 1: trySpecificParser() → null → extractWithGroq() (concurrencia=3)
-→ FASE 1.5: classifyMerchants() — Groq solo para comercios con categoria='OTRO'
+→ FASE 1: trySpecificParser() → null → omitido (sin fallback IA — Groq reservado para el asesor)
 → FASE 2: deduplicateUber() — pre-auths → sync_log.skipped_ids
 → FASE 3: upsert en transactions (ignoreDuplicates: true)
 → FASE 4: asignar mes_contable para meses afectados
@@ -186,8 +185,7 @@ feature/<nombre>   ← una por mejora, PR a main
 ### ⬜ Etapa 2 — Categorización inteligente (parcial)
 
 - [x] `guessCategoria()` con 120+ patrones — `lib/parsers/commerceCategories.ts`
-- [x] Groq fallback en sync — `lib/ai/categorizer.ts` + FASE 1.5 en `syncService.ts`
-- [ ] **Caché por comercio** — nueva tabla `commerce_rules`. Si el usuario cambia "Uber" a TRANSPORTE una vez, se aplica siempre en futuros syncs.
+- [ ] **Caché por comercio** — nueva tabla `commerce_rules`. Si el usuario cambia "Uber" a TRANSPORTE una vez, se aplica siempre en futuros syncs. (El fallback Groq fue removido — Groq reservado para el asesor.)
 
 ### ⬜ Accesibilidad (a11y) — WCAG 2.1 AA
 

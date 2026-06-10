@@ -56,7 +56,7 @@ export async function extractWithGroq(params: {
   body: string
   banco: Banco
 }): Promise<ExtractedTransaction | null> {
-  const snippet = params.body.slice(0, 800)
+  const snippet = params.body.slice(0, 400)
 
   try {
     const completion = await groq.chat.completions.create({

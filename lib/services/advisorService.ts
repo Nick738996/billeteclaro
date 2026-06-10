@@ -1,5 +1,5 @@
 import Groq from 'groq-sdk'
-import { startOfMonth, endOfMonth, parseISO, subHours } from 'date-fns'
+import { startOfMonth, endOfMonth, parseISO } from 'date-fns'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { buildAdvisorContext, hashContext } from '@/lib/ai/buildAdvisorContext'
 import { CATEGORIA_LABELS } from '@/lib/types'
@@ -204,7 +204,7 @@ export async function getInsights(
       .eq('mes', mes)
       .single()
 
-    if (cached && cached.context_hash === hash && new Date(cached.generated_at) > subHours(new Date(), 6)) {
+    if (cached && cached.context_hash === hash) {
       return { insights: cached.insights as Insight[], cached: true }
     }
   }
