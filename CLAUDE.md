@@ -15,10 +15,11 @@
 ```
 [✅ Etapa 1]  Recolección de datos (Gmail → Supabase)
 [✅ UI/UX]    Sistema de diseño, dark/light mode, glass morphism
-[✅ Etapa 3]  Asesor financiero IA  ← COMPLETA
+[✅ Etapa 3]  Asesor financiero IA
+[✅ Refactor] Auditoría y limpieza de código
 [⬜ Etapa 2]  Categorización inteligente  ← pendiente
+[⬜ QA]       Testing unitario (Vitest), E2E (Maestro), accesibilidad  ← pendiente
 [⬜ Deploy]   Dominio, hosting, PWA mobile  ← pendiente
-[⬜ QA]       Testing, refactor, organización  ← pendiente
 ```
 
 ---
@@ -381,7 +382,8 @@ Login solicita `email profile gmail.readonly` con `access_type: offline` y `prom
 ## Clientes Supabase
 
 - `lib/supabase/client.ts` — browser client para `'use client'`
-- `lib/supabase/server.ts` — server client (async cookies) + `createAdminClient()` con service role
+- `lib/supabase/server.ts` — server client (async cookies) + `createAdminClient()` con service role + `getAuthUser()` helper (crea client + obtiene user en una llamada; usado en todas las API routes)
+- `lib/utils/auditId.ts` — `generateAuditId(admin, userId, fecha)`: genera `MMDD-NN`. Usar siempre en loop `for` secuencial, no `Promise.all`, para evitar race condition en mismo día.
 
 ---
 
@@ -404,33 +406,81 @@ feature/<nombre>   ← una por mejora, PR a main
 
 - **`id_auditoria` con gaps** — si se borra y re-sincroniza, el contador reinicia desde -01.
 - **Uber dedup solo dentro del mismo sync** — si pre-auth y cobro caen en syncs distintos no se comparan. Riesgo bajo (ambos emails llegan casi juntos).
-- **`recharts` en `package.json`** — instalado pero no usado (el donut es SVG propio). Pendiente eliminar.
 
 ---
 
 ## Roadmap: lo que falta antes de lanzar
 
-### ⬜ QA y calidad de código
+### ✅ Refactor completado (rama `refactor/data-layer`)
+
+| Tarea                                                   | Estado |
+| ------------------------------------------------------- | ------ |
+| Eliminar `recharts` de `package.json`                   | ✅     |
+| Eliminar `SyncButton.tsx`                               | ✅     |
+| `BudgetEntry`/`BudgetSubcat` movidos a `lib/types.ts`   | ✅     |
+| `GASTO_CATS` unificado → `PRESUPUESTO_CATS` en types    | ✅     |
+| `SyncLog.skipped_ids` tipado, `PatrimonioItem` borrado  | ✅     |
+| `StatsCards` colores hardcoded → CSS variables          | ✅     |
+| `SpendingChart` stroke `#0A0A0A` → `var(--bg)`          | ✅     |
+| `SpendingChart` `ABONO_DEUDA` removido de `TIPOS_GASTO` | ✅     |
+| `generateAuditId` extraído a `lib/utils/auditId.ts`     | ✅     |
+| Race condition `generateAuditId` corregida (for loop)   | ✅     |
+| `getAuthUser()` helper — usado en 7 rutas API           | ✅     |
+
+### ⬜ Testing unitario
 
 | Tarea                                              | Prioridad | Notas                                                        |
 | -------------------------------------------------- | --------- | ------------------------------------------------------------ |
-| Eliminar `recharts` de `package.json`              | Alta      | No se usa, solo peso                                         |
-| Eliminar `SyncButton.tsx` y `ThemeToggle.tsx`      | Alta      | Reemplazados por `HeaderPill`, archivos muertos              |
-| Configurar Vitest o Jest                           | Media     | No hay test runner aún. `npx tsc --noEmit` es el único check |
-| Tests para parsers (`rappicard.ts`, `rappipay.ts`) | Media     | Son la lógica más crítica y más fácil de testear con mocks   |
-| Tests para `guessCategoria()`                      | Media     | 120+ patrones, fácil de verificar con tabla de casos         |
-| Tests para `deduplicateUber()`                     | Media     | Lógica de negocio con edge cases                             |
+| Configurar Vitest                                  | Alta      | No hay test runner aún. `npx tsc --noEmit` es el único check |
+| Tests para parsers (`rappicard.ts`, `rappipay.ts`) | Alta      | Lógica más crítica y más fácil de testear con fixtures       |
+| Tests para `guessCategoria()`                      | Alta      | 120+ patrones, tabla de casos entrada/salida esperada        |
+| Tests para `deduplicateUber()`                     | Alta      | Lógica de negocio con edge cases de tiempo y monto           |
+| Tests para `generateAuditId()`                     | Media     | Verificar secuencia y formato `MMDD-NN`                      |
 | Tests de integración para API routes               | Baja      | Requiere mock de Supabase/Groq                               |
-| Revisar y limpiar `SyncButton.tsx` obsoleto        | Alta      |                                                              |
+
+### ⬜ E2E con Maestro
+
+Maestro (`maestro.mobile.dev`) — framework de E2E para PWAs y apps móviles. Corre flujos reales en el browser/simulador con YAML.
+
+| Flujo a cubrir                           | Prioridad | Archivo sugerido                      |
+| ---------------------------------------- | --------- | ------------------------------------- |
+| Login con Google → llega al dashboard    | Alta      | `maestro/flows/login.yaml`            |
+| Sync de emails → aparecen transacciones  | Alta      | `maestro/flows/sync.yaml`             |
+| Agregar transacción manual               | Alta      | `maestro/flows/add_manual.yaml`       |
+| Editar categoría de una transacción      | Media     | `maestro/flows/edit_category.yaml`    |
+| Eliminar una transacción                 | Media     | `maestro/flows/delete_tx.yaml`        |
+| Guardar presupuesto mensual              | Media     | `maestro/flows/save_budget.yaml`      |
+| Ver insights del asesor IA               | Media     | `maestro/flows/ai_insights.yaml`      |
+| Chat con el asesor                       | Baja      | `maestro/flows/ai_chat.yaml`          |
+| Cambiar de mes en el dashboard           | Baja      | `maestro/flows/month_navigation.yaml` |
+
+**Setup:** `brew install maestro` · `maestro test maestro/flows/login.yaml` · Requiere app corriendo en `:3000` o en simulador iOS/Android.
+
+### ⬜ Accesibilidad (a11y)
+
+Objetivo: cumplir WCAG 2.1 AA. Todos los elementos interactivos deben ser navegables por teclado y legibles por screen readers.
+
+| Área                                    | Prioridad | Qué hacer                                                                          |
+| --------------------------------------- | --------- | ---------------------------------------------------------------------------------- |
+| `aria-label` en botones icon-only       | Alta      | `HeaderPill`: sync, reset, theme, logout — solo tienen íconos, sin texto visible   |
+| `role` y `aria-expanded` en colapsables | Alta      | `ManualTransactions`, `BudgetManager` (`<details>`), `AIAdvisorPanel` (chat)       |
+| Contraste en modo claro                 | Alta      | Verificar `--text-muted` (#6B6B6B) sobre `--surface` — puede fallar ratio 4.5:1   |
+| Focus visible en todos los botones      | Alta      | Muchos botones tienen `outline: none` — agregar `:focus-visible` con var(--border) |
+| `alt` en imágenes SVG decorativas       | Media     | Logo SVG: `aria-hidden="true"` ya puesto; verificar el resto                       |
+| Semántica de headings (`h1`→`h2`→`h3`) | Media     | Dashboard usa `<h2>` para secciones — verificar jerarquía                          |
+| Tamaños mínimos de touch target (44px)  | Media     | Ya aplicado en MonthNav; revisar chips de categoría y filas de transacción         |
+| `prefers-reduced-motion`                | Baja      | Animaciones CSS (`animate-spin`, transiciones) — envolver con media query          |
+
+**Herramientas:** `axe-core` (browser extension) · `eslint-plugin-jsx-a11y` · Lighthouse accessibility audit.
 
 ### ⬜ Features pendientes
 
-| Feature                                   | Componente afectado                             |
-| ----------------------------------------- | ----------------------------------------------- |
-| Copiar presupuesto del mes anterior       | `BudgetManager` — botón que carga el mes previo |
-| Caché por comercio (Etapa 2)              | Nueva tabla `commerce_rules`                    |
-| Groq fallback en categorización (Etapa 2) | `lib/parsers/commerceCategories.ts`             |
-| Soporte para escanear banco Bancolombia   |
+| Feature                                   | Componente / Ruta afectada                                                                                         |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Copiar presupuesto del mes anterior       | `BudgetManager` — botón que carga el mes previo                                                                    |
+| Caché por comercio (Etapa 2)              | Nueva tabla `commerce_rules`                                                                                       |
+| Groq fallback en categorización (Etapa 2) | `lib/parsers/commerceCategories.ts`                                                                                |
+| Soporte Bancolombia                       | Nuevo `lib/parsers/bancolombia.ts` + sender en `BANK_SENDERS` (`lib/gmail/client.ts`) + registro en `lib/parsers/index.ts`. Bancolombia envía notificaciones desde `alertas@notificaciones.bancolombia.com.co` |
 
 ### ⬜ Deploy y distribución
 
@@ -444,7 +494,7 @@ feature/<nombre>   ← una por mejora, PR a main
 
 **Orden recomendado para deploy:**
 
-1. Limpiar código muerto (`recharts`, `SyncButton`, `ThemeToggle`)
+1. ~~Limpiar código muerto~~ ✅ hecho
 2. `npm run build` sin errores
 3. Crear proyecto en Vercel, conectar repo, agregar env vars
 4. Comprar dominio y conectar
