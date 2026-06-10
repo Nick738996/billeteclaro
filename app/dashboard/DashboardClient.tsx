@@ -16,6 +16,9 @@ import StatsCards from '@/components/dashboard/StatsCards'
 import SpendingChart from '@/components/dashboard/SpendingChart'
 import TransactionsList from '@/components/dashboard/TransactionsList'
 import HeaderPill from '@/components/dashboard/HeaderPill'
+import BudgetManager from '@/components/dashboard/BudgetManager'
+import AIAdvisorPanel from '@/components/dashboard/AIAdvisorPanel'
+import ManualTransactions from '@/components/dashboard/ManualTransactions'
 
 interface Props {
   user: { name: string }
@@ -67,6 +70,13 @@ export default function DashboardClient({
   // Estado compartido entre SpendingChart y TransactionsList
   const [activeFilter, setActiveFilter] = useState<string>('TODOS')
 
+  // Presupuestos — se cargan en BudgetManager y se comparten con AIAdvisor
+  const [budgets, setBudgets] = useState<Record<string, number>>({})
+
+  // Versión de contexto: sube cada vez que cambian datos relevantes para el asesor
+  const [contextVersion, setContextVersion] = useState(0)
+  const bumpContext = useCallback(() => setContextVersion(v => v + 1), [])
+
   const stats = useMemo(() => buildStats(txs), [txs])
 
   const monthRef = parseISO(`${month}-01`)
@@ -99,7 +109,7 @@ export default function DashboardClient({
     loadMonth(m)
   }
 
-  const handleSyncComplete = () => loadMonth(month)
+  const handleSyncComplete = () => { loadMonth(month); bumpContext() }
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
@@ -125,7 +135,7 @@ export default function DashboardClient({
                stroke="currentColor" + color:var(--text) = adapta auto en light/dark */}
           <div className="flex items-center gap-2">
             <svg
-              viewBox="0 0 100 100" width="26" height="26"
+              viewBox="0 0 100 100" width="45" height="45"
               aria-hidden="true"
               style={{ color: 'var(--text)' }}
             >
@@ -136,8 +146,8 @@ export default function DashboardClient({
               <path d="M30,50 Q78,50 78,66 Q78,82 30,82"
                 stroke="#4ADE80" strokeWidth="6" fill="none" strokeLinecap="round"/>
             </svg>
-            <span className="font-semibold tracking-tight" style={{ fontSize: 'var(--text-base)', letterSpacing: '-0.02em' }}>
-              <span style={{ fontWeight: 300, color: 'var(--text)' }}>Billete</span>
+            <span className="tracking-tight" style={{ fontSize: 'var(--text-lg)', letterSpacing: '-0.02em' }}>
+              <span style={{ fontWeight: 400, color: 'var(--text)' }}>Billete</span>
               <span style={{ fontWeight: 700, color: 'var(--green)' }}>Claro</span>
             </span>
           </div>
@@ -218,6 +228,20 @@ export default function DashboardClient({
           onFilterChange={setActiveFilter}
         />
 
+        <BudgetManager
+          mes={month}
+          gastosPorCategoria={stats.porCategoria}
+          onBudgetsChange={setBudgets}
+          onSaved={bumpContext}
+        />
+
+        <AIAdvisorPanel
+          mes={month}
+          budgetCount={Object.values(budgets).filter(v => v > 0).length}
+          txCount={txs.length}
+          contextVersion={contextVersion}
+        />
+
         <div className="flex items-center justify-between px-1">
           <h2 className="font-medium" style={{ fontSize: 'var(--text-sm)', color: 'var(--text)' }}>
             Transacciones
@@ -227,10 +251,14 @@ export default function DashboardClient({
           </span>
         </div>
 
+        <ManualTransactions onSaved={() => { loadMonth(month); bumpContext() }} />
+
         <TransactionsList
           transactions={txs}
           activeFilter={activeFilter}
           onFilterChange={setActiveFilter}
+          onCategoriesUpdated={() => { loadMonth(month); bumpContext() }}
+          onTransactionDeleted={() => { loadMonth(month); bumpContext() }}
         />
       </main>
     </div>
