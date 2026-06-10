@@ -15,7 +15,7 @@
 - [x] **Etapa 1 — Recolección de datos** ← completa
 - [x] **UI/UX base** ← completa (dark/light mode, glass morphism, sistema de diseño)
 - [ ] **Etapa 2 — Categorización** (pendiente)
-- [ ] **Etapa 3 — Asesor financiero IA** ← en progreso
+- [~] **Etapa 3 — Asesor financiero IA** ← parcialmente completa (2 features pendientes)
 
 ### Criterios Etapa 1 — completados
 
@@ -51,6 +51,7 @@ npx tsc --noEmit   # type check (no hay test runner configurado aún)
 | Auth | Supabase Auth + Google OAuth |
 | Email | Gmail API v1 (`gmail.readonly`) |
 | IA / extracción | Gemini API — modelo `gemini-2.0-flash-lite` |
+| IA / asesor | Gemini API — modelo `gemini-2.0-flash-lite`, `temperature: 0.4` |
 | UI | Tailwind CSS + CSS variables (Recharts eliminado — donut SVG propio) |
 | Iconos | lucide-react |
 | Temas | next-themes (`data-theme` attribute, defaultTheme: "dark") |
@@ -163,6 +164,8 @@ Función `extractWithGroq` (nombre histórico, usa Gemini internamente). Recibe 
 ## Base de datos — puntos clave
 
 - `sync_log` tiene columna `skipped_ids text[] DEFAULT '{}'` (migración manual aplicada). Guarda IDs de Gmail ignorados (Uber pre-auths) para que el siguiente sync no los reprocese.
+- `budgets` tabla: `(user_id, mes, categoria, monto_presupuestado, subcategorias jsonb DEFAULT '[]')`. Constraint UNIQUE `(user_id, mes, categoria)`. RLS habilitado.
+- `subcategorias` es `jsonb` con estructura `[{nombre: string, monto: number}]`. Es UI-only — no se almacena ni refleja en `transactions`.
 - Todos los enums (`banco`, `tipo`, `categoria`) tienen CHECK constraints en BD **y** tipos TypeScript en `lib/types.ts`. Cambios requieren migración en `supabase/migrations/`.
 - `user_tokens` guarda `gmail_refresh_token`. El `provider_refresh_token` de Supabase solo está disponible justo después del login — se persiste en el callback usando el admin client.
 - RLS habilitado en todas las tablas con política `auth.uid() = user_id`.
@@ -187,14 +190,23 @@ Login solicita scopes `email profile gmail.readonly` con `access_type: offline` 
 
 `app/dashboard/page.tsx` — Server Component, fetcha transacciones del mes, pasa a `DashboardClient.tsx`.
 
-`app/dashboard/DashboardClient.tsx` — Client Component. Maneja navegación de mes, logout, refresco post-sync. `buildStats()` deriva gastos/ingresos/balance con `useMemo`.
+`app/dashboard/DashboardClient.tsx` — Client Component. Maneja navegación de mes, logout, refresco post-sync. `buildStats()` deriva gastos/ingresos/balance con `useMemo`. Estado `budgets: Record<string, number>` compartido entre `BudgetManager` y `AIAdvisor`.
+
+**Orden de componentes en el layout:**
+```
+StatsCards → SpendingChart → BudgetManager → AIAdvisor
+→ [header "Transacciones"] → ManualTransactions → TransactionsList
+```
 
 ### Componentes UI (`components/dashboard/`)
 
 - **`StatsCards`** — Balance como hero card full-width (número grande, badge "positivo"/"negativo") + Gastos/Ingresos en fila secundaria de 2 columnas
 - **`SpendingChart`** — donut SVG propio (sin Recharts), slices y leyenda clickeables → filtra `TransactionsList` via `activeFilter` compartido en `DashboardClient`. Barras proporcionales con % en leyenda. Top 8 categorías de gasto
 - **`HeaderPill`** — cápsula unificada: sync + reset + theme toggle + logout. Reemplaza `SyncButton` y `ThemeToggle` por separado.
-- **`TransactionsList`** — buscador + 3 chips fijos (Todos / RappiCard / RappiPay) + bottom sheet de categorías (`▾`) + barra de resumen + lista agrupada por fecha. Filas estilo "strip": borde izquierdo de color de categoría + dot. `activeFilter` recibido como prop desde `DashboardClient`
+- **`BudgetManager`** — presupuesto mensual por categoría con subcategorías opcionales. Patrón: `saved` (DB) + `draft` (local) + botón "Guardar" único. `isDirty` usa `normalize()` para ignorar subcats vacías. Papelera por categoría borra ese presupuesto (`monto: 0`). Top nav trash NO borra presupuestos (solo transacciones).
+- **`AIAdvisor`** — botón "Analizar" activo cuando `budgetCount >= 1`. Llama a `/api/ai-advisor`, muestra insights con íconos: `AlertTriangle` (alerta/rojo), `Lightbulb` (consejo/azul), `CheckCircle` (positivo/verde). Tono directo, colombiano, máx 3 bullets.
+- **`ManualTransactions`** — panel colapsable (`+`) para agregar transacciones en lote. Campos por fila: fecha, monto, comercio, tipo, banco, categoría. Llama `onSaved()` → `loadMonth()`.
+- **`TransactionsList`** — buscador + 3 chips fijos (Todos / RappiCard / RappiPay) + bottom sheet de categorías (`▾`) + barra de resumen + lista agrupada por fecha. Filas estilo "strip": borde izquierdo de color de categoría + dot. `activeFilter` recibido como prop desde `DashboardClient`. Edición de categoría: chip clickeable → `CategoryPicker` bottom sheet (renderizado FUERA del contenedor `backdropFilter` — fix WebKit). Guardar cambios: botón full-width único → batch PATCH. Filas con cambio pendiente muestran categoría en amarillo.
 
 ### Estado compartido: `activeFilter`
 `DashboardClient` gestiona `useState<string>('TODOS')` y lo pasa a `SpendingChart` y `TransactionsList`. Tocar un slice del donut o un chip de categoría actualiza ambos componentes. Se resetea a `'TODOS'` al cambiar de mes.
@@ -205,6 +217,33 @@ Login solicita scopes `email profile gmail.readonly` con `access_type: offline` 
 - `efectivoBanco(t)` — `ABONO_DEUDA` mapea a RAPPIPAY (el pago sale de la RappiCuenta)
 - `groupByDate(txs)` — agrupa por `"d de MMMM"` para los headers de fecha
 - Barra de resumen muestra total gastos y/o ingresos del filtro activo
+
+---
+
+## API Routes
+
+| Ruta | Método | Descripción |
+|---|---|---|
+| `/api/sync` | POST | Sincroniza emails nuevos de Gmail |
+| `/api/budgets` | GET | Lee presupuestos del mes (`?mes=yyyy-MM`) |
+| `/api/budgets` | PUT | Guarda presupuestos en batch. Items con `monto=0` se eliminan; con `monto>0` se hacen upsert |
+| `/api/ai-advisor` | POST | Genera insights con Gemini. Recibe `{mes, gastos, budgets}`. Retorna `{insights: AdvisorInsight[]}` |
+| `/api/transactions/manual` | POST | Crea transacciones manuales en batch. Genera `gmail_message_id = 'manual_' + uuid` |
+| `/api/transactions/categorize` | PATCH | Actualiza categorías en batch. Recibe `{changes: [{id, categoria}]}` |
+
+### Interfaces clave de API
+
+```typescript
+// /api/budgets
+interface BudgetSubcat { nombre: string; monto: number }
+interface BudgetEntry  { monto: number; subcategorias: BudgetSubcat[] }
+// PUT body: { mes: string, items: [{categoria, monto, subcategorias}] }
+
+// /api/ai-advisor
+interface AdvisorInsight { tipo: 'alerta' | 'consejo' | 'positivo'; texto: string }
+// POST body: { mes, gastos: Record<string,number>, budgets: Record<string,number> }
+// Response: { insights: AdvisorInsight[] }
+```
 
 ---
 
@@ -275,6 +314,13 @@ feature/<nombre>   ← una rama por mejora, PR a main
 | Glass morphism en cards (`--surface` rgba + `--glass-blur`) | Profundidad visual sin sombras; consistente con regla de diseño |
 | `HeaderPill` unificado en lugar de botones separados | Reduce ruido visual en el header; sync/reset/theme/logout en una cápsula |
 | Radios más grandes (`--radius-lg: 24px`, `--radius-xl: 32px`) | Look más fluido y moderno; coherente con el glass morphism |
+| Subcategorías en `jsonb` de `budgets`, no en `transactions` | Suman para el total del presupuesto sin contaminar los datos de transacciones |
+| Batch save en `BudgetManager` y `TransactionsList` | Reduce llamadas API; el usuario controla cuándo persiste |
+| `CategoryPicker` fuera del `backdropFilter` div | `position:fixed` no funciona dentro de `backdropFilter` en WebKit |
+| Top nav trash borra solo transacciones, no presupuestos | Presupuestos son configuración del usuario, no datos de sync |
+| Sin notificaciones push en MVP | Complejidad alta (service worker, permisos), valor bajo antes de tener usuarios reales |
+| Sin análisis de gastos nocturnos | Fuera de alcance del MVP |
+| Fragmentación Uber ya resuelta en Etapa 1 | `deduplicateUber()` + `skipped_ids` — no requiere lógica adicional en Etapa 3 |
 
 ---
 
@@ -289,23 +335,27 @@ feature/<nombre>   ← una rama por mejora, PR a main
 
 Categorización automática ya está parcialmente implementada via `guessCategoria()` en `lib/parsers/commerceCategories.ts` (120+ patrones). Lo que falta:
 
-1. **Edición manual de categoría** por transacción, con opción de aplicar al mismo comercio en bulk
-2. **Caché por comercio** — si el usuario cambia la categoría de "Uber" una vez, se aplica a todas las futuras
-3. **Gemini como último recurso** — para comercios no reconocidos por los patrones
+1. **Caché por comercio** — si el usuario cambia la categoría de "Uber" una vez, se aplica a todas las futuras (tabla `commerce_rules` o similar)
+2. **Gemini como último recurso** — para comercios no reconocidos por los patrones
 
-## Etapa 3 — Asesor financiero IA (en progreso)
+> Nota: la edición manual de categoría por transacción ya está implementada en Etapa 3 (`TransactionsList` + `/api/transactions/categorize`).
 
-### Alcance
-- Presupuesto mensual por categoría (configurable por el usuario)
-- Alertas: 80%/100% de presupuesto, fragmentación Uber, gastos nocturnos
-- IA conversacional con Gemini — contexto: gastos vs presupuesto por mes
-- Tono: directo, colombiano, máximo 3 bullets por respuesta
+---
 
-### Plan de implementación
+## Etapa 3 — Asesor financiero IA
 
-1. **BD: tabla `budgets`** — `user_id`, `categoria`, `monto_limite`, `mes` (o sin mes = recurrente)
-2. **API `/api/budgets`** — GET/POST/PATCH para leer y guardar presupuestos
-3. **UI: pantalla de presupuestos** — lista de categorías con input de monto límite por categoría
-4. **Alertas en dashboard** — badge/banner cuando gasto ≥ 80% o 100% del presupuesto
-5. **API `/api/advisor`** — POST recibe pregunta del usuario, construye contexto (gastos del mes, presupuestos, % consumido por categoría) y llama a Gemini
-6. **UI: chat flotante** — botón en dashboard abre un mini-chat, respuestas en bullets
+### Alcance definitivo (descartado: notificaciones push, gastos nocturnos — post-MVP)
+
+| Feature | Estado |
+|---|---|
+| Presupuesto mensual por categoría con subcategorías | ✅ `BudgetManager` + `/api/budgets` |
+| Asesor IA con Gemini (insights directos, tono colombiano) | ✅ `AIAdvisor` + `/api/ai-advisor` |
+| Agregar transacciones manuales en lote | ✅ `ManualTransactions` + `/api/transactions/manual` |
+| Edición de categoría por transacción (batch) | ✅ `TransactionsList` + `/api/transactions/categorize` |
+| Copiar presupuesto del mes anterior | ❌ pendiente |
+| Auto-análisis al abrir dashboard (si hay presupuestos) | ❌ pendiente |
+
+### Pendientes Etapa 3
+
+1. **Copiar presupuesto del mes anterior** — botón en `BudgetManager` que precarga los presupuestos del mes anterior como punto de partida para el mes actual
+2. **Auto-análisis al abrir** — si `budgetCount >= 1`, llamar a `/api/ai-advisor` automáticamente al cargar el dashboard (sin que el usuario toque "Analizar")
