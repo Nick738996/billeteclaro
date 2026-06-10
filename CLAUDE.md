@@ -16,7 +16,7 @@
 [✅ Etapa 1]  Recolección de datos (Gmail → Supabase)
 [✅ UI/UX]    Sistema de diseño, dark/light mode, glass morphism
 [✅ Etapa 3]  Asesor financiero IA
-[✅ Refactor] Auditoría y limpieza de código
+[✅ Refactor] Auditoría, limpieza de código y capa API
 [⬜ Etapa 2]  Categorización inteligente  ← pendiente
 [⬜ QA]       Testing unitario (Vitest), E2E (Maestro), accesibilidad  ← pendiente
 [⬜ Deploy]   Dominio, hosting, PWA mobile  ← pendiente
@@ -300,6 +300,43 @@ TransactionsList    ← buscador + chips + bottom sheet + delete por fila
 
 ## API Routes
 
+### Infraestructura (`lib/api/`)
+
+- **`lib/api/response.ts`** — `ok(data, status?)` / `err(message, status?)`. Toda route debe usar estos helpers; nunca `NextResponse.json()` directo.
+- **`lib/api/withAuth.ts`** — `withAuth(handler)`: resuelve `getAuthUser()`, devuelve 401 si no hay sesión, inyecta `(req, user, supabase, ctx)` al handler. Usar en **todas** las routes de negocio.
+
+**Patrón para una route nueva:**
+```typescript
+import { ok, err } from '@/lib/api/response'
+import { withAuth } from '@/lib/api/withAuth'
+import { miFuncion } from '@/lib/services/miService'
+
+export const GET = withAuth(async (req, user, supabase) => {
+  try {
+    const result = await miFuncion(supabase, user.id)
+    return ok(result)
+  } catch (e) {
+    console.error('[GET /api/mi-ruta]', { userId: user.id }, e)
+    return err('Mensaje de error')
+  }
+})
+```
+
+**Routes de OAuth (`/api/auth/*`) — excluidas de `withAuth`:** son flujos de redirect pre-autenticación, no retornan JSON.
+
+### Servicios (`lib/services/`)
+
+| Archivo                      | Funciones clave                                                                                   |
+| ---------------------------- | ------------------------------------------------------------------------------------------------- |
+| `budgetService.ts`           | `fetchBudgets(supabase, userId, mes)` · `saveBudgets(supabase, userId, mes, items)`               |
+| `advisorService.ts`          | `getInsights(supabase, userId, mes, force?)` · `sendChatMessage(supabase, userId, mes, message)`  |
+| `transactionService.ts`      | `fetchMonthTransactions` · `createManualTransactions` · `batchCategorize` · `deleteTransaction`   |
+| `syncService.ts`             | `runSync(userId, admin)` — pipeline completo Gmail→Supabase; `deduplicateUber` es privada al módulo |
+
+**Regla:** las route handlers son transporte puro (auth → validar input → llamar service → responder). La lógica de negocio vive en `lib/services/`.
+
+### Tabla de endpoints
+
 | Ruta                                 | Método | Descripción                                                                  |
 | ------------------------------------ | ------ | ---------------------------------------------------------------------------- |
 | `POST /api/sync`                     | POST   | Sincroniza emails nuevos de Gmail                                            |
@@ -411,7 +448,9 @@ feature/<nombre>   ← una por mejora, PR a main
 
 ## Roadmap: lo que falta antes de lanzar
 
-### ✅ Refactor completado (rama `refactor/data-layer`)
+### ✅ Refactor completado
+
+**Data layer (`refactor/data-layer`):**
 
 | Tarea                                                   | Estado |
 | ------------------------------------------------------- | ------ |
@@ -425,7 +464,20 @@ feature/<nombre>   ← una por mejora, PR a main
 | `SpendingChart` `ABONO_DEUDA` removido de `TIPOS_GASTO` | ✅     |
 | `generateAuditId` extraído a `lib/utils/auditId.ts`     | ✅     |
 | Race condition `generateAuditId` corregida (for loop)   | ✅     |
-| `getAuthUser()` helper — usado en 7 rutas API           | ✅     |
+| `getAuthUser()` helper — usado en todas las rutas API   | ✅     |
+
+**API layer (`refactor/api-layer`):**
+
+| Tarea                                                                          | Estado |
+| ------------------------------------------------------------------------------ | ------ |
+| `lib/api/response.ts` — helpers `ok()` / `err()`                              | ✅     |
+| `lib/api/withAuth.ts` — middleware de autenticación para route handlers        | ✅     |
+| `lib/services/budgetService.ts` — lógica de presupuestos                      | ✅     |
+| `lib/services/advisorService.ts` — insights y chat del asesor IA              | ✅     |
+| `lib/services/transactionService.ts` — CRUD de transacciones                  | ✅     |
+| `lib/services/syncService.ts` — pipeline Gmail→Supabase + dedup Uber          | ✅     |
+| 8 route handlers convertidos a transporte puro (auth → validar → service → ok) | ✅     |
+| Routes de OAuth (`/api/auth/*`) dejadas intactas (no son JSON endpoints)       | ✅     |
 
 ### ⬜ Testing unitario
 
@@ -526,5 +578,8 @@ Objetivo: cumplir WCAG 2.1 AA. Todos los elementos interactivos deben ser navega
 | InsightCard: superficie neutra + borde de color    | Más legible que fondos de color sólido; diferencia tipos sin saturar |
 | Tipo `observacion` en insights (púrpura, Eye)      | Diferencia "dato para pensar" de "acción concreta" (consejo)         |
 | Cache de insights en `ai_insights` tabla           | Evita llamadas Groq redundantes; hash como invalidación exacta       |
-| PWA antes que app nativa                           | Ya está configurada; instalable sin stores; app nativa es post-MVP   |
-| Sin notificaciones push en MVP                     | Alta complejidad, bajo valor antes de tener usuarios reales          |
+| PWA antes que app nativa                                           | Ya está configurada; instalable sin stores; app nativa es post-MVP   |
+| Sin notificaciones push en MVP                                     | Alta complejidad, bajo valor antes de tener usuarios reales          |
+| `withAuth` + `ok()`/`err()` como infraestructura de routes         | Elimina boilerplate de auth y formato en cada handler; routes son transporte puro |
+| Routes OAuth excluidas de `withAuth`                               | Son flujos de redirect pre-sesión; no retornan JSON y manejan estados intermedios |
+| Lógica de negocio en `lib/services/`, no en route handlers         | Testeable de forma aislada; routes quedan de 15–30 líneas máximo     |
