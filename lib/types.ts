@@ -106,6 +106,7 @@ export interface ExtractedTransaction {
 
 export interface MonthlyStats {
   gastos: number
+  gastosReales: number
   ingresos: number
   balance: number
   transacciones: number

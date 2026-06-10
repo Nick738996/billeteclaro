@@ -11,6 +11,7 @@ import { isIngreso, isGasto } from '@/lib/types'
 import { TEST_IDS } from '@/lib/testIds'
 import MonthHero from '@/components/dashboard/MonthHero'
 import BudgetOverview from '@/components/dashboard/BudgetOverview'
+import SpendingChart from '@/components/dashboard/SpendingChart'
 import TransactionsList from '@/components/dashboard/TransactionsList'
 import HeaderPill from '@/components/dashboard/HeaderPill'
 import AIAdvisorPanel from '@/components/dashboard/AIAdvisorPanel'
@@ -28,18 +29,19 @@ interface Props {
 }
 
 function buildStats(txs: Transaction[]): MonthlyStats {
-  const gastos = txs.filter(t => isGasto(t.tipo)).reduce((s, t) => s + t.monto, 0)
-  const ingresos = txs.filter(t => isIngreso(t.tipo)).reduce((s, t) => s + t.monto, 0)
-  const porCategoria = txs
-    .filter(t => isGasto(t.tipo))
-    .reduce<Record<string, number>>((acc, t) => {
-      acc[t.categoria] = (acc[t.categoria] ?? 0) + t.monto
-      return acc
-    }, {})
+  const gastosTxs    = txs.filter(t => isGasto(t.tipo))
+  const gastos       = gastosTxs.reduce((s, t) => s + t.monto, 0)
+  const gastosReales = gastosTxs.filter(t => t.categoria !== 'TRANSFERENCIA').reduce((s, t) => s + t.monto, 0)
+  const ingresos     = txs.filter(t => t.tipo === 'INGRESO').reduce((s, t) => s + t.monto, 0)
+  const porCategoria = gastosTxs.reduce<Record<string, number>>((acc, t) => {
+    acc[t.categoria] = (acc[t.categoria] ?? 0) + t.monto
+    return acc
+  }, {})
   return {
     gastos,
+    gastosReales,
     ingresos,
-    balance: ingresos - gastos,
+    balance: ingresos - gastosReales,
     transacciones: txs.length,
     porCategoria: porCategoria as Record<Categoria, number>,
   }
@@ -65,6 +67,7 @@ export default function DashboardClient({
 
   const [activeFilter, setActiveFilter] = useState<string>('TODOS')
   const [budgets, setBudgets] = useState<Record<string, number>>({})
+  const [showChart, setShowChart] = useState(false)
 
   // Versión de contexto: sube cada vez que cambian datos relevantes para el asesor
   const [contextVersion, setContextVersion] = useState(0)
@@ -215,12 +218,22 @@ export default function DashboardClient({
         )}
 
         <MonthHero
-          gastos={stats.gastos}
+          gastos={stats.gastosReales}
           ingresos={stats.ingresos}
           totalPresupuestado={Object.values(budgets).reduce((s, v) => s + v, 0)}
           transacciones={stats.transacciones}
           mes={month}
+          showChart={showChart}
+          onChartToggle={() => setShowChart(v => !v)}
         />
+
+        {showChart && (
+          <SpendingChart
+            transactions={txs}
+            activeFilter={activeFilter}
+            onFilterChange={setActiveFilter}
+          />
+        )}
 
         <BudgetOverview
           mes={month}

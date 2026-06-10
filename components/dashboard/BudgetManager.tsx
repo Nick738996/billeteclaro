@@ -21,17 +21,18 @@ type DraftMap = Record<string, BudgetEntry>
 interface Props {
   mes: string
   gastosPorCategoria: Record<string, number>
+  initialBudgets?: DraftMap
   onBudgetsChange?: (totals: Record<string, number>) => void
   onSaved?: () => void
 }
 
-export default function BudgetManager({ mes, gastosPorCategoria, onBudgetsChange, onSaved }: Props) {
-  const [saved,    setSaved]    = useState<DraftMap>({})
-  const [draft,    setDraft]    = useState<DraftMap>({})
+export default function BudgetManager({ mes, gastosPorCategoria, initialBudgets, onBudgetsChange, onSaved }: Props) {
+  const [saved,    setSaved]    = useState<DraftMap>(initialBudgets ?? {})
+  const [draft,    setDraft]    = useState<DraftMap>(initialBudgets ?? {})
   const [expanded, setExpanded] = useState<string | null>(null)
   const [saving,   setSaving]   = useState(false)
   const [savedOk,  setSavedOk]  = useState(false)
-  const [loaded,   setLoaded]   = useState(false)
+  const [loaded,   setLoaded]   = useState(!!initialBudgets)
   const [copying,  setCopying]  = useState(false)
 
   const [yy, mm] = mes.split('-').map(Number)
@@ -68,6 +69,7 @@ export default function BudgetManager({ mes, gastosPorCategoria, onBudgetsChange
     Object.fromEntries(Object.entries(map).map(([k, v]) => [k, v.monto]))
 
   useEffect(() => {
+    if (initialBudgets) return  // ya tenemos los datos — no re-fetchar
     fetch(`/api/budgets?mes=${mes}`)
       .then(r => r.json())
       .then(d => {

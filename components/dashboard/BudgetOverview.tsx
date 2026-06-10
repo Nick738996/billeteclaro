@@ -8,8 +8,11 @@ import {
   PRESUPUESTO_CATS,
   formatCOPCompact,
   type Categoria,
+  type BudgetEntry,
 } from '@/lib/types'
 import BudgetManager from './BudgetManager'
+
+type DraftMap = Record<string, BudgetEntry>
 
 interface Props {
   mes: string
@@ -31,24 +34,28 @@ function barColor(pct: number): string {
 }
 
 export default function BudgetOverview({ mes, gastosPorCategoria, onBudgetsChange, onSaved }: Props) {
-  const [budgets, setBudgets] = useState<Record<string, number>>({})
+  const [draftMap, setDraftMap] = useState<DraftMap>({})
   const [editing, setEditing] = useState(false)
   const [loaded, setLoaded] = useState(false)
+
+  // Totals derivados del DraftMap completo
+  const budgets: Record<string, number> = Object.fromEntries(
+    Object.entries(draftMap).map(([k, v]) => [k, v.monto])
+  )
 
   const loadBudgets = useCallback(() => {
     fetch(`/api/budgets?mes=${mes}`)
       .then(r => r.json())
       .then(d => {
-        const map: Record<string, number> = {}
-        for (const [k, v] of Object.entries(d.budgets ?? {})) {
-          map[k] = typeof v === 'object' && v !== null ? (v as any).monto : Number(v)
-        }
-        setBudgets(map)
-        onBudgetsChange(map)
+        const raw: DraftMap = d.budgets ?? {}
+        setDraftMap(raw)
+        const totals = Object.fromEntries(Object.entries(raw).map(([k, v]) => [k, v.monto]))
+        onBudgetsChange(totals)
         setLoaded(true)
       })
       .catch(() => setLoaded(true))
-  }, [mes, onBudgetsChange])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mes])
 
   useEffect(() => { loadBudgets() }, [loadBudgets])
 
@@ -222,8 +229,15 @@ export default function BudgetOverview({ mes, gastosPorCategoria, onBudgetsChang
           <BudgetManager
             mes={mes}
             gastosPorCategoria={gastosPorCategoria}
+            initialBudgets={draftMap}
             onBudgetsChange={newTotals => {
-              setBudgets(newTotals)
+              setDraftMap(prev => {
+                const next: DraftMap = {}
+                for (const [k, v] of Object.entries(newTotals)) {
+                  next[k] = prev[k] ? { ...prev[k], monto: v } : { monto: v, subcategorias: [] }
+                }
+                return next
+              })
               onBudgetsChange(newTotals)
             }}
             onSaved={() => {

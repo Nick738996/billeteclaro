@@ -1,6 +1,7 @@
 'use client'
 
 import { getDaysInMonth, parseISO } from 'date-fns'
+import { BarChart2 } from 'lucide-react'
 import { formatCOPCompact } from '@/lib/types'
 
 interface Props {
@@ -9,9 +10,11 @@ interface Props {
   totalPresupuestado: number
   transacciones: number
   mes: string
+  showChart: boolean
+  onChartToggle: () => void
 }
 
-export default function MonthHero({ gastos, ingresos, totalPresupuestado, transacciones, mes }: Props) {
+export default function MonthHero({ gastos, ingresos, totalPresupuestado, transacciones, mes, showChart, onChartToggle }: Props) {
   const ref = parseISO(`${mes}-01`)
   const today = new Date()
   const isCurrentMonth =
@@ -83,7 +86,7 @@ export default function MonthHero({ gastos, ingresos, totalPresupuestado, transa
         </div>
       )}
 
-      {/* Subtext */}
+      {/* Subtext + chart toggle */}
       <div className="flex items-center gap-4">
         {hasBudget && (
           <p style={{ fontSize: 'var(--text-xs)', color: over ? 'var(--red)' : 'var(--text-muted)' }}>
@@ -105,6 +108,21 @@ export default function MonthHero({ gastos, ingresos, totalPresupuestado, transa
         <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-subtle)' }}>
           {transacciones} mov.
         </p>
+        <button
+          onClick={onChartToggle}
+          aria-label={showChart ? 'Ocultar gráfico' : 'Ver gráfico por categoría'}
+          className="flex items-center justify-center transition-opacity hover:opacity-70 ml-auto"
+          style={{
+            background: showChart ? 'var(--surface-2)' : 'none',
+            border: showChart ? '1px solid var(--border)' : 'none',
+            borderRadius: 'var(--radius-badge)',
+            color: showChart ? 'var(--text)' : 'var(--text-subtle)',
+            cursor: 'pointer',
+            padding: '3px 6px',
+          }}
+        >
+          <BarChart2 size={14} />
+        </button>
       </div>
     </div>
   )
