@@ -151,10 +151,12 @@ export async function patchTransaction(
 // ── Delete all (reset) ────────────────────────────────────────────────────────
 
 export async function deleteAllTransactions(admin: Admin, userId: string): Promise<void> {
-  const [{ error: txError }, { error: logError }] = await Promise.all([
+  const [{ error: txError }, { error: logError }, { error: settingsError }] = await Promise.all([
     admin.from('transactions').delete().eq('user_id', userId),
     admin.from('sync_log').delete().eq('user_id', userId),
+    admin.from('user_settings').update({ onboarding_completed: false }).eq('user_id', userId),
   ])
-  if (txError)  throw new Error(`deleteAllTransactions (transactions): ${txError.message}`)
-  if (logError) throw new Error(`deleteAllTransactions (sync_log): ${logError.message}`)
+  if (txError)      throw new Error(`deleteAllTransactions (transactions): ${txError.message}`)
+  if (logError)     throw new Error(`deleteAllTransactions (sync_log): ${logError.message}`)
+  if (settingsError) throw new Error(`deleteAllTransactions (user_settings): ${settingsError.message}`)
 }
