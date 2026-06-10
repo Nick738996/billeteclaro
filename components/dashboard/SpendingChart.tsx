@@ -45,7 +45,7 @@ function donutArc(
 // ── Chart data builder (same logic as original) ──────────────────────────────
 
 const TIPOS_GASTO = new Set([
-  'COMPRA', 'PAGO_SERVICIO', 'RETIRO', 'TRANSFERENCIA_ENVIADA', 'ABONO_DEUDA',
+  'COMPRA', 'PAGO_SERVICIO', 'RETIRO', 'TRANSFERENCIA_ENVIADA',
 ])
 
 interface ChartEntry {
@@ -140,7 +140,7 @@ export default function SpendingChart({ transactions, activeFilter, onFilterChan
                   key={i}
                   d={donutArc(cx, cy, isSel ? oR + 7 : oR, iR, sl.a0, sl.a1)}
                   fill={sl.fill}
-                  stroke="#0A0A0A"
+                  stroke="var(--bg)"
                   strokeWidth="2.5"
                   opacity={isDimmed ? 0.28 : 1}
                   className="cursor-pointer transition-opacity duration-150"

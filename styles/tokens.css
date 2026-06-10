@@ -34,6 +34,14 @@
   --text-2xl:  24px;
   --text-3xl:  30px;
 
+  /* Glow tints — fondos y bordes de StatsCards */
+  --green-glow-bg:     rgba(74,222,128,0.04);
+  --green-glow-border: rgba(74,222,128,0.28);
+  --red-glow-bg:       rgba(255,107,107,0.04);
+  --red-glow-border:   rgba(255,107,107,0.28);
+
+  --text-4xl: 40px;
+
   /* Glass blur — usado como backdrop-filter en las cards */
   --glass-blur: blur(24px) saturate(160%);
 }
@@ -58,4 +66,9 @@
   --blue-soft:    #DBEAFE;
   --purple:       #7C3AED;
   --purple-soft:  #EDE9FE;
+
+  --green-glow-bg:     rgba(22,163,74,0.06);
+  --green-glow-border: rgba(22,163,74,0.25);
+  --red-glow-bg:       rgba(220,38,38,0.06);
+  --red-glow-border:   rgba(220,38,38,0.25);
 }

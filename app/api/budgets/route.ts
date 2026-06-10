@@ -1,21 +1,10 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import type { Categoria } from '@/lib/types'
-
-export interface BudgetSubcat {
-  nombre: string
-  monto: number
-}
-
-export interface BudgetEntry {
-  monto: number
-  subcategorias: BudgetSubcat[]
-}
+import { getAuthUser } from '@/lib/supabase/server'
+import type { Categoria, BudgetEntry, BudgetSubcat } from '@/lib/types'
 
 // GET /api/budgets?mes=YYYY-MM
 export async function GET(request: Request) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { user, supabase } = await getAuthUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const url = new URL(request.url)
@@ -41,8 +30,7 @@ export async function GET(request: Request) {
 
 // PUT /api/budgets  body: { mes, items: [{ categoria, monto, subcategorias }] }
 export async function PUT(request: Request) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { user, supabase } = await getAuthUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await request.json() as {

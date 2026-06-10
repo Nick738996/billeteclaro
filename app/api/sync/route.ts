@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { getAuthUser, createAdminClient } from '@/lib/supabase/server'
+import { generateAuditId } from '@/lib/utils/auditId'
 import {
   refreshGmailToken,
   buildGmailClient,
@@ -9,19 +10,14 @@ import {
 import { trySpecificParser } from '@/lib/parsers'
 import { extractWithGroq } from '@/lib/ai/extractor'
 import type { ExtractedTransaction } from '@/lib/types'
-import { format } from 'date-fns'
 
 const MAX_EMAILS_PER_SYNC = 2000
 const FETCH_BATCH_SIZE = 10
 const GROQ_CONCURRENCY = 3
 
 export async function POST() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const { user } = await getAuthUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const admin = createAdminClient()
 
@@ -278,24 +274,3 @@ function deduplicateUber(txs: Array<{ id: string; extracted: ExtractedTransactio
   }
 }
 
-async function generateAuditId(
-  admin: ReturnType<typeof createAdminClient>,
-  userId: string,
-  fecha: Date
-): Promise<string> {
-  const dayStart = new Date(fecha)
-  dayStart.setHours(0, 0, 0, 0)
-  const dayEnd = new Date(fecha)
-  dayEnd.setHours(23, 59, 59, 999)
-
-  const { count } = await admin
-    .from('transactions')
-    .select('id', { count: 'exact', head: true })
-    .eq('user_id', userId)
-    .gte('fecha', dayStart.toISOString())
-    .lte('fecha', dayEnd.toISOString())
-
-  const seq = ((count ?? 0) + 1).toString().padStart(2, '0')
-  const mmdd = format(fecha, 'MMdd')
-  return `${mmdd}-${seq}`
-}

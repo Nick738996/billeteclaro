@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import Groq from 'groq-sdk'
 import { startOfMonth, endOfMonth, parseISO } from 'date-fns'
-import { createClient } from '@/lib/supabase/server'
+import { getAuthUser } from '@/lib/supabase/server'
 import { buildAdvisorContext } from '@/lib/ai/buildAdvisorContext'
 import type { Transaction, Insight } from '@/lib/types'
 import { CATEGORIA_LABELS } from '@/lib/types'
@@ -53,8 +53,7 @@ ${insightTexts ? `Insights: \n${insightTexts}` : ''}
 
 // POST /api/ai/chat  body: { message: string, mes: string }
 export async function POST(request: Request) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { user, supabase } = await getAuthUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { message, mes } = await request.json() as { message: string; mes: string }

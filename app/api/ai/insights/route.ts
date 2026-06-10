@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import Groq from 'groq-sdk'
 import { startOfMonth, endOfMonth, parseISO, subHours } from 'date-fns'
-import { createClient } from '@/lib/supabase/server'
+import { getAuthUser } from '@/lib/supabase/server'
 import { buildAdvisorContext, hashContext } from '@/lib/ai/buildAdvisorContext'
 import type { Transaction, Insight } from '@/lib/types'
 import { CATEGORIA_LABELS } from '@/lib/types'
@@ -153,8 +153,7 @@ ${sinPresupuesto.length ? sinPresupuesto.join('\n') : '  (ninguna)'}`
 
 // GET /api/ai/insights?mes=YYYY-MM
 export async function GET(request: Request) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { user, supabase } = await getAuthUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const url = new URL(request.url)

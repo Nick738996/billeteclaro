@@ -15,10 +15,11 @@
 ```
 [✅ Etapa 1]  Recolección de datos (Gmail → Supabase)
 [✅ UI/UX]    Sistema de diseño, dark/light mode, glass morphism
-[✅ Etapa 3]  Asesor financiero IA  ← COMPLETA
+[✅ Etapa 3]  Asesor financiero IA
+[✅ Refactor] Auditoría y limpieza de código
 [⬜ Etapa 2]  Categorización inteligente  ← pendiente
+[⬜ QA]       Testing unitario (Vitest), E2E (Maestro), accesibilidad  ← pendiente
 [⬜ Deploy]   Dominio, hosting, PWA mobile  ← pendiente
-[⬜ QA]       Testing, refactor, organización  ← pendiente
 ```
 
 ---
@@ -27,15 +28,15 @@
 
 ### ✅ Etapa 1 — Recolección de datos
 
-| Criterio | Estado |
-|---|---|
-| Correos Rappi en Supabase sin duplicados | ✅ dedup por `gmail_message_id UNIQUE` |
-| Uber sin doble cobro | ✅ `deduplicateUber()` — pre-auths en `sync_log.skipped_ids` |
-| Datos persisten al cambiar sesión y mes | ✅ Supabase, no localStorage |
-| ID único por transacción | ✅ `generateAuditId()` — formato `MMDD-NN` |
-| Nombre del comercio legible | ✅ `toTitleCase()` en parsers y en UI |
-| Ingresos/egresos identificados correctamente | ✅ `isIngreso()`, `isGasto()` excluye `ABONO_DEUDA` |
-| Botón sync separado del delete | ✅ `HeaderPill` — sync + reset con confirmación 4s |
+| Criterio                                     | Estado                                                       |
+| -------------------------------------------- | ------------------------------------------------------------ |
+| Correos Rappi en Supabase sin duplicados     | ✅ dedup por `gmail_message_id UNIQUE`                       |
+| Uber sin doble cobro                         | ✅ `deduplicateUber()` — pre-auths en `sync_log.skipped_ids` |
+| Datos persisten al cambiar sesión y mes      | ✅ Supabase, no localStorage                                 |
+| ID único por transacción                     | ✅ `generateAuditId()` — formato `MMDD-NN`                   |
+| Nombre del comercio legible                  | ✅ `toTitleCase()` en parsers y en UI                        |
+| Ingresos/egresos identificados correctamente | ✅ `isIngreso()`, `isGasto()` excluye `ABONO_DEUDA`          |
+| Botón sync separado del delete               | ✅ `HeaderPill` — sync + reset con confirmación 4s           |
 
 ### ✅ UI/UX base
 
@@ -43,25 +44,27 @@ Glass morphism, dark/light mode, sistema de diseño con CSS variables, sin sombr
 
 ### ✅ Etapa 3 — Asesor financiero IA
 
-| Feature | Componente / Ruta |
-|---|---|
-| Presupuesto mensual por categoría + subcategorías | `BudgetManager` + `GET/PUT /api/budgets` |
-| Asesor IA: insights automáticos al cargar | `AIAdvisorPanel` + `GET /api/ai/insights` |
-| Chat conversacional con el asesor | `AIAdvisorPanel` (sección expandible) + `POST /api/ai/chat` |
-| Cache de insights por `context_hash` (6h TTL) | tabla `ai_insights` en Supabase |
-| `contextVersion` — invalidación de cache por eventos | `DashboardClient` → `bumpContext()` |
-| Agregar transacciones manuales en lote | `ManualTransactions` + `POST /api/transactions/manual` |
-| Edición de categoría por transacción (batch) | `TransactionsList` + `PATCH /api/transactions/categorize` |
-| Eliminar transacción individual | `TransactionsList` + `DELETE /api/transactions/[id]` |
-| Skeleton loader del asesor (imita InsightCard) | `SkeletonInsights` en `AIAdvisorPanel` |
+| Feature                                              | Componente / Ruta                                           |
+| ---------------------------------------------------- | ----------------------------------------------------------- |
+| Presupuesto mensual por categoría + subcategorías    | `BudgetManager` + `GET/PUT /api/budgets`                    |
+| Asesor IA: insights automáticos al cargar            | `AIAdvisorPanel` + `GET /api/ai/insights`                   |
+| Chat conversacional con el asesor                    | `AIAdvisorPanel` (sección expandible) + `POST /api/ai/chat` |
+| Cache de insights por `context_hash` (6h TTL)        | tabla `ai_insights` en Supabase                             |
+| `contextVersion` — invalidación de cache por eventos | `DashboardClient` → `bumpContext()`                         |
+| Agregar transacciones manuales en lote               | `ManualTransactions` + `POST /api/transactions/manual`      |
+| Edición de categoría por transacción (batch)         | `TransactionsList` + `PATCH /api/transactions/categorize`   |
+| Eliminar transacción individual                      | `TransactionsList` + `DELETE /api/transactions/[id]`        |
+| Skeleton loader del asesor (imita InsightCard)       | `SkeletonInsights` en `AIAdvisorPanel`                      |
 
 **Cuándo se llama a Groq para insights:**
+
 - Al cargar el dashboard (si hash cambió o no hay cache)
 - Al pulsar "Actualizar" (`?force=true`)
 - Cuando `contextVersion` sube: sync, add manual, delete, categoría editada, presupuesto guardado
 - NO se llama si el hash del contexto es idéntico al cacheado (mismo día, mismos datos)
 
 **InsightCard — tipos y colores:**
+
 ```
 alerta      → rojo    (AlertTriangle)  — solo pct_consumido >= 100%
 consejo     → azul    (Lightbulb)      — acción concreta con número HOY
@@ -88,20 +91,20 @@ observacion → púrpura (Eye)           — dato relevante sin acción inmediat
 
 ## Stack
 
-| Capa | Tecnología |
-|---|---|
-| Framework | Next.js 16 App Router + Turbopack |
-| Base de datos | Supabase (PostgreSQL, us-east-1) |
-| Auth | Supabase Auth + Google OAuth |
-| Email | Gmail API v1 (`gmail.readonly`) |
-| IA / extracción emails | Groq API — `llama-3.3-70b-versatile`, `temperature: 0.1` |
+| Capa                   | Tecnología                                                          |
+| ---------------------- | ------------------------------------------------------------------- |
+| Framework              | Next.js 16 App Router + Turbopack                                   |
+| Base de datos          | Supabase (PostgreSQL, us-east-1)                                    |
+| Auth                   | Supabase Auth + Google OAuth                                        |
+| Email                  | Gmail API v1 (`gmail.readonly`)                                     |
+| IA / extracción emails | Groq API — `llama-3.3-70b-versatile`, `temperature: 0.1`            |
 | IA / asesor (insights) | Groq API — `llama-3.3-70b-versatile`, `temperature: 0.1`, JSON mode |
-| IA / asesor (chat) | Groq API — `llama-3.3-70b-versatile`, `temperature: 0.4` |
-| UI | Tailwind CSS + CSS variables propias |
-| Iconos | lucide-react |
-| Temas | next-themes (`data-theme` attribute, `defaultTheme: "dark"`) |
-| Fuente | Inter via `next/font/google` |
-| PWA | @ducanh2912/next-pwa (deshabilitado en dev) |
+| IA / asesor (chat)     | Groq API — `llama-3.3-70b-versatile`, `temperature: 0.4`            |
+| UI                     | Tailwind CSS + CSS variables propias                                |
+| Iconos                 | lucide-react                                                        |
+| Temas                  | next-themes (`data-theme` attribute, `defaultTheme: "dark"`)        |
+| Fuente                 | Inter via `next/font/google`                                        |
+| PWA                    | @ducanh2912/next-pwa (deshabilitado en dev)                         |
 
 **Groq free tier:** 14.400 req/día, ~200ms latencia, JSON mode nativo. El cache de insights evita la mayoría de llamadas.
 
@@ -137,23 +140,23 @@ NEXT_PUBLIC_APP_URL
 
 ### Tablas
 
-| Tabla | Propósito |
-|---|---|
-| `transactions` | Todas las transacciones. UNIQUE `(user_id, gmail_message_id)` |
-| `sync_log` | Log de cada sync. `skipped_ids text[]` guarda IDs ignorados (Uber pre-auths, transacciones eliminadas) |
-| `user_tokens` | `gmail_refresh_token` por usuario |
-| `budgets` | `(user_id, mes, categoria, monto_presupuestado, subcategorias jsonb)`. UNIQUE `(user_id, mes, categoria)` |
-| `ai_insights` | Cache de insights. UNIQUE `(user_id, mes)`. Columnas: `insights jsonb`, `context_hash`, `generated_at` |
-| `chat_messages` | Historial del chat con el asesor. `role CHECK IN ('user','assistant')` |
+| Tabla           | Propósito                                                                                                 |
+| --------------- | --------------------------------------------------------------------------------------------------------- |
+| `transactions`  | Todas las transacciones. UNIQUE `(user_id, gmail_message_id)`                                             |
+| `sync_log`      | Log de cada sync. `skipped_ids text[]` guarda IDs ignorados (Uber pre-auths, transacciones eliminadas)    |
+| `user_tokens`   | `gmail_refresh_token` por usuario                                                                         |
+| `budgets`       | `(user_id, mes, categoria, monto_presupuestado, subcategorias jsonb)`. UNIQUE `(user_id, mes, categoria)` |
+| `ai_insights`   | Cache de insights. UNIQUE `(user_id, mes)`. Columnas: `insights jsonb`, `context_hash`, `generated_at`    |
+| `chat_messages` | Historial del chat con el asesor. `role CHECK IN ('user','assistant')`                                    |
 
 ### Migraciones aplicadas
 
-| Archivo | Estado |
-|---|---|
-| `001_add_rappipay_simplify_bancos.sql` | ✅ aplicada |
-| `002_budgets.sql` | ✅ aplicada |
-| `003_ai_advisor.sql` | ✅ aplicada (tablas `ai_insights` + `chat_messages`) |
-| `sync_log.skipped_ids` (ALTER manual) | ✅ aplicada |
+| Archivo                                | Estado                                               |
+| -------------------------------------- | ---------------------------------------------------- |
+| `001_add_rappipay_simplify_bancos.sql` | ✅ aplicada                                          |
+| `002_budgets.sql`                      | ✅ aplicada                                          |
+| `003_ai_advisor.sql`                   | ✅ aplicada (tablas `ai_insights` + `chat_messages`) |
+| `sync_log.skipped_ids` (ALTER manual)  | ✅ aplicada                                          |
 
 ### Puntos clave
 
@@ -191,11 +194,11 @@ Gmail OAuth refresh → listBankMessageIds() → filtrar ya procesados
 
 ## Detección de bancos (`lib/gmail/client.ts`)
 
-| Sender | Banco |
-|---|---|
-| `noreply@rappicard.co` | RAPPICARD |
-| `noreply@rappipay.co` | RAPPIPAY |
-| `noreply@holdingrappipay.co` | RAPPIPAY |
+| Sender                       | Banco     |
+| ---------------------------- | --------- |
+| `noreply@rappicard.co`       | RAPPICARD |
+| `noreply@rappipay.co`        | RAPPIPAY  |
+| `noreply@holdingrappipay.co` | RAPPIPAY  |
 
 **Para agregar un banco nuevo:** crear `lib/parsers/mibanaco.ts`, registrar en `lib/parsers/index.ts`, agregar sender en `BANK_SENDERS` en `lib/gmail/client.ts`.
 
@@ -222,6 +225,7 @@ Gmail OAuth refresh → listBankMessageIds() → filtrar ya procesados
 ### `buildAdvisorContext()` (`lib/ai/buildAdvisorContext.ts`)
 
 Deriva del mes + transacciones + presupuestos:
+
 - `dias_transcurridos` — día actual si es mes corriente, else totalDías
 - `dias_restantes` / `dias_restantes_semana`
 - `gastos_por_categoria` — filtra con `isGasto()`
@@ -231,15 +235,17 @@ Deriva del mes + transacciones + presupuestos:
 ### `hashContext()` — char-code sum del contexto serializado. Cambia cuando cambian datos o avanza el día (por `dias_transcurridos`).
 
 ### Cache (`ai_insights` tabla)
+
 - Hit: hash coincide + `generated_at > now() - 6h` → devuelve sin llamar Groq
 - Miss: llama Groq, guarda en cache, devuelve
 - `?force=true`: salta el cache siempre (botón "Actualizar")
 
 ### System prompt — reglas críticas
+
 - `alerta`: solo cuando `pct_consumido >= 100%`
 - `consejo`: acción ejecutable HOY con número exacto (vs. `observacion`)
 - `observacion`: dato relevante sin acción inmediata (púrpura, ícono Eye)
-- `positivo`: gasto significativamente menor al esperado — formato con Z = (limite - gastado) / dias_restantes * 7
+- `positivo`: gasto significativamente menor al esperado — formato con Z = (limite - gastado) / dias_restantes \* 7
 - Si presupuesto excedido: nunca "máximo $0 más" — mostrar exceso + consecuencia + comercio top
 - Sin frases: "Considera reducir", "Podrías intentar", "Sería recomendable"
 - REGLA ANTI-DUPLICADOS: un solo insight por categoría (fusionar alerta + consejo)
@@ -294,32 +300,54 @@ TransactionsList    ← buscador + chips + bottom sheet + delete por fila
 
 ## API Routes
 
-| Ruta | Método | Descripción |
-|---|---|---|
-| `POST /api/sync` | POST | Sincroniza emails nuevos de Gmail |
-| `GET /api/budgets` | GET | Lee presupuestos del mes (`?mes=yyyy-MM`) |
-| `PUT /api/budgets` | PUT | Guarda en batch. `monto=0` → elimina; `monto>0` → upsert |
-| `GET /api/ai/insights` | GET | Insights del asesor. Cache por `context_hash`. `?force=true` lo salta |
-| `POST /api/ai/chat` | POST | Chat conversacional. Incluye historial últimos 10 mensajes |
-| `POST /api/transactions/manual` | POST | Crea transacciones manuales. `gmail_message_id = 'manual_' + uuid` |
-| `PATCH /api/transactions/categorize` | PATCH | Actualiza categorías en batch |
-| `DELETE /api/transactions/[id]` | DELETE | Elimina una transacción. Gmail → agrega a `skipped_ids`. Manual → solo borra |
+| Ruta                                 | Método | Descripción                                                                  |
+| ------------------------------------ | ------ | ---------------------------------------------------------------------------- |
+| `POST /api/sync`                     | POST   | Sincroniza emails nuevos de Gmail                                            |
+| `GET /api/budgets`                   | GET    | Lee presupuestos del mes (`?mes=yyyy-MM`)                                    |
+| `PUT /api/budgets`                   | PUT    | Guarda en batch. `monto=0` → elimina; `monto>0` → upsert                     |
+| `GET /api/ai/insights`               | GET    | Insights del asesor. Cache por `context_hash`. `?force=true` lo salta        |
+| `POST /api/ai/chat`                  | POST   | Chat conversacional. Incluye historial últimos 10 mensajes                   |
+| `POST /api/transactions/manual`      | POST   | Crea transacciones manuales. `gmail_message_id = 'manual_' + uuid`           |
+| `PATCH /api/transactions/categorize` | PATCH  | Actualiza categorías en batch                                                |
+| `DELETE /api/transactions/[id]`      | DELETE | Elimina una transacción. Gmail → agrega a `skipped_ids`. Manual → solo borra |
 
 ---
 
 ## Tipos clave (`lib/types.ts`)
 
 ```typescript
-type TipoTransaccion = 'COMPRA' | 'TRANSFERENCIA_ENVIADA' | 'TRANSFERENCIA_RECIBIDA'
-                     | 'PAGO_SERVICIO' | 'RETIRO' | 'ABONO_DEUDA' | 'INGRESO'
+type TipoTransaccion =
+  | "COMPRA"
+  | "TRANSFERENCIA_ENVIADA"
+  | "TRANSFERENCIA_RECIBIDA"
+  | "PAGO_SERVICIO"
+  | "RETIRO"
+  | "ABONO_DEUDA"
+  | "INGRESO";
 
-type Categoria = 'HOGAR' | 'TRANSPORTE' | 'SALIDAS' | 'SALUD' | 'SUSCRIPCIONES'
-               | 'COMPRAS_ONLINE' | 'INVERSION' | 'DONACIONES' | 'EDUCACION'
-               | 'REEMBOLSABLE' | 'TRANSFERENCIA' | 'INGRESO' | 'OTRO'
+type Categoria =
+  | "HOGAR"
+  | "TRANSPORTE"
+  | "SALIDAS"
+  | "SALUD"
+  | "SUSCRIPCIONES"
+  | "COMPRAS_ONLINE"
+  | "INVERSION"
+  | "DONACIONES"
+  | "EDUCACION"
+  | "REEMBOLSABLE"
+  | "TRANSFERENCIA"
+  | "INGRESO"
+  | "OTRO";
 
-type Banco = 'RAPPICARD' | 'RAPPIPAY' | 'OTRO'
+type Banco = "RAPPICARD" | "RAPPIPAY" | "OTRO";
 
-type InsightTipo = 'alerta' | 'consejo' | 'positivo' | 'proyeccion' | 'observacion'
+type InsightTipo =
+  | "alerta"
+  | "consejo"
+  | "positivo"
+  | "proyeccion"
+  | "observacion";
 ```
 
 Utilidades: `formatCOP()` · `formatCOPCompact()` · `isIngreso()` · `isGasto()` · `CATEGORIA_LABELS`
@@ -329,6 +357,7 @@ Utilidades: `formatCOP()` · `formatCOPCompact()` · `isIngreso()` · `isGasto()
 ## Sistema de diseño (`styles/tokens.css`)
 
 **Modo oscuro (`:root`):**
+
 - `--bg #0A0A0A` / `--surface rgba(28,28,28,0.72)` / `--surface-2 rgba(36,36,36,0.72)`
 - `--border rgba(255,255,255,0.10)` / `--border-soft rgba(255,255,255,0.06)`
 - `--text #FFFFFF` / `--text-muted #888888` / `--text-subtle #444444`
@@ -353,7 +382,8 @@ Login solicita `email profile gmail.readonly` con `access_type: offline` y `prom
 ## Clientes Supabase
 
 - `lib/supabase/client.ts` — browser client para `'use client'`
-- `lib/supabase/server.ts` — server client (async cookies) + `createAdminClient()` con service role
+- `lib/supabase/server.ts` — server client (async cookies) + `createAdminClient()` con service role + `getAuthUser()` helper (crea client + obtiene user en una llamada; usado en todas las API routes)
+- `lib/utils/auditId.ts` — `generateAuditId(admin, userId, fecha)`: genera `MMDD-NN`. Usar siempre en loop `for` secuencial, no `Promise.all`, para evitar race condition en mismo día.
 
 ---
 
@@ -365,9 +395,10 @@ feature/<nombre>   ← una por mejora, PR a main
 ```
 
 **Reglas de git:**
+
 - Nunca commit ni push automático
 - Siempre en `feature/<nombre>`, nunca directo en `main`
-- Avisar cuando sea buen momento: *"Buen momento para commit en `feature/xxx` — ¿lo hacemos?"*
+- Avisar cuando sea buen momento: _"Buen momento para commit en `feature/xxx` — ¿lo hacemos?"_
 
 ---
 
@@ -375,45 +406,95 @@ feature/<nombre>   ← una por mejora, PR a main
 
 - **`id_auditoria` con gaps** — si se borra y re-sincroniza, el contador reinicia desde -01.
 - **Uber dedup solo dentro del mismo sync** — si pre-auth y cobro caen en syncs distintos no se comparan. Riesgo bajo (ambos emails llegan casi juntos).
-- **`recharts` en `package.json`** — instalado pero no usado (el donut es SVG propio). Pendiente eliminar.
 
 ---
 
 ## Roadmap: lo que falta antes de lanzar
 
-### ⬜ QA y calidad de código
+### ✅ Refactor completado (rama `refactor/data-layer`)
 
-| Tarea | Prioridad | Notas |
-|---|---|---|
-| Eliminar `recharts` de `package.json` | Alta | No se usa, solo peso |
-| Eliminar `SyncButton.tsx` y `ThemeToggle.tsx` | Alta | Reemplazados por `HeaderPill`, archivos muertos |
-| Configurar Vitest o Jest | Media | No hay test runner aún. `npx tsc --noEmit` es el único check |
-| Tests para parsers (`rappicard.ts`, `rappipay.ts`) | Media | Son la lógica más crítica y más fácil de testear con mocks |
-| Tests para `guessCategoria()` | Media | 120+ patrones, fácil de verificar con tabla de casos |
-| Tests para `deduplicateUber()` | Media | Lógica de negocio con edge cases |
-| Tests de integración para API routes | Baja | Requiere mock de Supabase/Groq |
-| Revisar y limpiar `SyncButton.tsx` obsoleto | Alta | |
+| Tarea                                                   | Estado |
+| ------------------------------------------------------- | ------ |
+| Eliminar `recharts` de `package.json`                   | ✅     |
+| Eliminar `SyncButton.tsx`                               | ✅     |
+| `BudgetEntry`/`BudgetSubcat` movidos a `lib/types.ts`   | ✅     |
+| `GASTO_CATS` unificado → `PRESUPUESTO_CATS` en types    | ✅     |
+| `SyncLog.skipped_ids` tipado, `PatrimonioItem` borrado  | ✅     |
+| `StatsCards` colores hardcoded → CSS variables          | ✅     |
+| `SpendingChart` stroke `#0A0A0A` → `var(--bg)`          | ✅     |
+| `SpendingChart` `ABONO_DEUDA` removido de `TIPOS_GASTO` | ✅     |
+| `generateAuditId` extraído a `lib/utils/auditId.ts`     | ✅     |
+| Race condition `generateAuditId` corregida (for loop)   | ✅     |
+| `getAuthUser()` helper — usado en 7 rutas API           | ✅     |
+
+### ⬜ Testing unitario
+
+| Tarea                                              | Prioridad | Notas                                                        |
+| -------------------------------------------------- | --------- | ------------------------------------------------------------ |
+| Configurar Vitest                                  | Alta      | No hay test runner aún. `npx tsc --noEmit` es el único check |
+| Tests para parsers (`rappicard.ts`, `rappipay.ts`) | Alta      | Lógica más crítica y más fácil de testear con fixtures       |
+| Tests para `guessCategoria()`                      | Alta      | 120+ patrones, tabla de casos entrada/salida esperada        |
+| Tests para `deduplicateUber()`                     | Alta      | Lógica de negocio con edge cases de tiempo y monto           |
+| Tests para `generateAuditId()`                     | Media     | Verificar secuencia y formato `MMDD-NN`                      |
+| Tests de integración para API routes               | Baja      | Requiere mock de Supabase/Groq                               |
+
+### ⬜ E2E con Maestro
+
+Maestro (`maestro.mobile.dev`) — framework de E2E para PWAs y apps móviles. Corre flujos reales en el browser/simulador con YAML.
+
+| Flujo a cubrir                           | Prioridad | Archivo sugerido                      |
+| ---------------------------------------- | --------- | ------------------------------------- |
+| Login con Google → llega al dashboard    | Alta      | `maestro/flows/login.yaml`            |
+| Sync de emails → aparecen transacciones  | Alta      | `maestro/flows/sync.yaml`             |
+| Agregar transacción manual               | Alta      | `maestro/flows/add_manual.yaml`       |
+| Editar categoría de una transacción      | Media     | `maestro/flows/edit_category.yaml`    |
+| Eliminar una transacción                 | Media     | `maestro/flows/delete_tx.yaml`        |
+| Guardar presupuesto mensual              | Media     | `maestro/flows/save_budget.yaml`      |
+| Ver insights del asesor IA               | Media     | `maestro/flows/ai_insights.yaml`      |
+| Chat con el asesor                       | Baja      | `maestro/flows/ai_chat.yaml`          |
+| Cambiar de mes en el dashboard           | Baja      | `maestro/flows/month_navigation.yaml` |
+
+**Setup:** `brew install maestro` · `maestro test maestro/flows/login.yaml` · Requiere app corriendo en `:3000` o en simulador iOS/Android.
+
+### ⬜ Accesibilidad (a11y)
+
+Objetivo: cumplir WCAG 2.1 AA. Todos los elementos interactivos deben ser navegables por teclado y legibles por screen readers.
+
+| Área                                    | Prioridad | Qué hacer                                                                          |
+| --------------------------------------- | --------- | ---------------------------------------------------------------------------------- |
+| `aria-label` en botones icon-only       | Alta      | `HeaderPill`: sync, reset, theme, logout — solo tienen íconos, sin texto visible   |
+| `role` y `aria-expanded` en colapsables | Alta      | `ManualTransactions`, `BudgetManager` (`<details>`), `AIAdvisorPanel` (chat)       |
+| Contraste en modo claro                 | Alta      | Verificar `--text-muted` (#6B6B6B) sobre `--surface` — puede fallar ratio 4.5:1   |
+| Focus visible en todos los botones      | Alta      | Muchos botones tienen `outline: none` — agregar `:focus-visible` con var(--border) |
+| `alt` en imágenes SVG decorativas       | Media     | Logo SVG: `aria-hidden="true"` ya puesto; verificar el resto                       |
+| Semántica de headings (`h1`→`h2`→`h3`) | Media     | Dashboard usa `<h2>` para secciones — verificar jerarquía                          |
+| Tamaños mínimos de touch target (44px)  | Media     | Ya aplicado en MonthNav; revisar chips de categoría y filas de transacción         |
+| `prefers-reduced-motion`                | Baja      | Animaciones CSS (`animate-spin`, transiciones) — envolver con media query          |
+
+**Herramientas:** `axe-core` (browser extension) · `eslint-plugin-jsx-a11y` · Lighthouse accessibility audit.
 
 ### ⬜ Features pendientes
 
-| Feature | Componente afectado |
-|---|---|
-| Copiar presupuesto del mes anterior | `BudgetManager` — botón que carga el mes previo |
-| Caché por comercio (Etapa 2) | Nueva tabla `commerce_rules` |
-| Groq fallback en categorización (Etapa 2) | `lib/parsers/commerceCategories.ts` |
+| Feature                                   | Componente / Ruta afectada                                                                                         |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Copiar presupuesto del mes anterior       | `BudgetManager` — botón que carga el mes previo                                                                    |
+| Caché por comercio (Etapa 2)              | Nueva tabla `commerce_rules`                                                                                       |
+| Groq fallback en categorización (Etapa 2) | `lib/parsers/commerceCategories.ts`                                                                                |
+| Soporte Bancolombia                       | Nuevo `lib/parsers/bancolombia.ts` + sender en `BANK_SENDERS` (`lib/gmail/client.ts`) + registro en `lib/parsers/index.ts`. Bancolombia envía notificaciones desde `alertas@notificaciones.bancolombia.com.co` |
 
 ### ⬜ Deploy y distribución
 
-| Decisión | Opciones | Recomendación |
-|---|---|---|
-| **Hosting** | Vercel (zero-config Next.js) vs Railway vs Fly.io | **Vercel** — deploy automático desde `main`, dominio custom gratis en plan Hobby |
-| **Dominio** | `billeteclaro.app` (.app requiere HTTPS, ya cumplimos) | Comprar en Namecheap o Google Domains (~$15/año). Conectar a Vercel en 2 pasos |
-| **Distribución móvil** | PWA (ya configurada) vs app nativa (React Native) vs Capacitor | **PWA primero** — ya está en el proyecto (`@ducanh2912/next-pwa`). Instalable desde Chrome/Safari sin pasar por stores. App nativa es post-MVP |
-| **OAuth en producción** | Google Console → Authorized redirect URIs | Agregar `https://billeteclaro.app/api/auth/callback` y `https://billeteclaro.app/api/auth/gmail-callback` |
-| **Supabase URL en prod** | Ya usa `NEXT_PUBLIC_SUPABASE_URL` | Solo agregar las env vars en Vercel |
+| Decisión                 | Opciones                                                       | Recomendación                                                                                                                                  |
+| ------------------------ | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Hosting**              | Vercel (zero-config Next.js) vs Railway vs Fly.io              | **Vercel** — deploy automático desde `main`, dominio custom gratis en plan Hobby                                                               |
+| **Dominio**              | `billeteclaro.app` (.app requiere HTTPS, ya cumplimos)         | Comprar en Namecheap o Google Domains (~$15/año). Conectar a Vercel en 2 pasos                                                                 |
+| **Distribución móvil**   | PWA (ya configurada) vs app nativa (React Native) vs Capacitor | **PWA primero** — ya está en el proyecto (`@ducanh2912/next-pwa`). Instalable desde Chrome/Safari sin pasar por stores. App nativa es post-MVP |
+| **OAuth en producción**  | Google Console → Authorized redirect URIs                      | Agregar `https://billeteclaro.app/api/auth/callback` y `https://billeteclaro.app/api/auth/gmail-callback`                                      |
+| **Supabase URL en prod** | Ya usa `NEXT_PUBLIC_SUPABASE_URL`                              | Solo agregar las env vars en Vercel                                                                                                            |
 
 **Orden recomendado para deploy:**
-1. Limpiar código muerto (`recharts`, `SyncButton`, `ThemeToggle`)
+
+1. ~~Limpiar código muerto~~ ✅ hecho
 2. `npm run build` sin errores
 3. Crear proyecto en Vercel, conectar repo, agregar env vars
 4. Comprar dominio y conectar
@@ -424,26 +505,26 @@ feature/<nombre>   ← una por mejora, PR a main
 
 ## Decisiones tomadas
 
-| Decisión | Razón |
-|---|---|
-| Groq + Llama 3.3 70B (extracción + asesor) | 14.400 req/día gratis, ~200ms, JSON mode nativo |
-| Parsers regex primero, Groq como fallback | Sin costo para RappiCard/RappiPay (100% del MVP) |
-| Fecha fija `after:2026/05/01` en Gmail | Evita sync lenta de 365 días |
-| `ABONO_DEUDA` excluido de gastos | Pago de tarjeta no es gasto real |
-| `toTitleCase` en parsers Y en UI | Parsers limpian datos nuevos; UI limpia históricos en BD |
-| `cookies()` async en Next.js 15+ | Cambio de API rompía `createClient` |
-| Uber pre-auths en `sync_log.skipped_ids` | Evita filas fantasma; IDs excluidos en próximos syncs |
-| Dark mode como default | Preferencia del usuario; persiste en localStorage |
-| CSS variables en lugar de Tailwind hardcodeado | Un solo punto de verdad para colores; tema sin rerender |
-| Glass morphism (`--surface` rgba + `--glass-blur`) | Profundidad visual sin sombras |
-| `HeaderPill` unificado | Reduce ruido visual; sync/reset/theme/logout en una cápsula |
-| Subcategorías en `jsonb` de `budgets` | No contamina `transactions`; son UI-only |
-| Batch save en BudgetManager y TransactionsList | El usuario controla cuándo persiste; menos calls API |
-| `CategoryPicker` fuera del `backdropFilter` div | `position:fixed` no funciona dentro de `backdropFilter` en WebKit |
-| `contextVersion` para invalidar cache del asesor | Signal explícito; el hash del servidor decide si llama Groq o no |
-| Delete de transacción → `skipped_ids` para Gmail | Sin esto, la transacción vuelve en el próximo sync |
-| InsightCard: superficie neutra + borde de color | Más legible que fondos de color sólido; diferencia tipos sin saturar |
-| Tipo `observacion` en insights (púrpura, Eye) | Diferencia "dato para pensar" de "acción concreta" (consejo) |
-| Cache de insights en `ai_insights` tabla | Evita llamadas Groq redundantes; hash como invalidación exacta |
-| PWA antes que app nativa | Ya está configurada; instalable sin stores; app nativa es post-MVP |
-| Sin notificaciones push en MVP | Alta complejidad, bajo valor antes de tener usuarios reales |
+| Decisión                                           | Razón                                                                |
+| -------------------------------------------------- | -------------------------------------------------------------------- |
+| Groq + Llama 3.3 70B (extracción + asesor)         | 14.400 req/día gratis, ~200ms, JSON mode nativo                      |
+| Parsers regex primero, Groq como fallback          | Sin costo para RappiCard/RappiPay (100% del MVP)                     |
+| Fecha fija `after:2026/05/01` en Gmail             | Evita sync lenta de 365 días                                         |
+| `ABONO_DEUDA` excluido de gastos                   | Pago de tarjeta no es gasto real                                     |
+| `toTitleCase` en parsers Y en UI                   | Parsers limpian datos nuevos; UI limpia históricos en BD             |
+| `cookies()` async en Next.js 15+                   | Cambio de API rompía `createClient`                                  |
+| Uber pre-auths en `sync_log.skipped_ids`           | Evita filas fantasma; IDs excluidos en próximos syncs                |
+| Dark mode como default                             | Preferencia del usuario; persiste en localStorage                    |
+| CSS variables en lugar de Tailwind hardcodeado     | Un solo punto de verdad para colores; tema sin rerender              |
+| Glass morphism (`--surface` rgba + `--glass-blur`) | Profundidad visual sin sombras                                       |
+| `HeaderPill` unificado                             | Reduce ruido visual; sync/reset/theme/logout en una cápsula          |
+| Subcategorías en `jsonb` de `budgets`              | No contamina `transactions`; son UI-only                             |
+| Batch save en BudgetManager y TransactionsList     | El usuario controla cuándo persiste; menos calls API                 |
+| `CategoryPicker` fuera del `backdropFilter` div    | `position:fixed` no funciona dentro de `backdropFilter` en WebKit    |
+| `contextVersion` para invalidar cache del asesor   | Signal explícito; el hash del servidor decide si llama Groq o no     |
+| Delete de transacción → `skipped_ids` para Gmail   | Sin esto, la transacción vuelve en el próximo sync                   |
+| InsightCard: superficie neutra + borde de color    | Más legible que fondos de color sólido; diferencia tipos sin saturar |
+| Tipo `observacion` en insights (púrpura, Eye)      | Diferencia "dato para pensar" de "acción concreta" (consejo)         |
+| Cache de insights en `ai_insights` tabla           | Evita llamadas Groq redundantes; hash como invalidación exacta       |
+| PWA antes que app nativa                           | Ya está configurada; instalable sin stores; app nativa es post-MVP   |
+| Sin notificaciones push en MVP                     | Alta complejidad, bajo valor antes de tener usuarios reales          |
