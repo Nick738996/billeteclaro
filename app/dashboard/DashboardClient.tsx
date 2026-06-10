@@ -16,6 +16,8 @@ import StatsCards from '@/components/dashboard/StatsCards'
 import SpendingChart from '@/components/dashboard/SpendingChart'
 import TransactionsList from '@/components/dashboard/TransactionsList'
 import HeaderPill from '@/components/dashboard/HeaderPill'
+import BudgetManager from '@/components/dashboard/BudgetManager'
+import AIAdvisor from '@/components/dashboard/AIAdvisor'
 
 interface Props {
   user: { name: string }
@@ -66,6 +68,9 @@ export default function DashboardClient({
 
   // Estado compartido entre SpendingChart y TransactionsList
   const [activeFilter, setActiveFilter] = useState<string>('TODOS')
+
+  // Presupuestos — se cargan en BudgetManager y se comparten con AIAdvisor
+  const [budgets, setBudgets] = useState<Record<string, number>>({})
 
   const stats = useMemo(() => buildStats(txs), [txs])
 
@@ -216,6 +221,18 @@ export default function DashboardClient({
           transactions={txs}
           activeFilter={activeFilter}
           onFilterChange={setActiveFilter}
+        />
+
+        <BudgetManager
+          mes={month}
+          gastosPorCategoria={stats.porCategoria}
+          onBudgetsChange={setBudgets}
+        />
+
+        <AIAdvisor
+          mes={month}
+          gastosPorCategoria={stats.porCategoria}
+          budgets={budgets}
         />
 
         <div className="flex items-center justify-between px-1">

@@ -12,12 +12,12 @@
 
 ## Estado de las etapas
 
-- [x] **Etapa 1 — Recolección de datos** ← completa (pendientes menores de UX)
-- [x] **UI/UX base** ← completa (dark/light mode, sistema de diseño)
-- [ ] **Etapa 2 — Categorización** (pendiente confirmación)
-- [ ] **Etapa 3 — Asesor financiero IA** (pendiente confirmación)
+- [x] **Etapa 1 — Recolección de datos** ← completa
+- [x] **UI/UX base** ← completa (dark/light mode, glass morphism, sistema de diseño)
+- [ ] **Etapa 2 — Categorización** (pendiente)
+- [ ] **Etapa 3 — Asesor financiero IA** ← en progreso
 
-### Criterios Etapa 1 — estado actual
+### Criterios Etapa 1 — completados
 
 | Criterio | Estado |
 |---|---|
@@ -27,9 +27,7 @@
 | Cada transacción tiene ID único MMDD-NN | ✅ `generateAuditId()` |
 | Nombre del comercio es legible | ✅ `toTitleCase()` en parsers y en UI |
 | Ingresos y egresos identificados correctamente | ✅ `isIngreso()`, `isGasto()` excluye `ABONO_DEUDA` |
-| Botón sincronizar sin llamadas duplicadas | ⚠️ separado del delete, falta cooldown explícito |
-| "Sincronizado hace X minutos" | ❌ pendiente |
-| Sync automática si pasaron +15 min | ❌ pendiente |
+| Botón sincronizar separado del delete | ✅ `HeaderPill` — sync y reset con confirmación 4s |
 
 ---
 
@@ -66,24 +64,26 @@ npx tsc --noEmit   # type check (no hay test runner configurado aún)
 CSS variables para dark (default) y light. Importado en `globals.css` antes de Tailwind.
 
 **Modo oscuro (`:root`):**
-- `--bg #0A0A0A` / `--surface #1C1C1C` / `--surface-2 #242424`
-- `--border #2E2E2E` / `--border-soft #222222`
+- `--bg #0A0A0A` / `--surface rgba(28,28,28,0.72)` / `--surface-2 rgba(36,36,36,0.72)`
+- `--border rgba(255,255,255,0.10)` / `--border-soft rgba(255,255,255,0.06)`
 - `--text #FFFFFF` / `--text-muted #888888` / `--text-subtle #444444`
 - `--green #4ADE80` / `--red #FF6B6B` / `--yellow #FCD34D` / `--blue #60A5FA` / `--purple #A78BFA`
-- Cada color tiene su `*-soft` (~18% opacidad) para fondos de badges
+- Cada color tiene su `*-soft` (color sólido oscuro) para fondos de badges
+- `--glass-blur: blur(24px) saturate(160%)` — usado como `backdropFilter` en cards
 
 **Modo claro (`[data-theme="light"]`):**
-- `--bg #FFFFFF` / `--surface #F8F8F8` / `--surface-2 #F0F0F0`
-- `--border #E8E8E8`
+- `--bg #FFFFFF` / `--surface rgba(248,248,248,0.80)` / `--surface-2 rgba(240,240,240,0.80)`
+- `--border rgba(0,0,0,0.09)` / `--border-soft rgba(0,0,0,0.05)`
 - `--green #16A34A` / `--red #DC2626`
+- Cada color tiene su `*-soft` (color suave pastel) para fondos de badges
 
 **Tipografía:** variables `--text-xs` (11px) a `--text-3xl` (30px)
-**Radio:** `--radius-sm` (6px) a `--radius-xl` (20px)
+**Radio:** `--radius-sm` (12px) / `--radius-md` (18px) / `--radius-lg` (24px) / `--radius-xl` (32px)
 
-**Regla de diseño:** sin sombras (`box-shadow: none`), sin gradientes. Solo bordes `var(--border)`.
+**Regla de diseño:** sin sombras (`box-shadow: none`), sin gradientes. Solo bordes `var(--border)`. Glass morphism via `backdropFilter: var(--glass-blur)` en todas las cards.
 
-### ThemeToggle (`components/ui/ThemeToggle.tsx`)
-Pill 72×32px con círculo deslizante. Sol (izquierda = light) / Luna (derecha = dark). Visible en header de `/dashboard` y en `/` (esquina superior derecha). Persiste en `localStorage` key `billeteclaro-theme`. Sin flash gracias a `suppressHydrationWarning` en `<html>`.
+### HeaderPill (`components/dashboard/HeaderPill.tsx`)
+Cápsula unificada en el header del dashboard. Reemplaza `SyncButton` + `ThemeToggle` + botón logout por separado. Contiene: sync (con spinner/check/error) | reset con confirmación 4s | toggle sun/moon | logout. Background translúcido, height 36px, border-radius 10.
 
 ### Colores semánticos por categoría (UI)
 ```
@@ -193,8 +193,8 @@ Login solicita scopes `email profile gmail.readonly` con `access_type: offline` 
 
 - **`StatsCards`** — Balance como hero card full-width (número grande, badge "positivo"/"negativo") + Gastos/Ingresos en fila secundaria de 2 columnas
 - **`SpendingChart`** — donut SVG propio (sin Recharts), slices y leyenda clickeables → filtra `TransactionsList` via `activeFilter` compartido en `DashboardClient`. Barras proporcionales con % en leyenda. Top 8 categorías de gasto
-- **`SyncButton`** — estados: idle / syncing / done / error. Botón de reset separado con confirmación de 4s
-- **`TransactionsList`** — buscador + 3 chips fijos (Todos / RappiCard / RappiPay) + bottom sheet de categorías (`▾`) + barra de resumen + lista agrupada por fecha. `activeFilter` recibido como prop desde `DashboardClient`
+- **`HeaderPill`** — cápsula unificada: sync + reset + theme toggle + logout. Reemplaza `SyncButton` y `ThemeToggle` por separado.
+- **`TransactionsList`** — buscador + 3 chips fijos (Todos / RappiCard / RappiPay) + bottom sheet de categorías (`▾`) + barra de resumen + lista agrupada por fecha. Filas estilo "strip": borde izquierdo de color de categoría + dot. `activeFilter` recibido como prop desde `DashboardClient`
 
 ### Estado compartido: `activeFilter`
 `DashboardClient` gestiona `useState<string>('TODOS')` y lo pasa a `SpendingChart` y `TransactionsList`. Tocar un slice del donut o un chip de categoría actualiza ambos componentes. Se resetea a `'TODOS'` al cambiar de mes.
@@ -272,6 +272,9 @@ feature/<nombre>   ← una rama por mejora, PR a main
 | Dark mode como default | Preferencia del usuario; se persiste en localStorage |
 | CSS variables en lugar de clases Tailwind hardcodeadas | Permite cambio de tema sin rerender; un solo punto de verdad para colores |
 | Demo page eliminada | Sin usuarios externos aún; simplifica el codebase |
+| Glass morphism en cards (`--surface` rgba + `--glass-blur`) | Profundidad visual sin sombras; consistente con regla de diseño |
+| `HeaderPill` unificado en lugar de botones separados | Reduce ruido visual en el header; sync/reset/theme/logout en una cápsula |
+| Radios más grandes (`--radius-lg: 24px`, `--radius-xl: 32px`) | Look más fluido y moderno; coherente con el glass morphism |
 
 ---
 
@@ -282,15 +285,7 @@ feature/<nombre>   ← una rama por mejora, PR a main
 
 ---
 
-## Pendientes Etapa 1 (UX menores)
-
-1. **"Sincronizado hace X minutos"** — timestamp del último sync en el header
-2. **Sync automática al abrir** — solo si `last_sync` tiene más de 15 min
-3. **Cooldown en botón sync** — deshabilitar 30s después de cada sync
-
----
-
-## Plan Etapa 2 — Categorización (cuando se confirme)
+## Plan Etapa 2 — Categorización (pendiente)
 
 Categorización automática ya está parcialmente implementada via `guessCategoria()` en `lib/parsers/commerceCategories.ts` (120+ patrones). Lo que falta:
 
@@ -298,9 +293,19 @@ Categorización automática ya está parcialmente implementada via `guessCategor
 2. **Caché por comercio** — si el usuario cambia la categoría de "Uber" una vez, se aplica a todas las futuras
 3. **Gemini como último recurso** — para comercios no reconocidos por los patrones
 
-## Plan Etapa 3 — Asesor financiero IA (cuando se confirme)
+## Etapa 3 — Asesor financiero IA (en progreso)
 
-- Presupuesto mensual por categoría (configurable)
+### Alcance
+- Presupuesto mensual por categoría (configurable por el usuario)
 - Alertas: 80%/100% de presupuesto, fragmentación Uber, gastos nocturnos
 - IA conversacional con Gemini — contexto: gastos vs presupuesto por mes
 - Tono: directo, colombiano, máximo 3 bullets por respuesta
+
+### Plan de implementación
+
+1. **BD: tabla `budgets`** — `user_id`, `categoria`, `monto_limite`, `mes` (o sin mes = recurrente)
+2. **API `/api/budgets`** — GET/POST/PATCH para leer y guardar presupuestos
+3. **UI: pantalla de presupuestos** — lista de categorías con input de monto límite por categoría
+4. **Alertas en dashboard** — badge/banner cuando gasto ≥ 80% o 100% del presupuesto
+5. **API `/api/advisor`** — POST recibe pregunta del usuario, construye contexto (gastos del mes, presupuestos, % consumido por categoría) y llama a Gemini
+6. **UI: chat flotante** — botón en dashboard abre un mini-chat, respuestas en bullets
