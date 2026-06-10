@@ -1,9 +1,5 @@
 'use client'
 
-// MEJORAS aplicadas en este archivo:
-// ⑤ MonthNav: botones w-8 h-8 (32px) → w-11 h-11 (44px) [touch target mínimo]
-// Estado `activeFilter` compartido entre SpendingChart y TransactionsList
-
 import { useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { format, parseISO, addMonths, subMonths } from 'date-fns'
@@ -13,11 +9,10 @@ import { createClient } from '@/lib/supabase/client'
 import type { Transaction, MonthlyStats, Categoria } from '@/lib/types'
 import { isIngreso, isGasto } from '@/lib/types'
 import { TEST_IDS } from '@/lib/testIds'
-import StatsCards from '@/components/dashboard/StatsCards'
-import SpendingChart from '@/components/dashboard/SpendingChart'
+import MonthHero from '@/components/dashboard/MonthHero'
+import BudgetOverview from '@/components/dashboard/BudgetOverview'
 import TransactionsList from '@/components/dashboard/TransactionsList'
 import HeaderPill from '@/components/dashboard/HeaderPill'
-import BudgetManager from '@/components/dashboard/BudgetManager'
 import AIAdvisorPanel from '@/components/dashboard/AIAdvisorPanel'
 import ManualTransactions from '@/components/dashboard/ManualTransactions'
 
@@ -68,10 +63,7 @@ export default function DashboardClient({
   const [isCurrent, setIsCurrent] = useState(initIsCurrent)
   const [loading, setLoading] = useState(false)
 
-  // Estado compartido entre SpendingChart y TransactionsList
   const [activeFilter, setActiveFilter] = useState<string>('TODOS')
-
-  // Presupuestos — se cargan en BudgetManager y se comparten con AIAdvisor
   const [budgets, setBudgets] = useState<Record<string, number>>({})
 
   // Versión de contexto: sube cada vez que cambian datos relevantes para el asesor
@@ -222,16 +214,15 @@ export default function DashboardClient({
           </a>
         )}
 
-        <StatsCards stats={stats} />
-
-        {/* SpendingChart y TransactionsList comparten activeFilter */}
-        <SpendingChart
-          transactions={txs}
-          activeFilter={activeFilter}
-          onFilterChange={setActiveFilter}
+        <MonthHero
+          gastos={stats.gastos}
+          ingresos={stats.ingresos}
+          totalPresupuestado={Object.values(budgets).reduce((s, v) => s + v, 0)}
+          transacciones={stats.transacciones}
+          mes={month}
         />
 
-        <BudgetManager
+        <BudgetOverview
           mes={month}
           gastosPorCategoria={stats.porCategoria}
           onBudgetsChange={setBudgets}
@@ -250,7 +241,7 @@ export default function DashboardClient({
             Transacciones
           </h2>
           <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
-            {txs.length} en total
+            {stats.transacciones} en total
           </span>
         </div>
 
