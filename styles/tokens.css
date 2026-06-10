@@ -20,7 +20,10 @@
   --purple:       #A78BFA;
   --purple-soft:  #26153D;
 
-  /* Fluido */
+  /* Radios — micro a macro */
+  --radius-xs:    4px;   /* progress chips, tiny elements */
+  --radius-badge: 6px;   /* inline badges, form inputs, small buttons */
+  --radius-pill:  10px;  /* pill-shaped buttons, rounded inputs */
   --radius-sm:    12px;
   --radius-md:    18px;
   --radius-lg:    24px;
@@ -44,6 +47,10 @@
 
   /* Glass blur — usado como backdrop-filter en las cards */
   --glass-blur: blur(24px) saturate(160%);
+
+  /* Surfaces adicionales */
+  --pill-bg:  rgba(255,255,255,0.05);  /* fondo del HeaderPill en dark */
+  --overlay:  rgba(0,0,0,0.55);        /* scrim de modales y bottom sheets */
 }
 
 [data-theme="light"] {
@@ -71,4 +78,6 @@
   --green-glow-border: rgba(22,163,74,0.25);
   --red-glow-bg:       rgba(220,38,38,0.06);
   --red-glow-border:   rgba(220,38,38,0.25);
+
+  --pill-bg: rgba(0,0,0,0.04);  /* fondo del HeaderPill en light */
 }

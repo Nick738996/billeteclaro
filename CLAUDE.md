@@ -257,7 +257,7 @@ Deriva del mes + transacciones + presupuestos:
 ### `DashboardClient.tsx` — estado global
 
 ```
-txs            — transacciones del mes (recargadas por loadMonth)
+txs            — transacciones del mes (recargadas por refetch de useTransactions)
 budgets        — Record<string,number> compartido con AIAdvisorPanel
 activeFilter   — string compartido entre SpendingChart y TransactionsList
 contextVersion — número que sube en cada evento de datos → dispara re-fetch del asesor
@@ -280,21 +280,43 @@ ManualTransactions  ← panel colapsable para agregar en lote
 TransactionsList    ← buscador + chips + bottom sheet + delete por fila
 ```
 
+### Hooks (`hooks/`)
+
+Lógica extraída de los componentes. Los componentes solo renderizan — la lógica vive en los hooks.
+
+| Hook | Qué encapsula |
+|---|---|
+| `useSync` | Estado del sync (idle/syncing/done/error), fetch a `/api/sync`, callback `onComplete` |
+| `useMonthNavigation` | Mes activo, label, isCurrent, prev/next, `goTo()` que actualiza URL |
+| `useTransactions` | Fetch de transacciones por mes, `useRef(isFirstRender)` para no re-fetch en mount (SSR data) |
+| `useTransactionsList` | Filtrado, delete optimista, batch categorías |
+| `useBudgetManager` | Fetch presupuestos, patrón draft/saved, `normalize()`, `isDirty`, save |
+| `useAdvisor` | Fetch insights, chat history, envío de mensajes, refs de scroll/focus |
+| `useManualTransactions` | Draft rows, `parseMonto`, batch save |
+
+**Patrón SSR + client fetch:** `useTransactions` usa `useRef(isFirstRender)` para saltar el primer `useEffect` — los datos SSR de `initialTxs` se usan en mount sin llamada extra a la DB.
+
+**Props drilling:** `activeFilter` pasa directo de `DashboardClient` a `SpendingChart` y `TransactionsList` (1 nivel) — no se necesita Context.
+
 ### Componentes (`components/dashboard/`)
 
-**`HeaderPill`** — sync | reset (confirmación 4s) | theme toggle | logout. Cápsula translúcida 36px.
+**`HeaderPill`** — usa `useSync`. Sync | reset (confirmación 4s) | theme toggle | logout. Cápsula translúcida 36px.
 
-**`StatsCards`** — Balance hero full-width + Gastos/Ingresos en fila de 2.
+**`StatsCards`** — Balance hero full-width + Gastos/Ingresos en fila de 2. Sin lógica propia.
 
 **`SpendingChart`** — donut SVG propio (sin Recharts). Slices y leyenda clickeables → filtra `TransactionsList` via `activeFilter`.
 
-**`BudgetManager`** — patrón `saved` (DB) + `draft` (local) + botón "Guardar" único. `isDirty` usa `normalize()` para ignorar subcats vacías. Llama `onSaved()` → `bumpContext()` en DashboardClient.
+**`BudgetManager`** — usa `useBudgetManager`. Estado `expanded` queda local (solo UI). Llama `onSaved()` → `bumpContext()` en DashboardClient.
 
-**`AIAdvisorPanel`** — auto-fetch en mount si `budgetCount >= 1 && txCount >= 5`. Re-fetch cuando cambia `contextVersion`. InsightCard: superficie neutra + borde izquierdo de color + badge de tipo + badge de categoría. Skeleton imita la estructura real de InsightCard. Chat expandible con `ThinkingDots`.
+**`AIAdvisorPanel`** — usa `useAdvisor`. Auto-fetch si `budgetCount >= 1 && txCount >= 5`. InsightCard: superficie neutra + borde izquierdo de color + badge de tipo + badge de categoría. Skeleton imita InsightCard. Chat expandible con `ThinkingDots`.
 
-**`ManualTransactions`** — panel colapsable. Campos: fecha, monto, comercio, tipo, banco, categoría. Batch POST.
+**`ManualTransactions`** — usa `useManualTransactions`. Estado `open` queda local. Batch POST.
 
-**`TransactionsList`** — buscador + 3 chips fijos + bottom sheet de categorías. Fila: dot + nombre + chip de categoría clickeable + banco + hora + monto + papelera. Delete con confirmación 2s inline. `deletedIds: Set<string>` para remoción optimista. `CategoryPicker` renderizado fuera del contenedor `backdropFilter` (fix WebKit `position:fixed`). Batch save de categorías.
+**`TransactionsList`** — usa `useTransactionsList`. Estado `pickerTxId` queda local. `CategoryPicker` renderizado fuera del contenedor `backdropFilter` (fix WebKit `position:fixed`). Delete con confirmación 2s inline, `deletedIds: Set<string>` para remoción optimista.
+
+### UI (`components/ui/`)
+
+**`Skeleton`** — `<Skeleton width height radius>` + `<SkeletonCard>`. Usa tokens `var(--surface-2)`, `var(--surface)`, `var(--border)`, `var(--glass-blur)`. Los componentes pueden usar la clase `.skeleton` directamente para casos simples.
 
 ---
 
@@ -391,7 +413,9 @@ Utilidades: `formatCOP()` · `formatCOPCompact()` · `isIngreso()` · `isGasto()
 
 ---
 
-## Sistema de diseño (`styles/tokens.css`)
+## Sistema de diseño
+
+### `styles/tokens.css`
 
 **Modo oscuro (`:root`):**
 
@@ -401,12 +425,34 @@ Utilidades: `formatCOP()` · `formatCOPCompact()` · `isIngreso()` · `isGasto()
 - `--green #4ADE80` / `--red #FF6B6B` / `--yellow #FCD34D` / `--blue #60A5FA` / `--purple #A78BFA`
 - Cada color tiene `*-soft` para fondos de badges
 - `--glass-blur: blur(24px) saturate(160%)`
+- `--pill-bg: rgba(255,255,255,0.05)` — fondo del HeaderPill (dark)
+- `--overlay: rgba(0,0,0,0.55)` — scrim de modales y bottom sheets
 
-**Modo claro (`[data-theme="light"]`):** `--bg #FFFFFF`, colores adaptados, `*-soft` pasteles.
+**Modo claro (`[data-theme="light"]`):** `--bg #FFFFFF`, colores adaptados, `*-soft` pasteles, `--pill-bg: rgba(0,0,0,0.04)`.
 
-**Radios:** `--radius-sm` 12px · `--radius-md` 18px · `--radius-lg` 24px · `--radius-xl` 32px
+**Radios:**
+
+| Token | Valor | Uso |
+|---|---|---|
+| `--radius-xs` | 4px | Progress chips, elementos tiny |
+| `--radius-badge` | 6px | Badges inline, inputs, botones pequeños |
+| `--radius-pill` | 10px | Inputs redondeados, botón send del chat |
+| `--radius-sm` | 12px | Botones medianos, InsightCard |
+| `--radius-md` | 18px | Alertas, cards secundarias |
+| `--radius-lg` | 24px | Cards principales del dashboard |
+| `--radius-xl` | 32px | Bottom sheets |
 
 **Regla:** sin `box-shadow`, sin gradientes. Solo bordes `var(--border)`. Glass morphism via `backdropFilter`.
+
+### `styles/utilities.css`
+
+Clases reutilizables importadas en `globals.css`. No usar valores hardcodeados cuando existe una clase equivalente.
+
+| Clase | Qué aplica | Cuándo usar |
+|---|---|---|
+| `.card` | surface + border + radius-lg + glass-blur + overflow hidden | Toda card del dashboard |
+| `.input-field` | surface + border + radius-badge + color + outline:none + text-xs | Todo `<input>`, `<select>`, `<textarea>` |
+| `.skeleton` | surface-2 + radius-badge + flex-shrink:0 | Placeholders de carga |
 
 ---
 
@@ -478,6 +524,34 @@ feature/<nombre>   ← una por mejora, PR a main
 | `lib/services/syncService.ts` — pipeline Gmail→Supabase + dedup Uber          | ✅     |
 | 8 route handlers convertidos a transporte puro (auth → validar → service → ok) | ✅     |
 | Routes de OAuth (`/api/auth/*`) dejadas intactas (no son JSON endpoints)       | ✅     |
+
+**Components layer (`refactor/components`):**
+
+| Tarea                                                                              | Estado |
+| ---------------------------------------------------------------------------------- | ------ |
+| `hooks/useSync.ts` — estado sync extraído de HeaderPill                           | ✅     |
+| `hooks/useMonthNavigation.ts` — navegación de mes extraída de DashboardClient     | ✅     |
+| `hooks/useTransactions.ts` — fetch de transacciones + SSR-aware                  | ✅     |
+| `hooks/useTransactionsList.ts` — filtrado, delete optimista, batch categorías     | ✅     |
+| `hooks/useBudgetManager.ts` — fetch, draft/saved pattern, normalize, save         | ✅     |
+| `hooks/useAdvisor.ts` — insights fetch, chat state, refs scroll/focus             | ✅     |
+| `hooks/useManualTransactions.ts` — draft rows, parseMonto, batch save             | ✅     |
+| `components/ui/Skeleton.tsx` — `<Skeleton>` + `<SkeletonCard>` reutilizables     | ✅     |
+| 6 componentes del dashboard refactorizados para usar sus hooks respectivos         | ✅     |
+
+**Styles layer (`refactor/styles`):**
+
+| Tarea                                                                              | Estado |
+| ---------------------------------------------------------------------------------- | ------ |
+| `styles/tokens.css` — nuevos tokens: `--radius-xs/badge/pill`, `--pill-bg`, `--overlay` | ✅     |
+| `styles/utilities.css` — clases `.card`, `.input-field`, `.skeleton`              | ✅     |
+| `app/globals.css` — import de utilities.css                                       | ✅     |
+| Strokes del logo SVG → `var(--green)` (page.tsx + DashboardClient)                | ✅     |
+| `HeaderPill` — radios → tokens, pill bg → `var(--pill-bg)`                        | ✅     |
+| `BudgetManager` — `.card`, `.skeleton`, `.input-field`, radios → tokens           | ✅     |
+| `AIAdvisorPanel` — `.card` en empty states + card principal, badges → `var(--radius-badge)`, chat → `var(--radius-pill)` | ✅     |
+| `ManualTransactions` — `.card`, `.input-field` en todos los inputs/selects        | ✅     |
+| `TransactionsList` — `.card`, overlay → `var(--overlay)`, delete btn → `var(--radius-badge)` | ✅     |
 
 ### ⬜ Testing unitario
 
@@ -583,3 +657,9 @@ Objetivo: cumplir WCAG 2.1 AA. Todos los elementos interactivos deben ser navega
 | `withAuth` + `ok()`/`err()` como infraestructura de routes         | Elimina boilerplate de auth y formato en cada handler; routes son transporte puro |
 | Routes OAuth excluidas de `withAuth`                               | Son flujos de redirect pre-sesión; no retornan JSON y manejan estados intermedios |
 | Lógica de negocio en `lib/services/`, no en route handlers         | Testeable de forma aislada; routes quedan de 15–30 líneas máximo     |
+| Custom hooks en `hooks/` por componente                            | Separa lógica de render; hooks son testeables unitariamente; componentes quedan puros |
+| No se usó Context para `activeFilter`                              | Solo 1 nivel de profundidad (DashboardClient → hijos directos); Context sería over-engineering |
+| `useRef(isFirstRender)` en `useTransactions`                       | Evita re-fetch al montar cuando `initialTxs` viene del servidor (SSR); sin efecto visible |
+| `.card`, `.input-field`, `.skeleton` en utilities.css              | Un solo punto de verdad para las superficies más repetidas; cambios de tema sin tocar JSX |
+| `--overlay`, `--pill-bg` como tokens en lugar de rgba inline       | Permite ajustar scrims y superficies desde CSS; facilita overrides en light mode |
+| `SpendingChart` mantiene colores hex en `CATEGORIA_COLORS`         | SVG `fill` attribute no acepta `var()` — CSS variables solo funcionan en `style` props |

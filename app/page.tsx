@@ -47,7 +47,7 @@ export default function LandingPage() {
             <path d="M30,18 Q70,18 70,34 Q70,50 30,50"
               stroke="currentColor" strokeWidth="6" fill="none" strokeLinecap="round"/>
             <path d="M30,50 Q78,50 78,66 Q78,82 30,82"
-              stroke="#4ADE80" strokeWidth="6" fill="none" strokeLinecap="round"/>
+              stroke="var(--green)" strokeWidth="6" fill="none" strokeLinecap="round"/>
           </svg>
 
           <div className="text-center">

@@ -119,7 +119,7 @@ function CategorySheet({
     <>
       <div
         className="fixed inset-0 z-50"
-        style={{ background: 'rgba(0,0,0,0.55)' }}
+        style={{ background: 'var(--overlay)' }}
         onClick={onClose}
       />
       <div
@@ -294,7 +294,7 @@ function CategoryPicker({ current, onSelect, onClose }: {
   const cats = Object.keys(CATEGORIA_LABELS) as Categoria[]
   return (
     <>
-      <div className="fixed inset-0 z-50" style={{ background: 'rgba(0,0,0,0.55)' }} onClick={onClose} />
+      <div className="fixed inset-0 z-50" style={{ background: 'var(--overlay)' }} onClick={onClose} />
       <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-lg z-50" style={{ background: 'var(--surface-2)', borderTop: '1px solid var(--border)', borderRadius: 'var(--radius-xl) var(--radius-xl) 0 0', padding: '16px 20px 40px' }}>
         <div className="flex items-center justify-between mb-4">
           <p className="font-semibold" style={{ fontSize: 'var(--text-sm)', color: 'var(--text)' }}>Cambiar categoría</p>
@@ -417,7 +417,7 @@ function TransactionRow({ t, pendingCat, onCategoryClick, onDelete }: {
               style={{
                 background: 'var(--red-soft)',
                 border: '1px solid var(--red)',
-                borderRadius: 6,
+                borderRadius: 'var(--radius-badge)',
                 padding: '4px 10px',
                 cursor: 'pointer',
                 color: 'var(--red)',
@@ -518,16 +518,7 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
 
   return (
     <>
-    <div
-      className="rounded-[var(--radius-lg)]"
-      style={{
-        background: 'var(--surface)',
-        border: '1px solid var(--border)',
-        backdropFilter: 'var(--glass-blur)',
-        WebkitBackdropFilter: 'var(--glass-blur)',
-        overflow: 'hidden',
-      }}
-    >
+    <div className="card">
       {/* Buscador */}
       <div className="px-4 pt-4 pb-3">
         <div

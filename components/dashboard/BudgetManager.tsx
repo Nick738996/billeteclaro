@@ -99,13 +99,13 @@ export default function BudgetManager({ mes, gastosPorCategoria, onBudgetsChange
   )
 
   if (!loaded) return (
-    <div style={{ padding: 20, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)' }}>
-      <div style={{ height: 12, width: 120, background: 'var(--surface-2)', borderRadius: 6 }} />
+    <div className="card" style={{ padding: 20 }}>
+      <div className="skeleton" style={{ height: 12, width: 120 }} />
     </div>
   )
 
   return (
-    <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)', overflow: 'hidden' }}>
+    <div className="card">
 
       {/* Header */}
       <div className="flex items-center justify-between" style={{ padding: '16px 16px 12px' }}>
@@ -258,7 +258,7 @@ function CategoryRow({ cat, entry, savedEntry, gasto, isExpanded, onToggle, onCh
             {formatCOP(gasto)}
           </span>
           {limite > 0 ? (
-            <span className="tabular-nums" style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color, background: bgColor, padding: '2px 7px', borderRadius: 4 }}>
+            <span className="tabular-nums" style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color, background: bgColor, padding: '2px 7px', borderRadius: 'var(--radius-xs)' }}>
               {over ? `+${Math.round(pct - 100)}%` : `${Math.round(pct)}%`}
             </span>
           ) : (
@@ -346,31 +346,23 @@ function SubcatRow({ sub, onNameChange, onMontoChange, onRemove }: {
   onMontoChange: (v: string) => void
   onRemove: () => void
 }) {
-  const inputStyle = {
-    background: 'var(--surface)',
-    border: '1px solid var(--border)',
-    borderRadius: 6,
-    padding: '4px 8px',
-    fontSize: 'var(--text-xs)',
-    color: 'var(--text)',
-    outline: 'none',
-  }
-
   return (
     <div className="flex items-center gap-2" style={{ marginBottom: 6 }}>
       <input
+        className="input-field"
         value={sub.nombre}
         onChange={e => onNameChange(e.target.value)}
         placeholder="Nombre (ej. Mercado)"
-        style={{ ...inputStyle, flex: 1 }}
+        style={{ flex: 1, padding: '4px 8px' }}
       />
       <div className="flex items-center gap-1" style={{ flexShrink: 0 }}>
         <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>$</span>
         <input
+          className="input-field"
           value={sub.monto > 0 ? sub.monto.toLocaleString('es-CO') : ''}
           onChange={e => onMontoChange(e.target.value)}
           placeholder="0"
-          style={{ ...inputStyle, width: 88, textAlign: 'right' }}
+          style={{ width: 88, padding: '4px 8px', textAlign: 'right' }}
         />
       </div>
       <button onClick={onRemove} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-subtle)', display: 'flex', padding: 0 }}>
@@ -388,21 +380,12 @@ function DirectInput({ value, onChange }: { value: number; onChange: (v: string)
 
   return (
     <input
+      className="input-field"
       ref={ref}
       value={local}
       onChange={e => { setLocal(e.target.value); onChange(e.target.value) }}
       placeholder="0"
-      style={{
-        width: 110,
-        background: 'var(--surface)',
-        border: '1px solid var(--border)',
-        borderRadius: 6,
-        padding: '4px 8px',
-        fontSize: 'var(--text-sm)',
-        color: 'var(--text)',
-        textAlign: 'right',
-        outline: 'none',
-      }}
+      style={{ width: 110, padding: '4px 8px', fontSize: 'var(--text-sm)', textAlign: 'right' }}
     />
   )
 }

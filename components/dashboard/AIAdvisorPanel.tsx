@@ -65,7 +65,7 @@ function InsightCard({ insight }: { insight: Insight }) {
             fontWeight: 600,
             color: c.badgeText,
             background: c.badgeBg,
-            borderRadius: 6,
+            borderRadius: 'var(--radius-badge)',
             padding: '1px 7px',
           }}
         >
@@ -77,7 +77,7 @@ function InsightCard({ insight }: { insight: Insight }) {
               fontSize: 'var(--text-xs)',
               color: 'var(--text-muted)',
               background: 'var(--surface-2)',
-              borderRadius: 6,
+              borderRadius: 'var(--radius-badge)',
               padding: '1px 7px',
             }}
           >
@@ -100,7 +100,7 @@ function InsightCard({ insight }: { insight: Insight }) {
             fontWeight: 600,
             color: c.accent,
             background: c.badgeBg,
-            borderRadius: 6,
+            borderRadius: 'var(--radius-badge)',
             padding: '2px 8px',
           }}
         >
@@ -130,9 +130,9 @@ function SkeletonInsights() {
           }}
         >
           {/* badge placeholder */}
-          <div style={{ height: 13, width: '28%', borderRadius: 6, background: 'var(--surface)' }} />
+          <div style={{ height: 13, width: '28%', borderRadius: 'var(--radius-badge)', background: 'var(--surface)' }} />
           {/* text placeholder */}
-          <div style={{ height: 11, width: w, borderRadius: 4, background: 'var(--surface)' }} />
+          <div style={{ height: 11, width: w, borderRadius: 'var(--radius-xs)', background: 'var(--surface)' }} />
         </div>
       ))}
     </div>
@@ -240,17 +240,7 @@ export default function AIAdvisorPanel({ mes, budgetCount, txCount, contextVersi
   // --- Estado vacío: sin presupuestos ---
   if (budgetCount < 1) {
     return (
-      <div
-        style={{
-          background: 'var(--surface)',
-          border: '1px solid var(--border)',
-          borderRadius: 'var(--radius-lg)',
-          backdropFilter: 'var(--glass-blur)',
-          WebkitBackdropFilter: 'var(--glass-blur)',
-          padding: '20px 16px',
-          textAlign: 'center',
-        }}
-      >
+      <div className="card" style={{ padding: '20px 16px', textAlign: 'center' }}>
         <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', marginBottom: 12 }}>
           Configura tu presupuesto mensual para activar el asesor
         </p>
@@ -263,7 +253,7 @@ export default function AIAdvisorPanel({ mes, budgetCount, txCount, contextVersi
               color: 'var(--green)',
               background: 'var(--green-soft)',
               border: '1px solid var(--green)',
-              borderRadius: 8,
+              borderRadius: 'var(--radius-badge)',
               padding: '6px 14px',
               cursor: 'pointer',
             }}
@@ -278,17 +268,7 @@ export default function AIAdvisorPanel({ mes, budgetCount, txCount, contextVersi
   // --- Estado vacío: sin transacciones ---
   if (txCount < 5) {
     return (
-      <div
-        style={{
-          background: 'var(--surface)',
-          border: '1px solid var(--border)',
-          borderRadius: 'var(--radius-lg)',
-          backdropFilter: 'var(--glass-blur)',
-          WebkitBackdropFilter: 'var(--glass-blur)',
-          padding: '20px 16px',
-          textAlign: 'center',
-        }}
-      >
+      <div className="card" style={{ padding: '20px 16px', textAlign: 'center' }}>
         <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>
           Sincroniza tus gastos primero para que pueda analizarlos
         </p>
@@ -304,16 +284,7 @@ export default function AIAdvisorPanel({ mes, budgetCount, txCount, contextVersi
         @keyframes bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }
       `}</style>
 
-      <div
-        style={{
-          background: 'var(--surface)',
-          border: '1px solid var(--border)',
-          borderRadius: 'var(--radius-lg)',
-          backdropFilter: 'var(--glass-blur)',
-          WebkitBackdropFilter: 'var(--glass-blur)',
-          overflow: 'hidden',
-        }}
-      >
+      <div className="card">
         {/* Header */}
         <div style={{ padding: '14px 16px 0' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
@@ -329,7 +300,7 @@ export default function AIAdvisorPanel({ mes, budgetCount, txCount, contextVersi
                   color: 'var(--green)',
                   background: 'var(--green-soft)',
                   border: '1px solid var(--green)',
-                  borderRadius: 8,
+                  borderRadius: 'var(--radius-badge)',
                   padding: '4px 10px',
                   cursor: 'pointer',
                 }}
@@ -483,7 +454,7 @@ export default function AIAdvisorPanel({ mes, budgetCount, txCount, contextVersi
                   flex: 1,
                   background: 'var(--surface-2)',
                   border: '1px solid var(--border)',
-                  borderRadius: 10,
+                  borderRadius: 'var(--radius-pill)',
                   padding: '8px 12px',
                   fontSize: 'var(--text-sm)',
                   color: 'var(--text)',
@@ -495,7 +466,7 @@ export default function AIAdvisorPanel({ mes, budgetCount, txCount, contextVersi
                 disabled={!input.trim() || sending}
                 style={{
                   width: 36, height: 36,
-                  borderRadius: 10,
+                  borderRadius: 'var(--radius-pill)',
                   background: input.trim() && !sending ? 'var(--green-soft)' : 'var(--surface-2)',
                   border: `1px solid ${input.trim() && !sending ? 'var(--green)' : 'var(--border)'}`,
                   color: input.trim() && !sending ? 'var(--green)' : 'var(--text-subtle)',
