@@ -4,7 +4,7 @@
 // Reemplaza <SyncButton> + <ThemeToggle> + botón logout en DashboardClient.tsx
 // Uso: <HeaderPill onSyncComplete={fn} onSignOut={fn} />
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useTheme } from 'next-themes'
 import { RefreshCw, Check, AlertCircle, Trash2, Sun, Moon, LogOut } from 'lucide-react'
 import { TEST_IDS } from '@/lib/testIds'
@@ -19,7 +19,9 @@ type ResetState = 'idle' | 'confirm' | 'resetting' | 'done'
 
 export default function HeaderPill({ onSyncComplete, onSignOut }: Props) {
   const { theme, setTheme } = useTheme()
-  const isDark = theme === 'dark'
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
+  const isDark = mounted && theme === 'dark'
 
   const [syncState,   setSyncState]  = useState<SyncState>('idle')
   const [resetState,  setResetState] = useState<ResetState>('idle')

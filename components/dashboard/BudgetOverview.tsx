@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Pencil, X } from 'lucide-react'
+import { Pencil, X, Info } from 'lucide-react'
 import {
   CATEGORIA_LABELS,
   CATEGORIA_COLORS,
@@ -68,7 +68,10 @@ export default function BudgetOverview({ mes, gastosPorCategoria, onBudgetsChang
   const extraGastos = (['TRANSFERENCIA'] as Categoria[]).filter(
     cat => (gastosPorCategoria[cat] ?? 0) > 0
   )
-  const noBudget = [...budgetOnly, ...extraGastos]
+  const noBudget = [...budgetOnly]
+    .sort((a, b) => (gastosPorCategoria[b] ?? 0) - (gastosPorCategoria[a] ?? 0))
+  const sinCategoria = [...extraGastos]
+    .sort((a, b) => (gastosPorCategoria[b] ?? 0) - (gastosPorCategoria[a] ?? 0))
 
   // Ordenar: excedidas → cerca del límite → OK, y dentro de cada grupo por % desc
   const sorted = [...withBudget].sort((a, b) => {
@@ -90,7 +93,15 @@ export default function BudgetOverview({ mes, gastosPorCategoria, onBudgetsChang
     </div>
   )
 
-  const hasContent = sorted.length > 0 || noBudget.length > 0
+  // Máximo gasto entre todas las categorías mostradas — para escalar las barras sin presupuesto
+  const maxGasto = Math.max(
+    1,
+    ...sorted.map(cat => gastosPorCategoria[cat] ?? 0),
+    ...noBudget.map(cat => gastosPorCategoria[cat] ?? 0),
+    ...sinCategoria.map(cat => gastosPorCategoria[cat] ?? 0),
+  )
+
+  const hasContent = sorted.length > 0 || noBudget.length > 0 || sinCategoria.length > 0
 
   return (
     <div>
@@ -195,32 +206,66 @@ export default function BudgetOverview({ mes, gastosPorCategoria, onBudgetsChang
           )
         })}
 
-        {/* Sin presupuesto — chips dentro de la card */}
+        {/* Sin presupuesto */}
         {noBudget.length > 0 && (
-          <div style={{ padding: '10px 16px 12px' }}>
-            <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-subtle)', marginBottom: 8 }}>
-              Sin presupuesto
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {noBudget.map(cat => (
-                <span
-                  key={cat}
-                  style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 5,
-                    fontSize: 'var(--text-xs)', color: 'var(--text-muted)',
-                    background: 'var(--surface-2)',
-                    border: '1px solid var(--border)',
-                    borderRadius: 'var(--radius-badge)',
-                    padding: '3px 9px',
-                  }}
-                >
-                  <span style={{ width: 5, height: 5, borderRadius: '50%', background: CATEGORIA_COLORS[cat], flexShrink: 0 }} />
-                  {CATEGORIA_LABELS[cat]} · {formatCOPCompact(gastosPorCategoria[cat] ?? 0)}
-                </span>
-              ))}
-            </div>
+          <div style={{ padding: '8px 16px 4px', borderTop: '1px solid var(--border-soft)' }}>
+            <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-subtle)', fontWeight: 500 }}>Sin presupuesto</p>
           </div>
         )}
+        {noBudget.map((cat, i) => {
+          const gasto = gastosPorCategoria[cat] ?? 0
+          const pct   = (gasto / maxGasto) * 100
+          return (
+            <div key={cat} style={{ padding: '10px 16px', borderBottom: i < noBudget.length - 1 ? '1px solid var(--border-soft)' : 'none' }}>
+              <div className="flex items-center gap-2" style={{ marginBottom: 7 }}>
+                <span style={{ width: 7, height: 7, borderRadius: '50%', background: CATEGORIA_COLORS[cat], flexShrink: 0 }} />
+                <span className="flex-1 truncate" style={{ fontSize: 'var(--text-sm)', color: 'var(--text)', fontWeight: 500 }}>
+                  {CATEGORIA_LABELS[cat]}
+                </span>
+                <span className="tabular-nums flex-shrink-0" style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
+                  {formatCOPCompact(gasto)} / $0
+                </span>
+                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-subtle)', minWidth: 38, textAlign: 'right' }}>—</span>
+              </div>
+              <div style={{ height: 3, background: 'var(--border)', borderRadius: 99, overflow: 'hidden' }}>
+                <div style={{ width: `${pct}%`, height: '100%', background: 'var(--blue)', borderRadius: 99, transition: 'width 0.3s ease' }} />
+              </div>
+            </div>
+          )
+        })}
+
+        {/* Sin categoría — TRANSFERENCIA, necesitan recategorizarse */}
+        {sinCategoria.length > 0 && (
+          <div
+            className="flex items-center gap-1.5"
+            style={{ padding: '8px 16px 4px', borderTop: '1px solid var(--border-soft)' }}
+          >
+            <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-subtle)', fontWeight: 500 }}>Sin categoría</p>
+            <span title="Estas transacciones están marcadas como Transferencia — considera recategorizarlas en la lista de movimientos">
+              <Info size={11} style={{ color: 'var(--text-subtle)', cursor: 'help', flexShrink: 0 }} />
+            </span>
+          </div>
+        )}
+        {sinCategoria.map((cat, i) => {
+          const gasto = gastosPorCategoria[cat] ?? 0
+          const pct   = (gasto / maxGasto) * 100
+          return (
+            <div key={cat} style={{ padding: '10px 16px', borderBottom: i < sinCategoria.length - 1 ? '1px solid var(--border-soft)' : 'none' }}>
+              <div className="flex items-center gap-2" style={{ marginBottom: 7 }}>
+                <span style={{ width: 7, height: 7, borderRadius: '50%', background: CATEGORIA_COLORS[cat], flexShrink: 0 }} />
+                <span className="flex-1 truncate" style={{ fontSize: 'var(--text-sm)', color: 'var(--text)', fontWeight: 500 }}>
+                  {CATEGORIA_LABELS[cat]}
+                </span>
+                <span className="tabular-nums flex-shrink-0" style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
+                  {formatCOPCompact(gasto)}
+                </span>
+              </div>
+              <div style={{ height: 3, background: 'var(--border)', borderRadius: 99, overflow: 'hidden' }}>
+                <div style={{ width: `${pct}%`, height: '100%', background: 'var(--yellow)', borderRadius: 99, transition: 'width 0.3s ease' }} />
+              </div>
+            </div>
+          )
+        })}
       </div>
 
       {/* Budget editor — inline collapse */}
