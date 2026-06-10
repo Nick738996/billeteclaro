@@ -41,9 +41,10 @@ const CATEGORIA_THEME: Record<Categoria, { color: string; bg: string }> = {
 }
 
 const BANCO_LABEL: Record<Banco, { label: string; color: string }> = {
-  RAPPICARD: { label: 'RappiCard', color: 'var(--yellow)' },
-  RAPPIPAY:  { label: 'RappiPay',  color: 'var(--blue)' },
-  OTRO:      { label: 'Otro',      color: 'var(--text-muted)' },
+  RAPPICARD:   { label: 'RappiCard',   color: 'var(--yellow)' },
+  RAPPIPAY:    { label: 'RappiPay',    color: 'var(--blue)' },
+  BANCOLOMBIA: { label: 'Bancolombia', color: 'var(--green)' },
+  OTRO:        { label: 'Otro',        color: 'var(--text-muted)' },
 }
 
 type FilterKey = Categoria | 'TODOS' | 'BANCO:RAPPICARD' | 'BANCO:RAPPIPAY'

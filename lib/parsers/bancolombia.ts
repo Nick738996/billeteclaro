@@ -105,7 +105,7 @@ function parseMovimiento(email: EmailInput): ParseResult {
     monto,
     comercio,
     descripcion: comercio ? `${tipo === 'COMPRA' ? 'Compra en' : 'Pago a'} ${comercio}` : 'Transacción Bancolombia',
-    banco:       'OTRO', // TODO: cambiar a 'BANCOLOMBIA' cuando se agregue al tipo Banco
+    banco:       'BANCOLOMBIA',
     tipo,
     categoria:   guessCategoria(comercio ?? ''),
     subcategoria: null,

@@ -1,6 +1,7 @@
 export type Banco =
   | 'RAPPICARD'
   | 'RAPPIPAY'
+  | 'BANCOLOMBIA'
   | 'OTRO'
 
 export type TipoTransaccion =
@@ -142,9 +143,10 @@ export const CATEGORIA_COLORS: Record<Categoria, string> = {
 }
 
 export const BANCO_LABELS: Record<Banco, string> = {
-  RAPPICARD: 'RappiCard',
-  RAPPIPAY: 'RappiPay',
-  OTRO: 'Otro',
+  RAPPICARD:   'RappiCard',
+  RAPPIPAY:    'RappiPay',
+  BANCOLOMBIA: 'Bancolombia',
+  OTRO:        'Otro',
 }
 
 export function formatCOP(amount: number): string {
