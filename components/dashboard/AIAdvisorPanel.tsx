@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { AlertTriangle, Lightbulb, CircleCheck, TrendingUp, Send, ChevronDown, ChevronUp, type LucideIcon } from 'lucide-react'
+import { AlertTriangle, Lightbulb, CircleCheck, TrendingUp, Eye, Send, ChevronDown, ChevronUp, type LucideIcon } from 'lucide-react'
 import type { Insight, InsightTipo } from '@/lib/types'
 import { formatCOP, CATEGORIA_LABELS } from '@/lib/types'
 
@@ -26,10 +26,11 @@ type ColorConfig = {
 }
 
 const COLOR_MAP: Record<InsightTipo, ColorConfig> = {
-  alerta:     { accent: 'var(--red)',    badgeBg: 'var(--red-soft)',    badgeText: 'var(--red)',    Icon: AlertTriangle, label: 'Alerta'     },
-  consejo:    { accent: 'var(--blue)',   badgeBg: 'var(--blue-soft)',   badgeText: 'var(--blue)',   Icon: Lightbulb,     label: 'Consejo'    },
-  positivo:   { accent: 'var(--green)',  badgeBg: 'var(--green-soft)',  badgeText: 'var(--green)',  Icon: CircleCheck,   label: 'Positivo'   },
-  proyeccion: { accent: 'var(--yellow)', badgeBg: 'var(--yellow-soft)', badgeText: 'var(--yellow)', Icon: TrendingUp,    label: 'Proyección' },
+  alerta:      { accent: 'var(--red)',    badgeBg: 'var(--red-soft)',    badgeText: 'var(--red)',    Icon: AlertTriangle, label: 'Alerta'     },
+  consejo:     { accent: 'var(--blue)',   badgeBg: 'var(--blue-soft)',   badgeText: 'var(--blue)',   Icon: Lightbulb,     label: 'Consejo'    },
+  positivo:    { accent: 'var(--green)',  badgeBg: 'var(--green-soft)',  badgeText: 'var(--green)',  Icon: CircleCheck,   label: 'Positivo'   },
+  proyeccion:  { accent: 'var(--yellow)', badgeBg: 'var(--yellow-soft)', badgeText: 'var(--yellow)', Icon: TrendingUp,    label: 'Proyección' },
+  observacion: { accent: 'var(--purple)', badgeBg: 'var(--purple-soft)', badgeText: 'var(--purple)', Icon: Eye,           label: 'Dato'       },
 }
 
 function InsightCard({ insight }: { insight: Insight }) {
