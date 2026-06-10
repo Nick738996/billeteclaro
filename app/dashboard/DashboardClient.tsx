@@ -6,7 +6,7 @@
 
 import { useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { format, parseISO, startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns'
+import { format, parseISO, addMonths, subMonths } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
@@ -86,19 +86,15 @@ export default function DashboardClient({
   const loadMonth = useCallback(async (m: string) => {
     setLoading(true)
     setActiveFilter('TODOS') // reset filter on month change
-    const r = parseISO(`${m}-01`)
-    const start = startOfMonth(r)
-    const end = endOfMonth(r)
 
     const { data } = await supabase
       .from('transactions')
       .select('*')
-      .gte('fecha', start.toISOString())
-      .lte('fecha', end.toISOString())
+      .eq('mes_contable', m)
       .order('fecha', { ascending: false })
 
     setTxs((data ?? []) as Transaction[])
-    setLabel(format(r, 'MMMM yyyy', { locale: es }))
+    setLabel(format(parseISO(`${m}-01`), 'MMMM yyyy', { locale: es }))
     setIsCurrent(m === today)
     setMonth(m)
     setLoading(false)

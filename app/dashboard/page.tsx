@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { format, parseISO, startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns'
+import { format, parseISO, addMonths, subMonths } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import type { Transaction } from '@/lib/types'
@@ -23,8 +23,6 @@ export default async function DashboardPage({ searchParams }: Props) {
   const { month } = await searchParams
   const monthParam = month ?? format(new Date(), 'yyyy-MM')
   const ref = parseISO(`${monthParam}-01`)
-  const start = startOfMonth(ref)
-  const end = endOfMonth(ref)
 
   const admin = createAdminClient()
   const { data: tokenRow } = await admin
@@ -38,8 +36,7 @@ export default async function DashboardPage({ searchParams }: Props) {
     .from('transactions')
     .select('*')
     .eq('user_id', user.id)
-    .gte('fecha', start.toISOString())
-    .lte('fecha', end.toISOString())
+    .eq('mes_contable', monthParam)
     .order('fecha', { ascending: false })
 
   const txs: Transaction[] = transactions ?? []

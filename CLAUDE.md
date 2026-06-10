@@ -17,6 +17,7 @@
 [✅ UI/UX]    Sistema de diseño, dark/light mode, glass morphism
 [✅ Etapa 3]  Asesor financiero IA
 [✅ Refactor] Auditoría, limpieza de código y capa API
+[✅ Feature]  Mes contable — ciclo sueldo vs. mes calendario
 [⬜ Etapa 2]  Categorización inteligente  ← pendiente
 [⬜ QA]       Testing unitario (Vitest), E2E (Maestro), accesibilidad  ← pendiente
 [⬜ Deploy]   Dominio, hosting, PWA mobile  ← pendiente
@@ -142,7 +143,7 @@ NEXT_PUBLIC_APP_URL
 
 | Tabla           | Propósito                                                                                                 |
 | --------------- | --------------------------------------------------------------------------------------------------------- |
-| `transactions`  | Todas las transacciones. UNIQUE `(user_id, gmail_message_id)`                                             |
+| `transactions`  | Todas las transacciones. UNIQUE `(user_id, gmail_message_id)`. Columnas `mes_contable` y `es_sueldo`      |
 | `sync_log`      | Log de cada sync. `skipped_ids text[]` guarda IDs ignorados (Uber pre-auths, transacciones eliminadas)    |
 | `user_tokens`   | `gmail_refresh_token` por usuario                                                                         |
 | `budgets`       | `(user_id, mes, categoria, monto_presupuestado, subcategorias jsonb)`. UNIQUE `(user_id, mes, categoria)` |
@@ -157,6 +158,7 @@ NEXT_PUBLIC_APP_URL
 | `002_budgets.sql`                      | ✅ aplicada                                          |
 | `003_ai_advisor.sql`                   | ✅ aplicada (tablas `ai_insights` + `chat_messages`) |
 | `sync_log.skipped_ids` (ALTER manual)  | ✅ aplicada                                          |
+| `004_mes_contable.sql`                 | ✅ aplicada (`mes_contable text`, `es_sueldo bool`, índice) |
 
 ### Puntos clave
 
@@ -164,6 +166,7 @@ NEXT_PUBLIC_APP_URL
 - `subcategorias` en `budgets` es `jsonb` — UI-only, no se refleja en `transactions`
 - `id_auditoria` formato `MMDD-NN` — puede tener gaps si se borra y re-sincroniza
 - `user_tokens.gmail_refresh_token` — se persiste en el callback de OAuth usando `createAdminClient()` (el `provider_refresh_token` de Supabase solo está disponible justo después del login)
+- `mes_contable` — asignado en FASE 4 del sync para todas las transacciones de los meses afectados. El dashboard filtra por esta columna, no por rango de `fecha`.
 
 ---
 
@@ -178,11 +181,40 @@ Gmail OAuth refresh → listBankMessageIds() → filtrar ya procesados
 → FASE 2: deduplicateUber() sobre TODAS las transacciones del sync
     → pre-auths de Uber → guardados en sync_log.skipped_ids
 → FASE 3: upsert en transactions (ignoreDuplicates: true)
+→ FASE 4: asignar mes_contable
+    → detectar meses calendario afectados por las nuevas transacciones
+    → por cada mes: fetch ALL transactions del mes (existentes + nuevas)
+    → asignarMesContable() → update mes_contable + es_sueldo en cada fila
 → log: "[sync] N emails — X parser | Y Groq | Z omitidos | W Uber preauth | E errores"
 → actualizar sync_log (finished_at, skipped_ids, status)
 ```
 
 **Límites:** máx 2000 emails por sync, búsqueda desde `after:2026/05/01` (fecha fija).
+
+### Mes contable (`lib/utils/mesContable.ts`)
+
+El mes contable separa el ciclo económico real (sueldo → próximo sueldo) del mes calendario. Las transacciones posteriores al sueldo van al mes siguiente en el dashboard.
+
+**Configuración:**
+- `FUENTES_SUELDO = ['citibank']` — match parcial en `comercio ?? '' + descripcion ?? ''` (toLowerCase)
+- `UMBRAL_SUELDO = 9_000_000` — monto mínimo para considerar un ingreso como sueldo
+- `VENTANA_DIAS = 5` — buscar el sueldo en los últimos 5 días del mes (ej. mayo 31 días → desde día 27)
+- `FALLBACK_DIAS = 3` — si no hay sueldo detectado, los últimos 3 días → mes siguiente
+
+**Lógica de `asignarMesContable(transacciones)`:**
+1. Agrupa por mes calendario (`fecha.slice(0,7)`)
+2. Por cada mes: busca sueldo en `dia >= inicioVentana` — primero por `FUENTES_SUELDO`, luego por monto solo
+3. Si sueldo encontrado: transacciones con `timestamp >= sueldo.timestamp` → `mes_contable = mes+1`
+4. Sin sueldo: transacciones en últimos `FALLBACK_DIAS` días → `mes_contable = mes+1`
+5. Marca `es_sueldo: true` en la transacción detectada (referencia exacta, no por valor)
+
+**Ejemplo verificado (mayo 2026):**
+- 27/mayo → `mes_contable: 2026-05` ✓
+- 28/mayo 09:40 Citibank +$10.254.616 → `mes_contable: 2026-06`, `es_sueldo: true` ✓
+- 28/mayo 11:45 Rappi → `mes_contable: 2026-06` ✓
+- 29–31/mayo → `mes_contable: 2026-06` ✓
+
+**Para agregar una fuente de sueldo nueva:** añadir el string a `FUENTES_SUELDO` en `mesContable.ts`.
 
 ### Eliminación de transacción individual (`DELETE /api/transactions/[id]`)
 
@@ -663,3 +695,7 @@ Objetivo: cumplir WCAG 2.1 AA. Todos los elementos interactivos deben ser navega
 | `.card`, `.input-field`, `.skeleton` en utilities.css              | Un solo punto de verdad para las superficies más repetidas; cambios de tema sin tocar JSX |
 | `--overlay`, `--pill-bg` como tokens en lugar de rgba inline       | Permite ajustar scrims y superficies desde CSS; facilita overrides en light mode |
 | `SpendingChart` mantiene colores hex en `CATEGORIA_COLORS`         | SVG `fill` attribute no acepta `var()` — CSS variables solo funcionan en `style` props |
+| `mes_contable` persistido en BD, no calculado on-the-fly           | Permite filtrar con una query simple `.eq('mes_contable', m)`; el cálculo on-the-fly requeriría traer todo y filtrar en cliente |
+| Re-computar `mes_contable` para meses completos en FASE 4          | El sueldo puede llegar en un sync distinto al de las transacciones del mismo período; re-computar con el set completo garantiza consistencia |
+| `es_sueldo` marcado por referencia de objeto (no por valor)        | Dos transacciones con mismo timestamp+monto son posibles; la referencia identifica exactamente la detectada |
+| Dashboard filtra por `mes_contable` en lugar de rango de `fecha`   | Un solo `.eq()` vs. `.gte()` + `.lte()`; además, transacciones de fin de mes anterior aparecen en el mes correcto |
