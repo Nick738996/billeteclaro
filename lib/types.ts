@@ -164,7 +164,7 @@ export function formatCOPCompact(amount: number): string {
   return `${sign}${formatCOP(abs)}`
 }
 
-export type InsightTipo = 'alerta' | 'consejo' | 'positivo' | 'proyeccion' | 'observacion'
+export type InsightTipo = 'alerta' | 'consejo' | 'positivo' | 'proyeccion'
 
 export interface Insight {
   tipo: InsightTipo

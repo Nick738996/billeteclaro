@@ -1,15 +1,14 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { AlertTriangle, Lightbulb, CircleCheck, TrendingUp, Eye, Send, ChevronDown, ChevronUp, type LucideIcon } from 'lucide-react'
+import { AlertTriangle, Lightbulb, CheckCircle, TrendingUp, Send, ChevronDown, ChevronUp } from 'lucide-react'
 import type { Insight, InsightTipo } from '@/lib/types'
-import { formatCOP, CATEGORIA_LABELS } from '@/lib/types'
+import { formatCOP } from '@/lib/types'
 
 interface Props {
   mes: string
   budgetCount: number
   txCount: number
-  contextVersion?: number
   onOpenBudgets?: () => void
 }
 
@@ -18,37 +17,26 @@ interface ChatMsg {
   content: string
 }
 
-type ColorConfig = {
-  accent: string
-  badgeBg: string
-  badgeText: string
-  Icon: LucideIcon
-  label: string
+const ICON: Record<InsightTipo, React.ReactNode> = {
+  alerta:     <AlertTriangle  size={15} />,
+  consejo:    <Lightbulb      size={15} />,
+  positivo:   <CheckCircle    size={15} />,
+  proyeccion: <TrendingUp     size={15} />,
 }
 
-const COLOR_MAP: Record<InsightTipo, ColorConfig> = {
-  alerta:      { accent: 'var(--red)',    badgeBg: 'var(--red-soft)',    badgeText: 'var(--red)',    Icon: AlertTriangle, label: 'Alerta'     },
-  consejo:     { accent: 'var(--blue)',   badgeBg: 'var(--blue-soft)',   badgeText: 'var(--blue)',   Icon: Lightbulb,     label: 'Consejo'    },
-  positivo:    { accent: 'var(--green)',  badgeBg: 'var(--green-soft)',  badgeText: 'var(--green)',  Icon: CircleCheck,   label: 'Positivo'   },
-  proyeccion:  { accent: 'var(--yellow)', badgeBg: 'var(--yellow-soft)', badgeText: 'var(--yellow)', Icon: TrendingUp,    label: 'Proyección' },
-  observacion: { accent: 'var(--purple)', badgeBg: 'var(--purple-soft)', badgeText: 'var(--purple)', Icon: Eye,           label: 'Dato'       },
+const COLOR: Record<InsightTipo, { bg: string; text: string }> = {
+  alerta:     { bg: 'var(--red-soft)',    text: 'var(--red)'    },
+  consejo:    { bg: 'var(--blue-soft)',   text: 'var(--blue)'   },
+  positivo:   { bg: 'var(--green-soft)',  text: 'var(--green)'  },
+  proyeccion: { bg: 'var(--yellow-soft)', text: 'var(--yellow)' },
 }
 
 function InsightCard({ insight }: { insight: Insight }) {
-  const c = COLOR_MAP[insight.tipo]
-  const categoriaLabel = insight.categoria ? (CATEGORIA_LABELS[insight.categoria as keyof typeof CATEGORIA_LABELS] ?? insight.categoria) : null
-
-  // Only show limite_sugerido badge when the number isn't already visible in the text
-  const limiteStr = insight.limite_sugerido != null ? formatCOP(insight.limite_sugerido) : null
-  const limiteAlreadyInText = limiteStr != null && insight.texto.includes(limiteStr)
-  const showLimiteBadge = limiteStr != null && !limiteAlreadyInText
-
+  const c = COLOR[insight.tipo]
   return (
     <div
       style={{
-        background: 'var(--surface)',
-        border: '1px solid var(--border)',
-        borderLeft: `3px solid ${c.accent}`,
+        background: c.bg,
         borderRadius: 'var(--radius-sm)',
         padding: '10px 12px',
         display: 'flex',
@@ -56,84 +44,51 @@ function InsightCard({ insight }: { insight: Insight }) {
         gap: 6,
       }}
     >
-      {/* Header row: icon + label badge + optional categoria badge */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <span style={{ color: c.accent, flexShrink: 0, display: 'flex' }}><c.Icon size={13} /></span>
-        <span
-          style={{
-            fontSize: 'var(--text-xs)',
-            fontWeight: 600,
-            color: c.badgeText,
-            background: c.badgeBg,
-            borderRadius: 6,
-            padding: '1px 7px',
-          }}
-        >
-          {c.label}
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+        <span style={{ color: c.text, flexShrink: 0, marginTop: 1 }}>
+          {ICON[insight.tipo]}
         </span>
-        {categoriaLabel && (
+        <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text)', lineHeight: 1.4, flex: 1 }}>
+          {insight.texto}
+        </p>
+      </div>
+      {insight.limite_sugerido != null && (
+        <div style={{ paddingLeft: 23 }}>
           <span
             style={{
               fontSize: 'var(--text-xs)',
-              color: 'var(--text-muted)',
-              background: 'var(--surface-2)',
+              fontWeight: 600,
+              color: c.text,
+              background: 'transparent',
+              border: `1px solid ${c.text}`,
               borderRadius: 6,
-              padding: '1px 7px',
+              padding: '2px 7px',
+              opacity: 0.85,
             }}
           >
-            {categoriaLabel}
+            Límite sugerido: {formatCOP(insight.limite_sugerido)}
           </span>
-        )}
-      </div>
-
-      {/* Text */}
-      <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text)', lineHeight: 1.45, margin: 0 }}>
-        {insight.texto}
-      </p>
-
-      {/* Límite sugerido badge — only when not already mentioned */}
-      {showLimiteBadge && (
-        <span
-          style={{
-            alignSelf: 'flex-start',
-            fontSize: 'var(--text-xs)',
-            fontWeight: 600,
-            color: c.accent,
-            background: c.badgeBg,
-            borderRadius: 6,
-            padding: '2px 8px',
-          }}
-        >
-          Límite: {limiteStr}
-        </span>
+        </div>
       )}
     </div>
   )
 }
 
 function SkeletonInsights() {
-  const lines = ['75%', '60%', '82%']
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 14 }}>
-      {lines.map((w, i) => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {[80, 65, 72].map((w, i) => (
         <div
           key={i}
           style={{
+            height: 48,
             borderRadius: 'var(--radius-sm)',
             background: 'var(--surface-2)',
-            borderLeft: '3px solid var(--border)',
-            padding: '10px 12px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 7,
-            animation: `pulse 1.6s ease-in-out ${i * 0.18}s infinite`,
+            opacity: 0.6,
+            animation: 'pulse 1.5s ease-in-out infinite',
+            width: `${w}%`,
           }}
-        >
-          {/* badge placeholder */}
-          <div style={{ height: 13, width: '28%', borderRadius: 6, background: 'var(--surface)' }} />
-          {/* text placeholder */}
-          <div style={{ height: 11, width: w, borderRadius: 4, background: 'var(--surface)' }} />
-        </div>
+        />
       ))}
     </div>
   )
@@ -158,7 +113,7 @@ function ThinkingDots() {
   )
 }
 
-export default function AIAdvisorPanel({ mes, budgetCount, txCount, contextVersion = 0, onOpenBudgets }: Props) {
+export default function AIAdvisorPanel({ mes, budgetCount, txCount, onOpenBudgets }: Props) {
   const [insights, setInsights]       = useState<Insight[]>([])
   const [loadingInsights, setLoadingInsights] = useState(false)
   const [insightsError, setInsightsError]     = useState<string | null>(null)
@@ -179,12 +134,12 @@ export default function AIAdvisorPanel({ mes, budgetCount, txCount, contextVersi
     setChatOpen(false)
   }, [mes])
 
-  // Cargar insights al montar y cuando cambie el contexto (datos o presupuestos)
+  // Cargar insights al montar (si hay datos suficientes)
   useEffect(() => {
     if (budgetCount < 1 || txCount < 5) return
     fetchInsights()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mes, budgetCount, txCount, contextVersion])
+  }, [mes, budgetCount, txCount])
 
   // Scroll al fondo del chat cuando hay mensajes nuevos
   useEffect(() => {

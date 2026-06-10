@@ -17,7 +17,7 @@ import SpendingChart from '@/components/dashboard/SpendingChart'
 import TransactionsList from '@/components/dashboard/TransactionsList'
 import HeaderPill from '@/components/dashboard/HeaderPill'
 import BudgetManager from '@/components/dashboard/BudgetManager'
-import AIAdvisor from '@/components/dashboard/AIAdvisor'
+import AIAdvisorPanel from '@/components/dashboard/AIAdvisorPanel'
 import ManualTransactions from '@/components/dashboard/ManualTransactions'
 
 interface Props {
@@ -230,10 +230,10 @@ export default function DashboardClient({
           onBudgetsChange={setBudgets}
         />
 
-        <AIAdvisor
+        <AIAdvisorPanel
           mes={month}
-          gastosPorCategoria={stats.porCategoria}
-          budgets={budgets}
+          budgetCount={Object.values(budgets).filter(v => v > 0).length}
+          txCount={txs.length}
         />
 
         <div className="flex items-center justify-between px-1">

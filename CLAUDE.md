@@ -67,8 +67,8 @@ NEXT_PUBLIC_APP_URL
 | Base de datos | Supabase (PostgreSQL, us-east-1) |
 | Auth | Supabase Auth + Google OAuth |
 | Email | Gmail API v1 (`gmail.readonly`) |
-| IA / extracción | Gemini API — modelo `gemini-2.0-flash-lite` |
-| IA / asesor | Gemini API — modelo `gemini-2.0-flash-lite`, `temperature: 0.4` |
+| IA / extracción | Groq API — modelo `llama-3.3-70b-versatile` |
+| IA / asesor | Groq API — modelo `llama-3.3-70b-versatile`, `temperature: 0.4` |
 | UI | Tailwind CSS + CSS variables (Recharts eliminado — donut SVG propio) |
 | Iconos | lucide-react |
 | Temas | next-themes (`data-theme` attribute, defaultTheme: "dark") |
@@ -322,32 +322,16 @@ Utilidades: `formatCOP()` · `formatCOPCompact()` · `isIngreso()` · `isGasto()
 
 ## Sistema de diseño (`styles/tokens.css`)
 
-**Modo oscuro (`:root`):**
-- `--bg #0A0A0A` / `--surface rgba(28,28,28,0.72)` / `--surface-2 rgba(36,36,36,0.72)`
-- `--border rgba(255,255,255,0.10)` / `--border-soft rgba(255,255,255,0.06)`
-- `--text #FFFFFF` / `--text-muted #888888` / `--text-subtle #444444`
-- `--green #4ADE80` / `--red #FF6B6B` / `--yellow #FCD34D` / `--blue #60A5FA` / `--purple #A78BFA`
-- Cada color tiene `*-soft` para fondos de badges
-- `--glass-blur: blur(24px) saturate(160%)`
-
-**Modo claro (`[data-theme="light"]`):** `--bg #FFFFFF`, colores adaptados, `*-soft` pasteles.
-
-**Radios:** `--radius-sm` 12px · `--radius-md` 18px · `--radius-lg` 24px · `--radius-xl` 32px
-
-**Regla:** sin `box-shadow`, sin gradientes. Solo bordes `var(--border)`. Glass morphism via `backdropFilter`.
-
----
-
-## Auth y tokens Gmail
-
-Login solicita `email profile gmail.readonly` con `access_type: offline` y `prompt: consent`. Middleware protege `/dashboard/**`, redirige `/` si hay sesión activa.
-
----
-
-## Clientes Supabase
-
-- `lib/supabase/client.ts` — browser client para `'use client'`
-- `lib/supabase/server.ts` — server client (async cookies) + `createAdminClient()` con service role
+```
+NEXT_PUBLIC_SUPABASE_URL
+NEXT_PUBLIC_SUPABASE_ANON_KEY
+SUPABASE_SERVICE_ROLE_KEY
+DATABASE_URL          # Supabase Session Pooler
+GOOGLE_CLIENT_ID
+GOOGLE_CLIENT_SECRET
+GROQ_API_KEY          # console.groq.com — gratis, 14.400 req/día
+NEXT_PUBLIC_APP_URL
+```
 
 ---
 
@@ -420,7 +404,7 @@ feature/<nombre>   ← una por mejora, PR a main
 
 | Decisión | Razón |
 |---|---|
-| Groq + Llama 3.3 70B (extracción + asesor) | 14.400 req/día gratis, ~200ms, JSON mode nativo |
+| Groq + Llama 3.3 70B para extracción y asesor | 14.400 req/día gratis, ~200ms latencia, JSON mode nativo |
 | Parsers regex primero, Groq como fallback | Sin costo para RappiCard/RappiPay (100% del MVP) |
 | Fecha fija `after:2026/05/01` en Gmail | Evita sync lenta de 365 días |
 | `ABONO_DEUDA` excluido de gastos | Pago de tarjeta no es gasto real |
