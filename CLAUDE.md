@@ -18,8 +18,10 @@
 [✅ Etapa 3]  Asesor financiero IA
 [✅ Refactor] Auditoría, limpieza de código y capa API
 [✅ Feature]  Mes contable — ciclo sueldo vs. mes calendario
+[✅ Feature]  Onboarding — landing + flujo 3 pasos + manejo de errores sync
+[✅ QA]       Vitest configurado — 61 tests (parsers, mesContable, deduplicateUber)
 [⬜ Etapa 2]  Categorización inteligente  ← pendiente
-[⬜ QA]       Testing unitario (Vitest), E2E (Maestro), accesibilidad  ← pendiente
+[⬜ QA]       E2E (Maestro), accesibilidad completa  ← pendiente
 [⬜ Deploy]   Dominio, hosting, PWA mobile  ← pendiente
 ```
 
@@ -74,6 +76,33 @@ proyeccion  → amarillo (TrendingUp)    — proyección al cierre del mes
 observacion → púrpura (Eye)           — dato relevante sin acción inmediata obvia
 ```
 
+### ✅ Feature — Onboarding
+
+| Archivo | Descripción |
+| ------- | ----------- |
+| `app/page.tsx` | Landing pública: hero, "Cómo funciona", "¿Es seguro?", CTA login |
+| `app/onboarding/layout.tsx` | Layout con logo + progress dots (paso activo según pathname) |
+| `app/onboarding/page.tsx` | Paso 1: bienvenida con nombre del usuario, lista de 3 pasos |
+| `app/onboarding/step-2/page.tsx` | Paso 2: sync (idle/syncing con mensajes rotativos/success/no_emails/error) |
+| `app/onboarding/step-3/page.tsx` | Paso 3: presupuesto simplificado (4 categorías) + "Ir al dashboard" |
+| `app/api/onboarding/complete/route.ts` | Marca `onboarding_completed = true` vía `POST` |
+| `lib/services/settingsService.ts` | `getOnboardingCompleted()` · `completeOnboarding()` |
+| `components/ui/SyncErrorCard.tsx` | Tarjeta de error con 5 tipos: `gmail_auth_expired`, `gmail_permission_denied`, `no_emails_found`, `sync_timeout`, `unknown` |
+| `middleware.ts` | Routing: `/` → onboarding/dashboard según estado; `/onboarding` bloqueado si ya completado |
+
+**Tabla `user_settings`** (migración `005` aplicada manualmente):
+```sql
+user_id uuid PRIMARY KEY, onboarding_completed boolean DEFAULT false, onboarding_completed_at timestamptz
+```
+
+**Flujo de routing (middleware):**
+- `/` + no auth → landing
+- `/` + auth + no completado → `/onboarding`
+- `/` + auth + completado → `/dashboard`
+- `/onboarding/**` + completado → `/dashboard`
+- `/dashboard/**` + no completado → `/onboarding`
+- `/api/**` → siempre pasa (no check de onboarding)
+
 ### ⬜ Etapa 2 — Categorización inteligente (pendiente)
 
 `guessCategoria()` en `lib/parsers/commerceCategories.ts` ya cubre 120+ patrones. Lo que falta:
@@ -83,10 +112,10 @@ observacion → púrpura (Eye)           — dato relevante sin acción inmediat
 
 > La edición manual ya existe en Etapa 3. Etapa 2 agrega memoria y automatización.
 
-### ⬜ Pendientes menores (Etapa 3 casi completa)
+### ✅ Pendientes menores (completados)
 
-1. **Copiar presupuesto del mes anterior** — botón en `BudgetManager` que precarga el mes previo
-2. **recharts** — está en `package.json` pero el donut es SVG propio. Eliminar la dependencia.
+1. ~~Copiar presupuesto del mes anterior~~ ✅ — botón "Copiar mes anterior" en el header de `BudgetManager`
+2. ~~recharts~~ ✅ — eliminado de `package.json` en `refactor/data-layer`
 
 ---
 
@@ -385,7 +414,8 @@ export const GET = withAuth(async (req, user, supabase) => {
 | `budgetService.ts`           | `fetchBudgets(supabase, userId, mes)` · `saveBudgets(supabase, userId, mes, items)`               |
 | `advisorService.ts`          | `getInsights(supabase, userId, mes, force?)` · `sendChatMessage(supabase, userId, mes, message)`  |
 | `transactionService.ts`      | `fetchMonthTransactions` · `createManualTransactions` · `batchCategorize` · `deleteTransaction`   |
-| `syncService.ts`             | `runSync(userId, admin)` — pipeline completo Gmail→Supabase; `deduplicateUber` es privada al módulo |
+| `syncService.ts`             | `runSync(userId, admin)` — pipeline completo Gmail→Supabase                                         |
+| `settingsService.ts`         | `getOnboardingCompleted(supabase, userId)` · `completeOnboarding(supabase, userId)`                 |
 
 **Regla:** las route handlers son transporte puro (auth → validar input → llamar service → responder). La lógica de negocio vive en `lib/services/`.
 
@@ -401,6 +431,7 @@ export const GET = withAuth(async (req, user, supabase) => {
 | `POST /api/transactions/manual`      | POST   | Crea transacciones manuales. `gmail_message_id = 'manual_' + uuid`           |
 | `PATCH /api/transactions/categorize` | PATCH  | Actualiza categorías en batch                                                |
 | `DELETE /api/transactions/[id]`      | DELETE | Elimina una transacción. Gmail → agrega a `skipped_ids`. Manual → solo borra |
+| `POST /api/onboarding/complete`      | POST   | Marca `onboarding_completed = true` en `user_settings`                       |
 
 ---
 
@@ -499,6 +530,7 @@ Login solicita `email profile gmail.readonly` con `access_type: offline` y `prom
 - `lib/supabase/client.ts` — browser client para `'use client'`
 - `lib/supabase/server.ts` — server client (async cookies) + `createAdminClient()` con service role + `getAuthUser()` helper (crea client + obtiene user en una llamada; usado en todas las API routes)
 - `lib/utils/auditId.ts` — `generateAuditId(admin, userId, fecha)`: genera `MMDD-NN`. Usar siempre en loop `for` secuencial, no `Promise.all`, para evitar race condition en mismo día.
+- `lib/utils/deduplicateUber.ts` — `deduplicateUber(txs)`: extrae pre-auths de Uber (mismo par dentro de 2h, diferencia de monto ≤20%). Extraído de `syncService.ts` para ser testeable de forma aislada.
 
 ---
 
@@ -585,16 +617,20 @@ feature/<nombre>   ← una por mejora, PR a main
 | `ManualTransactions` — `.card`, `.input-field` en todos los inputs/selects        | ✅     |
 | `TransactionsList` — `.card`, overlay → `var(--overlay)`, delete btn → `var(--radius-badge)` | ✅     |
 
-### ⬜ Testing unitario
+### ✅ Testing unitario (Vitest)
 
-| Tarea                                              | Prioridad | Notas                                                        |
-| -------------------------------------------------- | --------- | ------------------------------------------------------------ |
-| Configurar Vitest                                  | Alta      | No hay test runner aún. `npx tsc --noEmit` es el único check |
-| Tests para parsers (`rappicard.ts`, `rappipay.ts`) | Alta      | Lógica más crítica y más fácil de testear con fixtures       |
-| Tests para `guessCategoria()`                      | Alta      | 120+ patrones, tabla de casos entrada/salida esperada        |
-| Tests para `deduplicateUber()`                     | Alta      | Lógica de negocio con edge cases de tiempo y monto           |
-| Tests para `generateAuditId()`                     | Media     | Verificar secuencia y formato `MMDD-NN`                      |
-| Tests de integración para API routes               | Baja      | Requiere mock de Supabase/Groq                               |
+`npm test` ejecuta los 61 tests. `npm run test:watch` para modo watch.
+
+| Tarea                                              | Prioridad | Estado |
+| -------------------------------------------------- | --------- | ------ |
+| Configurar Vitest                                  | Alta      | ✅ `vitest.config.ts` + scripts `test` / `test:watch` |
+| Tests para parsers (`rappicard.ts`, `rappipay.ts`) | Alta      | ✅ `tests/parsers/rappicard.test.ts` / `rappipay.test.ts` |
+| Tests para `guessCategoria()`                      | Alta      | ✅ `tests/parsers/commerceCategories.test.ts` |
+| Tests para utils del parser (`parseCOPAmount`, `parseSpanishDate`, `toTitleCase`) | Alta | ✅ `tests/parsers/utils.test.ts` |
+| Tests para `deduplicateUber()`                     | Alta      | ✅ `tests/utils/deduplicateUber.test.ts` — función extraída a `lib/utils/deduplicateUber.ts` |
+| Tests para `asignarMesContable()`                  | Alta      | ✅ `tests/utils/mesContable.test.ts` |
+| Tests para `generateAuditId()`                     | Media     | ⬜ Requiere mock de Supabase |
+| Tests de integración para API routes               | Baja      | ⬜ Requiere mock de Supabase/Groq |
 
 ### ⬜ E2E con Maestro
 
@@ -614,20 +650,20 @@ Maestro (`maestro.mobile.dev`) — framework de E2E para PWAs y apps móviles. C
 
 **Setup:** `brew install maestro` · `maestro test maestro/flows/login.yaml` · Requiere app corriendo en `:3000` o en simulador iOS/Android.
 
-### ⬜ Accesibilidad (a11y)
+### ⬜ Accesibilidad (a11y) — parcialmente implementado
 
 Objetivo: cumplir WCAG 2.1 AA. Todos los elementos interactivos deben ser navegables por teclado y legibles por screen readers.
 
-| Área                                    | Prioridad | Qué hacer                                                                          |
-| --------------------------------------- | --------- | ---------------------------------------------------------------------------------- |
-| `aria-label` en botones icon-only       | Alta      | `HeaderPill`: sync, reset, theme, logout — solo tienen íconos, sin texto visible   |
-| `role` y `aria-expanded` en colapsables | Alta      | `ManualTransactions`, `BudgetManager` (`<details>`), `AIAdvisorPanel` (chat)       |
-| Contraste en modo claro                 | Alta      | Verificar `--text-muted` (#6B6B6B) sobre `--surface` — puede fallar ratio 4.5:1   |
-| Focus visible en todos los botones      | Alta      | Muchos botones tienen `outline: none` — agregar `:focus-visible` con var(--border) |
-| `alt` en imágenes SVG decorativas       | Media     | Logo SVG: `aria-hidden="true"` ya puesto; verificar el resto                       |
-| Semántica de headings (`h1`→`h2`→`h3`) | Media     | Dashboard usa `<h2>` para secciones — verificar jerarquía                          |
-| Tamaños mínimos de touch target (44px)  | Media     | Ya aplicado en MonthNav; revisar chips de categoría y filas de transacción         |
-| `prefers-reduced-motion`                | Baja      | Animaciones CSS (`animate-spin`, transiciones) — envolver con media query          |
+| Área                                    | Prioridad | Estado |
+| --------------------------------------- | --------- | ------ |
+| `aria-label` en botones icon-only       | Alta      | ✅ `HeaderPill`: los 4 botones (sync, reset, theme, logout) tienen `aria-label` |
+| Focus visible en todos los botones      | Alta      | ✅ `globals.css`: regla global `:focus-visible` con `var(--border)` |
+| `role` y `aria-expanded` en colapsables | Alta      | ⬜ `ManualTransactions`, `BudgetManager` (`<details>`), `AIAdvisorPanel` (chat) |
+| Contraste en modo claro                 | Alta      | ⬜ Verificar `--text-muted` (#6B6B6B) sobre `--surface` — puede fallar ratio 4.5:1 |
+| `alt` en imágenes SVG decorativas       | Media     | ✅ Logo SVG: `aria-hidden="true"` ya puesto |
+| Semántica de headings (`h1`→`h2`→`h3`) | Media     | ⬜ Dashboard usa `<h2>` para secciones — verificar jerarquía |
+| Tamaños mínimos de touch target (44px)  | Media     | ✅ Aplicado en MonthNav; ⬜ chips de categoría y filas de transacción |
+| `prefers-reduced-motion`                | Baja      | ⬜ Animaciones CSS (`animate-spin`, transiciones) — envolver con media query |
 
 **Herramientas:** `axe-core` (browser extension) · `eslint-plugin-jsx-a11y` · Lighthouse accessibility audit.
 
@@ -635,7 +671,7 @@ Objetivo: cumplir WCAG 2.1 AA. Todos los elementos interactivos deben ser navega
 
 | Feature                                   | Componente / Ruta afectada                                                                                         |
 | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| Copiar presupuesto del mes anterior       | `BudgetManager` — botón que carga el mes previo                                                                    |
+| ✅ Copiar presupuesto del mes anterior    | `BudgetManager` — botón "Copiar mes anterior" en el header, carga draft del mes previo |
 | Caché por comercio (Etapa 2)              | Nueva tabla `commerce_rules`                                                                                       |
 | Groq fallback en categorización (Etapa 2) | `lib/parsers/commerceCategories.ts`                                                                                |
 | Soporte Bancolombia                       | Nuevo `lib/parsers/bancolombia.ts` + sender en `BANK_SENDERS` (`lib/gmail/client.ts`) + registro en `lib/parsers/index.ts`. Bancolombia envía notificaciones desde `alertas@notificaciones.bancolombia.com.co` |

@@ -99,18 +99,20 @@ export default function HeaderPill({ onSyncComplete, onSignOut }: Props) {
 
   /* ── Single pill button ─────────────────────────── */
   const PillBtn = ({
-    onClick, icon, color, disabled = false, title,
+    onClick, icon, color, disabled = false, title, ariaLabel,
   }: {
     onClick: () => void
     icon: React.ReactNode
     color: string
     disabled?: boolean
     title?: string
+    ariaLabel?: string
   }) => (
     <button
       onClick={onClick}
       disabled={disabled}
       title={title}
+      aria-label={ariaLabel ?? title}
       style={{
         background: 'none',
         border: 'none',
@@ -151,6 +153,7 @@ export default function HeaderPill({ onSyncComplete, onSignOut }: Props) {
         color={syncColor}
         disabled={isBusy}
         title={syncTitle}
+        ariaLabel="Sincronizar correos"
       />
       <Divider/>
       <PillBtn
@@ -159,6 +162,7 @@ export default function HeaderPill({ onSyncComplete, onSignOut }: Props) {
         color={resetColor}
         disabled={isBusy || syncState !== 'idle'}
         title={resetTitle}
+        ariaLabel="Borrar todos los datos"
       />
       <Divider/>
       <PillBtn
@@ -166,6 +170,7 @@ export default function HeaderPill({ onSyncComplete, onSignOut }: Props) {
         icon={isDark ? <Sun size={13}/> : <Moon size={13}/>}
         color="var(--text-muted)"
         title={isDark ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+        ariaLabel={isDark ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
       />
       <Divider/>
       <PillBtn
@@ -173,6 +178,7 @@ export default function HeaderPill({ onSyncComplete, onSignOut }: Props) {
         icon={<LogOut size={13}/>}
         color="var(--text-muted)"
         title="Cerrar sesión"
+        ariaLabel="Cerrar sesión"
       />
     </div>
   )

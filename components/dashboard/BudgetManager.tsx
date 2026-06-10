@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Check, RefreshCw, ChevronRight, Plus, Trash2 } from 'lucide-react'
+import { Check, RefreshCw, ChevronRight, Plus, Trash2, Copy } from 'lucide-react'
 import { CATEGORIA_LABELS, formatCOP, formatCOPCompact, PRESUPUESTO_CATS, type Categoria, type BudgetEntry, type BudgetSubcat } from '@/lib/types'
 
 function pctColor(pct: number) {
@@ -31,6 +31,25 @@ export default function BudgetManager({ mes, gastosPorCategoria, onBudgetsChange
   const [saving,   setSaving]   = useState(false)
   const [savedOk,  setSavedOk]  = useState(false)
   const [loaded,   setLoaded]   = useState(false)
+  const [copying,  setCopying]  = useState(false)
+
+  const [yy, mm] = mes.split('-').map(Number)
+  const prevMes = mm === 1 ? `${yy - 1}-12` : `${yy}-${String(mm - 1).padStart(2, '0')}`
+
+  const copyFromPrev = async () => {
+    setCopying(true)
+    try {
+      const res = await fetch(`/api/budgets?mes=${prevMes}`)
+      const d = await res.json()
+      const b: DraftMap = d.budgets ?? {}
+      if (Object.keys(b).length > 0) {
+        setDraft(b)
+        onBudgetsChange?.(totals(b))
+      }
+    } finally {
+      setCopying(false)
+    }
+  }
 
   const normalize = (map: DraftMap) =>
     Object.fromEntries(
@@ -111,9 +130,21 @@ export default function BudgetManager({ mes, gastosPorCategoria, onBudgetsChange
       <div className="flex items-center justify-between" style={{ padding: '16px 16px 12px' }}>
         <div>
           <p style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text)' }}>Presupuesto mensual</p>
-          <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginTop: 3 }}>
-            Toca ▸ para desglosar en subcategorías
-          </p>
+          <div className="flex items-center gap-3" style={{ marginTop: 3 }}>
+            <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
+              Toca ▸ para desglosar
+            </p>
+            <button
+              onClick={copyFromPrev}
+              disabled={copying}
+              aria-label="Copiar presupuesto del mes anterior"
+              className="flex items-center gap-1 transition-opacity hover:opacity-70 disabled:opacity-40"
+              style={{ fontSize: 'var(--text-xs)', color: 'var(--text-subtle)', background: 'none', border: 'none', cursor: copying ? 'default' : 'pointer', padding: 0 }}
+            >
+              <Copy size={10} />
+              {copying ? 'Copiando…' : 'Copiar mes anterior'}
+            </button>
+          </div>
         </div>
         <button
           onClick={handleSave}
