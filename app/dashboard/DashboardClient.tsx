@@ -18,6 +18,7 @@ import TransactionsList from '@/components/dashboard/TransactionsList'
 import HeaderPill from '@/components/dashboard/HeaderPill'
 import BudgetManager from '@/components/dashboard/BudgetManager'
 import AIAdvisor from '@/components/dashboard/AIAdvisor'
+import ManualTransactions from '@/components/dashboard/ManualTransactions'
 
 interface Props {
   user: { name: string }
@@ -244,14 +245,13 @@ export default function DashboardClient({
           </span>
         </div>
 
-        <ManualTransactions onSaved={() => { loadMonth(month); bumpContext() }} />
+        <ManualTransactions onSaved={() => loadMonth(month)} />
 
         <TransactionsList
           transactions={txs}
           activeFilter={activeFilter}
           onFilterChange={setActiveFilter}
-          onCategoriesUpdated={() => { loadMonth(month); bumpContext() }}
-          onTransactionDeleted={() => { loadMonth(month); bumpContext() }}
+          onCategoriesUpdated={() => loadMonth(month)}
         />
       </main>
     </div>
