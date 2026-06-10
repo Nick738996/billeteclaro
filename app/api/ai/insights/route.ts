@@ -22,7 +22,21 @@ Tipos de insight y sus reglas exactas:
 
 "alerta": SOLO cuando pct_consumido >= 100%. Nunca usar para 43%, 80% o 90%.
 
-"consejo": Acción concreta con número específico. Ejemplo válido: "Ya gastaste $103.000 de $100.000 en transporte — los X días restantes: cero Uber o bus solamente".
+"consejo": Acción concreta que el usuario puede ejecutar HOY, con número exacto de impacto.
+  → Solo si hay algo específico que hacer: "máximo $X más", "cancela Y para ahorrar $Z"
+  → Siempre con un número COP concreto y un verbo imperativo implícito
+
+"observacion": Dato relevante que el usuario probablemente no sabe, sin acción obvia.
+  → Para categorías sin presupuesto, patrones inusuales, o hechos que merecen atención
+  → Sin verbo imperativo — solo el dato y su implicación
+  → Ejemplos válidos:
+     "El 37,6% de tu gasto ($410.000) está sin categorizar en Otro — sin visibilidad sobre ese dinero no puedes saber dónde ajustar"
+     "$467.217 en Suscripciones es casi la mitad de lo que gastaste este mes — ¿sabes cuáles sigues usando?"
+  → La pregunta retórica ("¿sabes cuáles sigues usando?") está permitida SOLO para Suscripciones
+
+Criterio para elegir entre consejo y observacion:
+- ¿Hay un número concreto que el usuario puede gastar o ahorrar HOY? → consejo
+- ¿Es un dato que merece atención pero no tiene acción inmediata obvia? → observacion
 
 "positivo": SOLO cuando el gasto es significativamente menor al esperado para los días transcurridos.
 Formato obligatorio: "Llevas solo [X]% del presupuesto de [categoría] con [Y]% del mes transcurrido — puedes gastar $[Z] más esta semana sin preocuparte"
@@ -50,6 +64,34 @@ REGLA PARA CATEGORÍAS SIN PRESUPUESTO:
 Si hay gasto significativo en una categoría sin presupuesto, el insight informa el impacto real — no pide que el usuario configure nada.
 ✗ "Los $410.000 en Otro son significativos, considera asignar un presupuesto"
 ✓ "Llevas $410.000 en Otro sin presupuesto — eso es el X% de tu gasto total este mes"
+
+REGLA: CUANDO EL LÍMITE RESTANTE ES $0 O NEGATIVO
+Si el gasto ya superó el presupuesto de una categoría, NUNCA digas "máximo $0 más" ni uses un límite negativo — eso es obvio e inútil.
+El insight debe tener esta estructura:
+1. Cuánto se pasó (gasto - presupuesto = exceso)
+2. Una consecuencia concreta para los días restantes
+3. Si el contexto incluye comercios de esa categoría, nómbralos
+
+✗ "Ya quemaste transporte ($103.472/$100.000) — te quedan 21 días y máximo $0 más"
+✓ "Te pasaste $3.472 en transporte — los próximos 21 días sin Uber o bus solamente"
+✓ "Te pasaste $3.472 en transporte — cualquier gasto de aquí al fin de mes lo saca del presupuesto total" (si no hay comercio identificado)
+
+limite_sugerido en este caso: 0 o null. Nunca negativo.
+
+REGLA: CATEGORÍAS SIN PRESUPUESTO — OBSERVACIÓN DE IMPACTO
+Cuando hay gasto significativo en una categoría sin presupuesto, el insight es una observación de impacto, no un recordatorio de que "debería" asignar presupuesto.
+Estructura:
+1. El monto y qué % representa del gasto total
+2. Qué revela ese dato (¿es inusual? ¿es recurrente?)
+3. Sin "considera", sin "deberías", sin "sería bueno"
+
+✗ "Llevas $410.000 en Otro sin presupuesto — eso es el 37,6% de tu gasto total, considera revisar tus gastos"
+✓ "El 37,6% de tu gasto ($410.000) está sin categorizar en Otro — sin visibilidad sobre ese dinero no puedes saber dónde ajustar"
+
+✗ "Llevas $467.217 en Suscripciones sin presupuesto — eso es el 42,8% de tu gasto total este mes"
+✓ "$467.217 en Suscripciones es casi la mitad de lo que gastaste este mes — ¿sabes cuáles sigues usando?"
+
+La pregunta retórica ("¿sabes cuáles sigues usando?") está permitida SOLO para Suscripciones.
 
 FRASES PROHIBIDAS — si generas alguna de estas, el insight es inválido:
 ✗ "Considera reducir..."
