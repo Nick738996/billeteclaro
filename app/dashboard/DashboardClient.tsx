@@ -17,8 +17,7 @@ import SpendingChart from '@/components/dashboard/SpendingChart'
 import TransactionsList from '@/components/dashboard/TransactionsList'
 import HeaderPill from '@/components/dashboard/HeaderPill'
 import BudgetManager from '@/components/dashboard/BudgetManager'
-import AIAdvisorPanel from '@/components/dashboard/AIAdvisorPanel'
-import ManualTransactions from '@/components/dashboard/ManualTransactions'
+import AIAdvisor from '@/components/dashboard/AIAdvisor'
 
 interface Props {
   user: { name: string }
@@ -72,10 +71,6 @@ export default function DashboardClient({
 
   // Presupuestos — se cargan en BudgetManager y se comparten con AIAdvisor
   const [budgets, setBudgets] = useState<Record<string, number>>({})
-
-  // Versión de contexto: sube cada vez que cambian datos relevantes para el asesor
-  const [contextVersion, setContextVersion] = useState(0)
-  const bumpContext = useCallback(() => setContextVersion(v => v + 1), [])
 
   const stats = useMemo(() => buildStats(txs), [txs])
 
@@ -232,14 +227,12 @@ export default function DashboardClient({
           mes={month}
           gastosPorCategoria={stats.porCategoria}
           onBudgetsChange={setBudgets}
-          onSaved={bumpContext}
         />
 
-        <AIAdvisorPanel
+        <AIAdvisor
           mes={month}
-          budgetCount={Object.values(budgets).filter(v => v > 0).length}
-          txCount={txs.length}
-          contextVersion={contextVersion}
+          gastosPorCategoria={stats.porCategoria}
+          budgets={budgets}
         />
 
         <div className="flex items-center justify-between px-1">
