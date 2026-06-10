@@ -602,29 +602,6 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
         </div>
       )}
 
-      {/* Resumen */}
-      {filtered.length > 0 && (
-        <div
-          className="px-4 py-2.5 flex items-center justify-between"
-          style={{ borderBottom: '1px solid var(--border-soft)', background: 'var(--surface-2)' }}
-        >
-          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
-            {filtered.length} transacción{filtered.length !== 1 ? 'es' : ''}
-          </span>
-          <div className="flex items-center gap-3">
-            {totalIngresos > 0 && (
-              <span className="font-semibold tabular-nums" style={{ fontSize: 'var(--text-sm)', color: 'var(--green)' }}>
-                +{formatCOP(totalIngresos)}
-              </span>
-            )}
-            {totalGastos > 0 && (
-              <span className="font-semibold tabular-nums" style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>
-                -{formatCOP(totalGastos)}
-              </span>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* Lista agrupada por fecha */}
       <div className="px-4" data-testid={TEST_IDS.DASHBOARD_TRANSACTIONS_LIST} role="list" aria-label="Lista de transacciones">

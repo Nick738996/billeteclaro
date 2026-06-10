@@ -46,10 +46,10 @@ const newDraft = (): DraftTx => ({
 
 interface Props {
   onSaved: () => void
+  onClose: () => void
 }
 
-export default function ManualTransactions({ onSaved }: Props) {
-  const [open,    setOpen]    = useState(false)
+export default function ManualTransactions({ onSaved, onClose }: Props) {
   const [items,   setItems]   = useState<DraftTx[]>([newDraft()])
   const [saving,  setSaving]  = useState(false)
   const [savedOk, setSavedOk] = useState(false)
@@ -85,7 +85,7 @@ export default function ManualTransactions({ onSaved }: Props) {
       setSavedOk(true)
       setItems([newDraft()])
       onSaved()
-      setTimeout(() => { setSavedOk(false); setOpen(false) }, 2000)
+      setTimeout(() => { setSavedOk(false); onClose() }, 2000)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error')
     } finally {
@@ -97,26 +97,7 @@ export default function ManualTransactions({ onSaved }: Props) {
 
   return (
     <div className="card">
-
-      {/* Header — siempre visible */}
-      <button
-        onClick={() => setOpen(o => !o)}
-        aria-expanded={open}
-        aria-controls="manual-transactions-body"
-        className="w-full flex items-center justify-between"
-        style={{ padding: '14px 16px', background: 'none', border: 'none', cursor: 'pointer' }}
-      >
-        <div className="flex items-center gap-2">
-          <Plus size={14} style={{ color: 'var(--text-muted)' }} />
-          <span style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text)' }}>
-            Agregar transacciones
-          </span>
-        </div>
-        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', transform: open ? 'rotate(180deg)' : 'none', display: 'inline-block', transition: 'transform 0.15s' }}>▾</span>
-      </button>
-
-      {open && (
-        <div id="manual-transactions-body" style={{ borderTop: '1px solid var(--border-soft)', padding: '12px 16px 16px' }}>
+      <div style={{ padding: '12px 16px 16px' }}>
 
           {/* Filas de transacciones */}
           {items.map((item, idx) => (
@@ -212,7 +193,6 @@ export default function ManualTransactions({ onSaved }: Props) {
                         `Guardar ${items.filter(i => parseFloat(i.monto.replace(/\D/g,'')) > 0).length || ''} transacción${items.filter(i => parseFloat(i.monto.replace(/\D/g,'')) > 0).length !== 1 ? 'es' : ''}`}
           </button>
         </div>
-      )}
     </div>
   )
 }

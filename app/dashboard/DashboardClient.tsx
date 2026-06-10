@@ -4,7 +4,7 @@ import { useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { format, parseISO, addMonths, subMonths } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react'
+import { ChevronLeft, ChevronRight, AlertTriangle, Plus } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { Transaction, MonthlyStats, Categoria } from '@/lib/types'
 import { isIngreso, isGasto } from '@/lib/types'
@@ -31,8 +31,8 @@ interface Props {
 function buildStats(txs: Transaction[]): MonthlyStats {
   const gastosTxs    = txs.filter(t => isGasto(t.tipo))
   const gastos       = gastosTxs.reduce((s, t) => s + t.monto, 0)
-  const gastosReales = gastosTxs.filter(t => t.categoria !== 'TRANSFERENCIA').reduce((s, t) => s + t.monto, 0)
-  const ingresos     = txs.filter(t => t.tipo === 'INGRESO').reduce((s, t) => s + t.monto, 0)
+  const gastosReales = gastos
+  const ingresos     = txs.filter(t => isIngreso(t.tipo)).reduce((s, t) => s + t.monto, 0)
   const porCategoria = gastosTxs.reduce<Record<string, number>>((acc, t) => {
     acc[t.categoria] = (acc[t.categoria] ?? 0) + t.monto
     return acc
@@ -68,6 +68,7 @@ export default function DashboardClient({
   const [activeFilter, setActiveFilter] = useState<string>('TODOS')
   const [budgets, setBudgets] = useState<Record<string, number>>({})
   const [showChart, setShowChart] = useState(false)
+  const [manualOpen, setManualOpen] = useState(false)
 
   // Versión de contexto: sube cada vez que cambian datos relevantes para el asesor
   const [contextVersion, setContextVersion] = useState(0)
@@ -218,7 +219,7 @@ export default function DashboardClient({
         )}
 
         <MonthHero
-          gastos={stats.gastosReales}
+          gastos={stats.gastos}
           ingresos={stats.ingresos}
           totalPresupuestado={Object.values(budgets).reduce((s, v) => s + v, 0)}
           transacciones={stats.transacciones}
@@ -253,12 +254,26 @@ export default function DashboardClient({
           <h2 className="font-medium" style={{ fontSize: 'var(--text-sm)', color: 'var(--text)' }}>
             Transacciones
           </h2>
-          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
-            {stats.transacciones} en total
-          </span>
+          <button
+            onClick={() => setManualOpen(v => !v)}
+            className="flex items-center gap-1"
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              fontSize: 'var(--text-xs)', color: 'var(--text-muted)',
+              padding: '4px 0',
+            }}
+          >
+            <Plus size={12} />
+            Agregar
+          </button>
         </div>
 
-        <ManualTransactions onSaved={() => { loadMonth(month); bumpContext() }} />
+        {manualOpen && (
+          <ManualTransactions
+            onSaved={() => { loadMonth(month); bumpContext() }}
+            onClose={() => setManualOpen(false)}
+          />
+        )}
 
         <TransactionsList
           transactions={txs}
