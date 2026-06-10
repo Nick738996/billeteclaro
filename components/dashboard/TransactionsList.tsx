@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { Search, Check, RefreshCw, X } from 'lucide-react'
+import { Search, Check, RefreshCw, X, Trash2 } from 'lucide-react'
 import {
   type Transaction,
   type Categoria,
@@ -320,19 +320,40 @@ function CategoryPicker({ current, onSelect, onClose }: {
 
 // ── TransactionRow ─────────────────────────────────────────────────────────
 
-function TransactionRow({ t, pendingCat, onCategoryClick }: {
+type DeletePhase = 'idle' | 'confirming' | 'deleting'
+
+function TransactionRow({ t, pendingCat, onCategoryClick, onDelete }: {
   t: Transaction
   pendingCat?: Categoria
   onCategoryClick: () => void
+  onDelete: () => void
 }) {
-  const [expanded] = useState(false)
-  const income    = isIngreso(t.tipo)
+  const [deletePhase, setDeletePhase] = useState<DeletePhase>('idle')
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const income     = isIngreso(t.tipo)
   const displayCat = pendingCat ?? t.categoria
-  const theme     = CATEGORIA_THEME[displayCat] ?? CATEGORIA_THEME['OTRO']
-  const banco     = efectivoBanco(t)
-  const chip      = BANCO_LABEL[banco]
-  const time      = format(new Date(t.fecha), 'HH:mm', { locale: es })
-  const isDirty   = pendingCat !== undefined
+  const theme      = CATEGORIA_THEME[displayCat] ?? CATEGORIA_THEME['OTRO']
+  const banco      = efectivoBanco(t)
+  const chip       = BANCO_LABEL[banco]
+  const time       = format(new Date(t.fecha), 'HH:mm', { locale: es })
+  const isDirty    = pendingCat !== undefined
+
+  function startConfirm() {
+    setDeletePhase('confirming')
+    timerRef.current = setTimeout(() => setDeletePhase('idle'), 2000)
+  }
+
+  function cancelConfirm() {
+    if (timerRef.current) clearTimeout(timerRef.current)
+    setDeletePhase('idle')
+  }
+
+  async function confirmDelete() {
+    if (timerRef.current) clearTimeout(timerRef.current)
+    setDeletePhase('deleting')
+    onDelete()
+  }
 
   return (
     <div
@@ -351,7 +372,6 @@ function TransactionRow({ t, pendingCat, onCategoryClick }: {
           {getDisplayName(t)}
         </p>
         <div className="flex items-center gap-1" style={{ marginTop: 3 }}>
-          {/* Chip de categoría — toca para cambiar */}
           <button
             onClick={onCategoryClick}
             style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}
@@ -366,17 +386,53 @@ function TransactionRow({ t, pendingCat, onCategoryClick }: {
           <span style={{ fontSize: 10, color: 'var(--text-subtle)' }}>·</span>
           <span style={{ fontSize: 10, color: 'var(--text-subtle)' }}>{time}</span>
         </div>
-        {expanded && t.id_auditoria && (
-          <p className="font-mono mt-2" style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', background: 'var(--surface-2)', padding: '4px 8px', borderRadius: 'var(--radius-sm)' }}>
-            {t.id_auditoria}
-          </p>
-        )}
       </div>
 
-      <div className="flex-shrink-0">
-        <p className="font-semibold tabular-nums" style={{ fontSize: 'var(--text-sm)', color: income ? 'var(--green)' : 'var(--text)' }}>
-          {income ? '+' : '-'}{formatCOP(t.monto)}
-        </p>
+      {/* Área derecha: monto + papelera en idle/deleting, controles de confirmación en confirming */}
+      <div className="flex-shrink-0 flex items-center gap-2">
+        {deletePhase !== 'confirming' && (
+          <p className="font-semibold tabular-nums" style={{ fontSize: 'var(--text-sm)', color: income ? 'var(--green)' : 'var(--text)' }}>
+            {income ? '+' : '-'}{formatCOP(t.monto)}
+          </p>
+        )}
+
+        {deletePhase === 'idle' && (
+          <button
+            onClick={startConfirm}
+            style={{ background: 'none', border: 'none', padding: 4, cursor: 'pointer', color: 'var(--text-subtle)', display: 'flex' }}
+          >
+            <Trash2 size={13} />
+          </button>
+        )}
+        {deletePhase === 'confirming' && (
+          <>
+            <button
+              onClick={cancelConfirm}
+              style={{ background: 'none', border: 'none', padding: 4, cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' }}
+            >
+              <X size={13} />
+            </button>
+            <button
+              onClick={confirmDelete}
+              style={{
+                background: 'var(--red-soft)',
+                border: '1px solid var(--red)',
+                borderRadius: 6,
+                padding: '4px 10px',
+                cursor: 'pointer',
+                color: 'var(--red)',
+                fontSize: 'var(--text-xs)',
+                fontWeight: 600,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              Eliminar
+            </button>
+          </>
+        )}
+        {deletePhase === 'deleting' && (
+          <RefreshCw size={12} className="animate-spin" style={{ color: 'var(--text-muted)' }} />
+        )}
       </div>
     </div>
   )
@@ -389,17 +445,32 @@ interface Props {
   activeFilter: string
   onFilterChange: (key: string) => void
   onCategoriesUpdated?: () => void
+  onTransactionDeleted?: () => void
 }
 
-export default function TransactionsList({ transactions, activeFilter, onFilterChange, onCategoriesUpdated }: Props) {
+export default function TransactionsList({ transactions, activeFilter, onFilterChange, onCategoriesUpdated, onTransactionDeleted }: Props) {
   const [search,          setSearch]          = useState('')
   const [pendingCats,     setPendingCats]      = useState<Record<string, Categoria>>({})
   const [pickerTxId,      setPickerTxId]       = useState<string | null>(null)
   const [savingCats,      setSavingCats]       = useState(false)
   const [savedCatsOk,     setSavedCatsOk]      = useState(false)
+  const [deletedIds,      setDeletedIds]       = useState<Set<string>>(new Set())
   const activeFilterKey = activeFilter as FilterKey
 
   const hasPendingCats = Object.keys(pendingCats).length > 0
+
+  const handleDelete = async (t: Transaction) => {
+    // Optimistic: hide immediately
+    setDeletedIds(prev => new Set(prev).add(t.id))
+    try {
+      const res = await fetch(`/api/transactions/${t.id}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error()
+      onTransactionDeleted?.()
+    } catch {
+      // Rollback on error
+      setDeletedIds(prev => { const next = new Set(prev); next.delete(t.id); return next })
+    }
+  }
 
   const saveCategoryChanges = async () => {
     setSavingCats(true)
@@ -422,7 +493,7 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
 
   const pickerTx = pickerTxId ? transactions.find(t => t.id === pickerTxId) : null
 
-  const filtered = useMemo(() => transactions.filter(t => {
+  const filtered = useMemo(() => transactions.filter(t => !deletedIds.has(t.id)).filter(t => {
     let matchesCategory: boolean
     if (activeFilter === 'TODOS') {
       matchesCategory = true
@@ -439,7 +510,7 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
       || t.descripcion?.toLowerCase().includes(q)
       || CATEGORIA_LABELS[t.categoria].toLowerCase().includes(q)
     return matchesCategory && matchesSearch
-  }), [transactions, activeFilter, search])
+  }), [transactions, activeFilter, search, deletedIds])
 
   const totalGastos   = useMemo(() => filtered.filter(t => !isIngreso(t.tipo)).reduce((s, t) => s + t.monto, 0), [filtered])
   const totalIngresos = useMemo(() => filtered.filter(t =>  isIngreso(t.tipo)).reduce((s, t) => s + t.monto, 0), [filtered])
@@ -553,6 +624,7 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
                     t={t}
                     pendingCat={pendingCats[t.id]}
                     onCategoryClick={() => setPickerTxId(t.id)}
+                    onDelete={() => handleDelete(t)}
                   />
                 </div>
               ))}
