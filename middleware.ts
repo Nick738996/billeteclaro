@@ -31,14 +31,39 @@ export async function middleware(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname
 
-  // Redirect unauthenticated users away from protected routes
-  if (!user && pathname.startsWith('/dashboard')) {
-    return NextResponse.redirect(new URL('/', request.url))
+  // API routes — skip routing logic entirely
+  if (pathname.startsWith('/api/')) return supabaseResponse
+
+  // Unauthenticated: protect dashboard and onboarding
+  if (!user) {
+    if (pathname.startsWith('/dashboard') || pathname.startsWith('/onboarding')) {
+      return NextResponse.redirect(new URL('/', request.url))
+    }
+    return supabaseResponse
   }
 
-  // Redirect authenticated users away from landing page
-  if (user && pathname === '/') {
+  // Authenticated: check onboarding status
+  const { data: settings } = await supabase
+    .from('user_settings')
+    .select('onboarding_completed')
+    .eq('user_id', user.id)
+    .single()
+
+  const completed = settings?.onboarding_completed ?? false
+
+  // / → send to right place
+  if (pathname === '/') {
+    return NextResponse.redirect(new URL(completed ? '/dashboard' : '/onboarding', request.url))
+  }
+
+  // /onboarding → if already completed, skip to dashboard
+  if (pathname.startsWith('/onboarding') && completed) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
+  }
+
+  // /dashboard → if onboarding not done, send there first
+  if (pathname.startsWith('/dashboard') && !completed) {
+    return NextResponse.redirect(new URL('/onboarding', request.url))
   }
 
   return supabaseResponse
