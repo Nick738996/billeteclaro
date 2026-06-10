@@ -9,6 +9,7 @@ interface Props {
   mes: string
   budgetCount: number
   txCount: number
+  contextVersion?: number
   onOpenBudgets?: () => void
 }
 
@@ -111,20 +112,28 @@ function InsightCard({ insight }: { insight: Insight }) {
 }
 
 function SkeletonInsights() {
+  const lines = ['75%', '60%', '82%']
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      {[80, 65, 72].map((w, i) => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 14 }}>
+      {lines.map((w, i) => (
         <div
           key={i}
           style={{
-            height: 48,
             borderRadius: 'var(--radius-sm)',
             background: 'var(--surface-2)',
-            opacity: 0.6,
-            animation: 'pulse 1.5s ease-in-out infinite',
-            width: `${w}%`,
+            borderLeft: '3px solid var(--border)',
+            padding: '10px 12px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 7,
+            animation: `pulse 1.6s ease-in-out ${i * 0.18}s infinite`,
           }}
-        />
+        >
+          {/* badge placeholder */}
+          <div style={{ height: 13, width: '28%', borderRadius: 6, background: 'var(--surface)' }} />
+          {/* text placeholder */}
+          <div style={{ height: 11, width: w, borderRadius: 4, background: 'var(--surface)' }} />
+        </div>
       ))}
     </div>
   )
@@ -149,7 +158,7 @@ function ThinkingDots() {
   )
 }
 
-export default function AIAdvisorPanel({ mes, budgetCount, txCount, onOpenBudgets }: Props) {
+export default function AIAdvisorPanel({ mes, budgetCount, txCount, contextVersion = 0, onOpenBudgets }: Props) {
   const [insights, setInsights]       = useState<Insight[]>([])
   const [loadingInsights, setLoadingInsights] = useState(false)
   const [insightsError, setInsightsError]     = useState<string | null>(null)
@@ -170,12 +179,12 @@ export default function AIAdvisorPanel({ mes, budgetCount, txCount, onOpenBudget
     setChatOpen(false)
   }, [mes])
 
-  // Cargar insights al montar (si hay datos suficientes)
+  // Cargar insights al montar y cuando cambie el contexto (datos o presupuestos)
   useEffect(() => {
     if (budgetCount < 1 || txCount < 5) return
     fetchInsights()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mes, budgetCount, txCount])
+  }, [mes, budgetCount, txCount, contextVersion])
 
   // Scroll al fondo del chat cuando hay mensajes nuevos
   useEffect(() => {
