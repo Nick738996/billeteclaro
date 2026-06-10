@@ -252,6 +252,7 @@ export default function DashboardClient({
           activeFilter={activeFilter}
           onFilterChange={setActiveFilter}
           onCategoriesUpdated={() => loadMonth(month)}
+          onTransactionDeleted={() => loadMonth(month)}
         />
       </main>
     </div>
