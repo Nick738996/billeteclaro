@@ -27,9 +27,10 @@ interface Props {
   mes: string
   gastosPorCategoria: Record<string, number>
   onBudgetsChange?: (totals: Record<string, number>) => void
+  onSaved?: () => void
 }
 
-export default function BudgetManager({ mes, gastosPorCategoria, onBudgetsChange }: Props) {
+export default function BudgetManager({ mes, gastosPorCategoria, onBudgetsChange, onSaved }: Props) {
   const [saved,    setSaved]    = useState<DraftMap>({})
   const [draft,    setDraft]    = useState<DraftMap>({})
   const [expanded, setExpanded] = useState<string | null>(null)
@@ -89,6 +90,7 @@ export default function BudgetManager({ mes, gastosPorCategoria, onBudgetsChange
       if (!res.ok) throw new Error('Error')
       setSaved(draft)
       setSavedOk(true)
+      onSaved?.()
       setTimeout(() => setSavedOk(false), 3000)
     } finally {
       setSaving(false)

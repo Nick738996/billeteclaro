@@ -73,6 +73,10 @@ export default function DashboardClient({
   // Presupuestos — se cargan en BudgetManager y se comparten con AIAdvisor
   const [budgets, setBudgets] = useState<Record<string, number>>({})
 
+  // Versión de contexto: sube cada vez que cambian datos relevantes para el asesor
+  const [contextVersion, setContextVersion] = useState(0)
+  const bumpContext = useCallback(() => setContextVersion(v => v + 1), [])
+
   const stats = useMemo(() => buildStats(txs), [txs])
 
   const monthRef = parseISO(`${month}-01`)
@@ -105,7 +109,7 @@ export default function DashboardClient({
     loadMonth(m)
   }
 
-  const handleSyncComplete = () => loadMonth(month)
+  const handleSyncComplete = () => { loadMonth(month); bumpContext() }
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
@@ -228,12 +232,14 @@ export default function DashboardClient({
           mes={month}
           gastosPorCategoria={stats.porCategoria}
           onBudgetsChange={setBudgets}
+          onSaved={bumpContext}
         />
 
         <AIAdvisorPanel
           mes={month}
           budgetCount={Object.values(budgets).filter(v => v > 0).length}
           txCount={txs.length}
+          contextVersion={contextVersion}
         />
 
         <div className="flex items-center justify-between px-1">
@@ -245,14 +251,14 @@ export default function DashboardClient({
           </span>
         </div>
 
-        <ManualTransactions onSaved={() => loadMonth(month)} />
+        <ManualTransactions onSaved={() => { loadMonth(month); bumpContext() }} />
 
         <TransactionsList
           transactions={txs}
           activeFilter={activeFilter}
           onFilterChange={setActiveFilter}
-          onCategoriesUpdated={() => loadMonth(month)}
-          onTransactionDeleted={() => loadMonth(month)}
+          onCategoriesUpdated={() => { loadMonth(month); bumpContext() }}
+          onTransactionDeleted={() => { loadMonth(month); bumpContext() }}
         />
       </main>
     </div>
