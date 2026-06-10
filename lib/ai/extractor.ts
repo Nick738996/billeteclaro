@@ -1,15 +1,7 @@
-import { GoogleGenerativeAI } from '@google/generative-ai'
+import Groq from 'groq-sdk'
 import type { Banco, ExtractedTransaction } from '@/lib/types'
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
-const model = genAI.getGenerativeModel({
-  model: 'gemini-2.0-flash-lite',
-  generationConfig: {
-    temperature: 0.1,
-    maxOutputTokens: 512,
-    responseMimeType: 'application/json',
-  },
-})
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
 
 const PROMPT_TEMPLATE = (params: {
   from: string
@@ -67,10 +59,15 @@ export async function extractWithGroq(params: {
   const snippet = params.body.slice(0, 800)
 
   try {
-    const result = await model.generateContent(
-      PROMPT_TEMPLATE({ ...params, snippet })
-    )
-    const text = result.response.text().trim()
+    const completion = await groq.chat.completions.create({
+      model: 'llama-3.3-70b-versatile',
+      temperature: 0.1,
+      max_tokens: 512,
+      response_format: { type: 'json_object' },
+      messages: [{ role: 'user', content: PROMPT_TEMPLATE({ ...params, snippet }) }],
+    })
+
+    const text = completion.choices[0]?.message?.content?.trim() ?? ''
     const parsed = JSON.parse(text)
 
     if (parsed.error === 'not_a_transaction') return null
@@ -90,7 +87,7 @@ export async function extractWithGroq(params: {
       flags: Array.isArray(parsed.flags) ? parsed.flags : [],
     }
   } catch (err) {
-    console.error('Gemini extraction error:', err)
+    console.error('Groq extraction error:', err)
     return null
   }
 }

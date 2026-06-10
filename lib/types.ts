@@ -164,6 +164,45 @@ export function formatCOPCompact(amount: number): string {
   return `${sign}${formatCOP(abs)}`
 }
 
+export type InsightTipo = 'alerta' | 'consejo' | 'positivo' | 'proyeccion'
+
+export interface Insight {
+  tipo: InsightTipo
+  texto: string
+  categoria?: Categoria
+  limite_sugerido?: number
+}
+
+export interface AdvisorContext {
+  mes: string
+  dias_transcurridos: number
+  dias_restantes: number
+  dias_restantes_semana: number
+  gastos_por_categoria: Record<Categoria, number>
+  presupuesto_por_categoria: Record<Categoria, number>
+  total_gastado: number
+  total_presupuestado: number
+  ingreso_estimado: number
+}
+
+export interface AiInsight {
+  id: string
+  user_id: string
+  mes: string
+  insights: Insight[]
+  generated_at: string
+  context_hash: string
+}
+
+export interface ChatMessage {
+  id: string
+  user_id: string
+  mes: string
+  role: 'user' | 'assistant'
+  content: string
+  created_at: string
+}
+
 export function isIngreso(tipo: TipoTransaccion): boolean {
   return tipo === 'INGRESO' || tipo === 'TRANSFERENCIA_RECIBIDA'
 }

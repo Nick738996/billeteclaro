@@ -1,0 +1,471 @@
+'use client'
+
+import { useState, useEffect, useRef } from 'react'
+import { AlertTriangle, Lightbulb, CheckCircle, TrendingUp, Send, ChevronDown, ChevronUp } from 'lucide-react'
+import type { Insight, InsightTipo } from '@/lib/types'
+import { formatCOP } from '@/lib/types'
+
+interface Props {
+  mes: string
+  budgetCount: number
+  txCount: number
+  onOpenBudgets?: () => void
+}
+
+interface ChatMsg {
+  role: 'user' | 'assistant'
+  content: string
+}
+
+const ICON: Record<InsightTipo, React.ReactNode> = {
+  alerta:     <AlertTriangle  size={15} />,
+  consejo:    <Lightbulb      size={15} />,
+  positivo:   <CheckCircle    size={15} />,
+  proyeccion: <TrendingUp     size={15} />,
+}
+
+const COLOR: Record<InsightTipo, { bg: string; text: string }> = {
+  alerta:     { bg: 'var(--red-soft)',    text: 'var(--red)'    },
+  consejo:    { bg: 'var(--blue-soft)',   text: 'var(--blue)'   },
+  positivo:   { bg: 'var(--green-soft)',  text: 'var(--green)'  },
+  proyeccion: { bg: 'var(--yellow-soft)', text: 'var(--yellow)' },
+}
+
+function InsightCard({ insight }: { insight: Insight }) {
+  const c = COLOR[insight.tipo]
+  return (
+    <div
+      style={{
+        background: c.bg,
+        borderRadius: 'var(--radius-sm)',
+        padding: '10px 12px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 6,
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+        <span style={{ color: c.text, flexShrink: 0, marginTop: 1 }}>
+          {ICON[insight.tipo]}
+        </span>
+        <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text)', lineHeight: 1.4, flex: 1 }}>
+          {insight.texto}
+        </p>
+      </div>
+      {insight.limite_sugerido != null && (
+        <div style={{ paddingLeft: 23 }}>
+          <span
+            style={{
+              fontSize: 'var(--text-xs)',
+              fontWeight: 600,
+              color: c.text,
+              background: 'transparent',
+              border: `1px solid ${c.text}`,
+              borderRadius: 6,
+              padding: '2px 7px',
+              opacity: 0.85,
+            }}
+          >
+            Límite sugerido: {formatCOP(insight.limite_sugerido)}
+          </span>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function SkeletonInsights() {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {[80, 65, 72].map((w, i) => (
+        <div
+          key={i}
+          style={{
+            height: 48,
+            borderRadius: 'var(--radius-sm)',
+            background: 'var(--surface-2)',
+            opacity: 0.6,
+            animation: 'pulse 1.5s ease-in-out infinite',
+            width: `${w}%`,
+          }}
+        />
+      ))}
+    </div>
+  )
+}
+
+function ThinkingDots() {
+  return (
+    <div style={{ display: 'flex', gap: 4, padding: '6px 4px' }}>
+      {[0, 1, 2].map(i => (
+        <span
+          key={i}
+          style={{
+            width: 6, height: 6,
+            borderRadius: '50%',
+            background: 'var(--text-muted)',
+            display: 'inline-block',
+            animation: `bounce 1.2s ease-in-out ${i * 0.2}s infinite`,
+          }}
+        />
+      ))}
+    </div>
+  )
+}
+
+export default function AIAdvisorPanel({ mes, budgetCount, txCount, onOpenBudgets }: Props) {
+  const [insights, setInsights]       = useState<Insight[]>([])
+  const [loadingInsights, setLoadingInsights] = useState(false)
+  const [insightsError, setInsightsError]     = useState<string | null>(null)
+
+  const [chatOpen, setChatOpen] = useState(false)
+  const [history, setHistory]   = useState<ChatMsg[]>([])
+  const [input, setInput]       = useState('')
+  const [sending, setSending]   = useState(false)
+
+  const chatEndRef = useRef<HTMLDivElement>(null)
+  const inputRef   = useRef<HTMLInputElement>(null)
+
+  // Reset chat cuando cambia el mes
+  useEffect(() => {
+    setHistory([])
+    setInsights([])
+    setInsightsError(null)
+    setChatOpen(false)
+  }, [mes])
+
+  // Cargar insights al montar (si hay datos suficientes)
+  useEffect(() => {
+    if (budgetCount < 1 || txCount < 5) return
+    fetchInsights()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mes, budgetCount, txCount])
+
+  // Scroll al fondo del chat cuando hay mensajes nuevos
+  useEffect(() => {
+    if (chatOpen) {
+      chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [history, chatOpen, sending])
+
+  async function fetchInsights() {
+    setLoadingInsights(true)
+    setInsightsError(null)
+    try {
+      const res = await fetch(`/api/ai/insights?mes=${mes}`)
+      const data = await res.json()
+      if (!res.ok) {
+        const isQuota = data?.error === 'quota_exceeded'
+        throw new Error(isQuota
+          ? 'Cupo de Gemini agotado por hoy. Vuelve mañana o activa billing en Google AI Studio.'
+          : 'No se pudieron cargar los insights. Intenta de nuevo.')
+      }
+      setInsights(data.insights ?? [])
+    } catch (e) {
+      setInsightsError(e instanceof Error ? e.message : 'Error desconocido.')
+    } finally {
+      setLoadingInsights(false)
+    }
+  }
+
+  async function sendMessage() {
+    const msg = input.trim()
+    if (!msg || sending) return
+
+    setInput('')
+    setHistory(h => [...h, { role: 'user', content: msg }])
+    setSending(true)
+
+    try {
+      const res = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: msg, mes }),
+      })
+      if (!res.ok) throw new Error()
+      const data = await res.json()
+      setHistory(h => [...h, { role: 'assistant', content: data.response }])
+    } catch {
+      setHistory(h => [...h, { role: 'assistant', content: 'Hubo un error. Intenta de nuevo.' }])
+    } finally {
+      setSending(false)
+    }
+  }
+
+  // --- Estado vacío: sin presupuestos ---
+  if (budgetCount < 1) {
+    return (
+      <div
+        style={{
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--radius-lg)',
+          backdropFilter: 'var(--glass-blur)',
+          WebkitBackdropFilter: 'var(--glass-blur)',
+          padding: '20px 16px',
+          textAlign: 'center',
+        }}
+      >
+        <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', marginBottom: 12 }}>
+          Configura tu presupuesto mensual para activar el asesor
+        </p>
+        {onOpenBudgets && (
+          <button
+            onClick={onOpenBudgets}
+            style={{
+              fontSize: 'var(--text-xs)',
+              fontWeight: 600,
+              color: 'var(--green)',
+              background: 'var(--green-soft)',
+              border: '1px solid var(--green)',
+              borderRadius: 8,
+              padding: '6px 14px',
+              cursor: 'pointer',
+            }}
+          >
+            Configurar presupuesto
+          </button>
+        )}
+      </div>
+    )
+  }
+
+  // --- Estado vacío: sin transacciones ---
+  if (txCount < 5) {
+    return (
+      <div
+        style={{
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--radius-lg)',
+          backdropFilter: 'var(--glass-blur)',
+          WebkitBackdropFilter: 'var(--glass-blur)',
+          padding: '20px 16px',
+          textAlign: 'center',
+        }}
+      >
+        <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>
+          Sincroniza tus gastos primero para que pueda analizarlos
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <>
+      {/* keyframes inyectados inline una vez */}
+      <style>{`
+        @keyframes pulse { 0%,100%{opacity:.6} 50%{opacity:1} }
+        @keyframes bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }
+      `}</style>
+
+      <div
+        style={{
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--radius-lg)',
+          backdropFilter: 'var(--glass-blur)',
+          WebkitBackdropFilter: 'var(--glass-blur)',
+          overflow: 'hidden',
+        }}
+      >
+        {/* Header */}
+        <div style={{ padding: '14px 16px 0' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <span style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text)' }}>
+              Asesor financiero
+            </span>
+            {!loadingInsights && insights.length === 0 && !insightsError && (
+              <button
+                onClick={fetchInsights}
+                style={{
+                  fontSize: 'var(--text-xs)',
+                  fontWeight: 600,
+                  color: 'var(--green)',
+                  background: 'var(--green-soft)',
+                  border: '1px solid var(--green)',
+                  borderRadius: 8,
+                  padding: '4px 10px',
+                  cursor: 'pointer',
+                }}
+              >
+                Analizar
+              </button>
+            )}
+            {!loadingInsights && insights.length > 0 && (
+              <button
+                onClick={fetchInsights}
+                style={{
+                  fontSize: 'var(--text-xs)',
+                  color: 'var(--text-muted)',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: 0,
+                }}
+              >
+                Actualizar
+              </button>
+            )}
+          </div>
+
+          {/* Insights */}
+          {loadingInsights && <SkeletonInsights />}
+
+          {insightsError && (
+            <p style={{ fontSize: 'var(--text-xs)', color: 'var(--red)', marginBottom: 12 }}>
+              {insightsError}
+            </p>
+          )}
+
+          {!loadingInsights && insights.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+              {insights.map((ins, i) => (
+                <InsightCard key={i} insight={ins} />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Botón expandir chat */}
+        {insights.length > 0 && (
+          <button
+            onClick={() => {
+              setChatOpen(o => !o)
+              if (!chatOpen) setTimeout(() => inputRef.current?.focus(), 100)
+            }}
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6,
+              padding: '10px 16px',
+              background: 'none',
+              border: 'none',
+              borderTop: '1px solid var(--border-soft)',
+              cursor: 'pointer',
+              color: 'var(--text-muted)',
+              fontSize: 'var(--text-xs)',
+              fontWeight: 500,
+            }}
+          >
+            {chatOpen ? (
+              <><ChevronUp size={13} /> Cerrar asesor</>
+            ) : (
+              <><ChevronDown size={13} /> Hablar con mi asesor</>
+            )}
+          </button>
+        )}
+
+        {/* Chat */}
+        {chatOpen && (
+          <div style={{ borderTop: '1px solid var(--border-soft)' }}>
+            {/* Historial */}
+            <div
+              style={{
+                maxHeight: 280,
+                overflowY: 'auto',
+                padding: '12px 16px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 8,
+              }}
+            >
+              {history.length === 0 && (
+                <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', textAlign: 'center' }}>
+                  Pregúntame lo que quieras sobre tus finanzas de este mes
+                </p>
+              )}
+              {history.map((msg, i) => (
+                <div
+                  key={i}
+                  style={{
+                    display: 'flex',
+                    justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                  }}
+                >
+                  <div
+                    style={{
+                      maxWidth: '80%',
+                      padding: '8px 12px',
+                      borderRadius: msg.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
+                      background: msg.role === 'user' ? 'var(--green-soft)' : 'var(--surface-2)',
+                      border: `1px solid ${msg.role === 'user' ? 'var(--green)' : 'var(--border)'}`,
+                      fontSize: 'var(--text-sm)',
+                      color: 'var(--text)',
+                      lineHeight: 1.4,
+                    }}
+                  >
+                    {msg.content}
+                  </div>
+                </div>
+              ))}
+              {sending && (
+                <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+                  <div
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: '14px 14px 14px 4px',
+                      background: 'var(--surface-2)',
+                      border: '1px solid var(--border)',
+                    }}
+                  >
+                    <ThinkingDots />
+                  </div>
+                </div>
+              )}
+              <div ref={chatEndRef} />
+            </div>
+
+            {/* Input */}
+            <div
+              style={{
+                display: 'flex',
+                gap: 8,
+                padding: '10px 16px 14px',
+                borderTop: '1px solid var(--border-soft)',
+              }}
+            >
+              <input
+                ref={inputRef}
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() } }}
+                placeholder="Pregúntame algo…"
+                disabled={sending}
+                style={{
+                  flex: 1,
+                  background: 'var(--surface-2)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 10,
+                  padding: '8px 12px',
+                  fontSize: 'var(--text-sm)',
+                  color: 'var(--text)',
+                  outline: 'none',
+                }}
+              />
+              <button
+                onClick={sendMessage}
+                disabled={!input.trim() || sending}
+                style={{
+                  width: 36, height: 36,
+                  borderRadius: 10,
+                  background: input.trim() && !sending ? 'var(--green-soft)' : 'var(--surface-2)',
+                  border: `1px solid ${input.trim() && !sending ? 'var(--green)' : 'var(--border)'}`,
+                  color: input.trim() && !sending ? 'var(--green)' : 'var(--text-subtle)',
+                  cursor: input.trim() && !sending ? 'pointer' : 'default',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  flexShrink: 0,
+                  transition: 'background 0.15s, border-color 0.15s',
+                }}
+              >
+                <Send size={14} />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </>
+  )
+}

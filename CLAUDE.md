@@ -50,8 +50,8 @@ npx tsc --noEmit   # type check (no hay test runner configurado aún)
 | Base de datos | Supabase (PostgreSQL, us-east-1) |
 | Auth | Supabase Auth + Google OAuth |
 | Email | Gmail API v1 (`gmail.readonly`) |
-| IA / extracción | Gemini API — modelo `gemini-2.0-flash-lite` |
-| IA / asesor | Gemini API — modelo `gemini-2.0-flash-lite`, `temperature: 0.4` |
+| IA / extracción | Groq API — modelo `llama-3.3-70b-versatile` |
+| IA / asesor | Groq API — modelo `llama-3.3-70b-versatile`, `temperature: 0.4` |
 | UI | Tailwind CSS + CSS variables (Recharts eliminado — donut SVG propio) |
 | Iconos | lucide-react |
 | Temas | next-themes (`data-theme` attribute, defaultTheme: "dark") |
@@ -276,7 +276,7 @@ SUPABASE_SERVICE_ROLE_KEY
 DATABASE_URL          # Supabase Session Pooler
 GOOGLE_CLIENT_ID
 GOOGLE_CLIENT_SECRET
-GEMINI_API_KEY        # aistudio.google.com — gratis, gemini-2.0-flash-lite
+GROQ_API_KEY          # console.groq.com — gratis, 14.400 req/día
 NEXT_PUBLIC_APP_URL
 ```
 
@@ -300,8 +300,8 @@ feature/<nombre>   ← una rama por mejora, PR a main
 
 | Decisión | Razón |
 |---|---|
-| Gemini 2.0 Flash Lite para extracción | Misma cuenta Google del OAuth, gratis 1500 req/día, JSON nativo |
-| Parsers regex primero, Gemini como fallback | Sin costo para RappiCard/RappiPay (100% del MVP) |
+| Groq + Llama 3.3 70B para extracción y asesor | 14.400 req/día gratis, ~200ms latencia, JSON mode nativo |
+| Parsers regex primero, Groq como fallback | Sin costo para RappiCard/RappiPay (100% del MVP) |
 | Fecha fija `after:2026/05/01` en Gmail | Evita sync lenta de 365 días |
 | `ABONO_DEUDA` excluido de gastos | Pago de tarjeta no es gasto real |
 | `toTitleCase` en parsers Y en UI | Parsers limpian datos nuevos; UI limpia históricos en BD |
