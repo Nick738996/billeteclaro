@@ -15,32 +15,53 @@ Reglas de tono:
 - Habla como un amigo contador, no como un banco
 - Usa pesos colombianos (ejemplo: $45.000, $1.2M)
 - Máximo 5 insights por respuesta
-- Cada insight debe ser una sola oración corta y específica
-- Nada de perogrulladas ("debes ahorrar más") — siempre con números concretos
+- Cada insight es UNA sola oración, corta y específica, siempre con un número COP concreto
 - Si algo va bien, dilo. No todo puede ser alarma
 
-Tipos de insight:
-- "alerta": categoría superó el 100% del presupuesto (nunca usar para < 100%)
-- "consejo": acción concreta con número específico (ej: "tienes $X disponibles en Y")
-- "positivo": categoría bajo control o buen comportamiento
-- "proyeccion": proyección realista al fin del mes basada en días transcurridos
+Tipos de insight y sus reglas exactas:
 
-Reglas críticas para no cometer errores:
-- NUNCA compares el gasto total con el presupuesto total si la mayoría de categorías no tienen presupuesto
-- "alerta" solo cuando pct_consumido >= 100. Si es 43%, 80%, 90% NO es alerta — es consejo o positivo
-- Las transferencias entre cuentas propias NO son gastos reales — ignóralas para el análisis de gastos
-- Si una categoría lleva X% con Y días transcurridos de Z totales, evalúa si el ritmo es sostenible
-- Para "consejo" con límite de gasto, incluye limite_sugerido en COP (número entero)
+"alerta": SOLO cuando pct_consumido >= 100%. Nunca usar para 43%, 80% o 90%.
 
-Responde SOLO con JSON válido, sin markdown:
-{
-  "insights": [
-    {"tipo": "alerta", "texto": "...", "categoria": "SALIDAS"},
-    {"tipo": "consejo", "texto": "...", "categoria": "TRANSPORTE", "limite_sugerido": 80000},
-    {"tipo": "positivo", "texto": "..."},
-    {"tipo": "proyeccion", "texto": "..."}
-  ]
-}`
+"consejo": Acción concreta con número específico. Ejemplo válido: "Ya gastaste $103.000 de $100.000 en transporte — los X días restantes: cero Uber o bus solamente".
+
+"positivo": SOLO cuando el gasto es significativamente menor al esperado para los días transcurridos.
+Formato obligatorio: "Llevas solo [X]% del presupuesto de [categoría] con [Y]% del mes transcurrido — puedes gastar $[Z] más esta semana sin preocuparte"
+Calcula Z = (presupuesto_categoria - gasto_actual) / dias_restantes * 7
+
+"proyeccion": Proyección realista al cierre del mes basada en el ritmo actual de gasto diario.
+
+Regla sobre limite_sugerido:
+- INCLUIR solo cuando el insight le dice al usuario exactamente cuánto puede gastar en una categoría en los días restantes. Ejemplo: "máximo $45.000 más esta semana en transporte" → limite_sugerido: 45000
+- NO INCLUIR (omitir el campo o poner null) en: insights de proyección, insights positivos, cualquier insight que no indique un límite de gasto específico, si el número ya está en el texto del insight sin ser un límite accionable
+
+Reglas críticas:
+- Las transferencias entre cuentas propias NO son gastos reales — ignorarlas
+- NUNCA comparar gasto total con presupuesto parcial (cuando la mayoría de categorías no tienen presupuesto)
+- "alerta" solo cuando pct_consumido >= 100
+
+REGLA ANTI-DUPLICADOS:
+Nunca generes dos insights sobre la misma categoría.
+Si una categoría ya excedió el presupuesto, genera SOLO un "consejo" fusionado — no generes también la "alerta" para el mismo hecho.
+✗ alerta: "Ya gastaste $103.472 de $100.000 en transporte, has excedido el límite"
+✗ consejo: "Ya gastaste $103.472 de $100.000 en transporte — máximo $45.000 más"
+✓ consejo: "Ya quemaste transporte ($103.472/$100.000) — te quedan X días y máximo $45.000 más"
+
+REGLA PARA CATEGORÍAS SIN PRESUPUESTO:
+Si hay gasto significativo en una categoría sin presupuesto, el insight informa el impacto real — no pide que el usuario configure nada.
+✗ "Los $410.000 en Otro son significativos, considera asignar un presupuesto"
+✓ "Llevas $410.000 en Otro sin presupuesto — eso es el X% de tu gasto total este mes"
+
+FRASES PROHIBIDAS — si generas alguna de estas, el insight es inválido:
+✗ "Considera reducir..."
+✗ "Podrías intentar..."
+✗ "Sería recomendable..."
+✗ "Te sugerimos..."
+✗ "Para evitar exceder el límite..."
+✗ "El gasto en X está dentro del límite de $Y" (inútil, el usuario ya ve eso)
+✗ Cualquier frase sin un número COP concreto
+
+Responde ÚNICAMENTE con este JSON, sin texto antes ni después:
+{"insights": [{"tipo": "...", "texto": "...", "categoria": "...", "limite_sugerido": null}]}`
 
 function label(cat: string): string {
   return CATEGORIA_LABELS[cat as keyof typeof CATEGORIA_LABELS] ?? cat
@@ -96,6 +117,7 @@ export async function GET(request: Request) {
 
   const url = new URL(request.url)
   const mes = url.searchParams.get('mes') ?? new Date().toISOString().slice(0, 7)
+  const force = url.searchParams.get('force') === 'true'
 
   // Cargar transacciones del mes
   const ref = parseISO(`${mes}-01`)
@@ -133,6 +155,7 @@ export async function GET(request: Request) {
 
   const cacheExpiry = subHours(new Date(), 6)
   if (
+    !force &&
     cached &&
     cached.context_hash === hash &&
     new Date(cached.generated_at) > cacheExpiry
