@@ -45,6 +45,8 @@ export interface Transaction {
   flags: string[]
   raw_snippet: string | null
   procesado: boolean
+  mes_contable: string | null
+  es_sueldo: boolean
   created_at: string
 }
 

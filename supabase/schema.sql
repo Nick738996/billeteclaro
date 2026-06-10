@@ -41,6 +41,8 @@ CREATE TABLE IF NOT EXISTS transactions (
   flags               text[] DEFAULT '{}',
   raw_snippet         text,
   procesado           boolean DEFAULT true,
+  mes_contable        text,
+  es_sueldo           boolean DEFAULT false,
   created_at          timestamptz DEFAULT now(),
 
   UNIQUE(user_id, gmail_message_id),
@@ -60,6 +62,7 @@ CREATE TABLE IF NOT EXISTS transactions (
 );
 
 CREATE INDEX idx_transactions_user_fecha ON transactions(user_id, fecha DESC);
+CREATE INDEX idx_transactions_user_mes_contable ON transactions(user_id, mes_contable);
 CREATE INDEX idx_transactions_user_categoria ON transactions(user_id, categoria);
 CREATE INDEX idx_transactions_gmail_id ON transactions(gmail_message_id);
 

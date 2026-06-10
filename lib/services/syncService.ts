@@ -7,6 +7,7 @@ import {
 import { trySpecificParser } from '@/lib/parsers'
 import { extractWithGroq } from '@/lib/ai/extractor'
 import { generateAuditId } from '@/lib/utils/auditId'
+import { asignarMesContable } from '@/lib/utils/mesContable'
 import { createAdminClient } from '@/lib/supabase/server'
 import type { ExtractedTransaction } from '@/lib/types'
 
@@ -135,6 +136,40 @@ export async function runSync(userId: string, admin: Admin): Promise<SyncResult>
 
       if (insertError) errores.push(`Insert error: ${insertError.message}`)
       else transaccionesNuevas += inserted?.length ?? 0
+    }
+
+    // 8. FASE 4 — asignar mes_contable
+    // Re-computar para todos los meses calendario con transacciones nuevas,
+    // usando el set completo (existentes + nuevas) para detectar el sueldo correctamente.
+    if (deduped.length > 0) {
+      const mesesAfectados = [...new Set(deduped.map(({ extracted }) =>
+        (extracted.fecha ? new Date(extracted.fecha) : new Date()).toISOString().slice(0, 7)
+      ))]
+
+      for (const mes of mesesAfectados) {
+        const mesStart = `${mes}-01`
+        const [y, m] = mes.split('-').map(Number)
+        const mesEnd = new Date(y, m, 0).toISOString().slice(0, 10) // último día del mes
+
+        const { data: txsMes } = await admin
+          .from('transactions')
+          .select('id, fecha, monto, tipo, comercio, descripcion')
+          .eq('user_id', userId)
+          .gte('fecha', mesStart)
+          .lte('fecha', mesEnd + 'T23:59:59Z')
+
+        if (!txsMes?.length) continue
+
+        const conMes = asignarMesContable(txsMes)
+
+        // Actualizar en batch (cada transacción individualmente por la API de Supabase)
+        await Promise.all(conMes.map(t =>
+          admin.from('transactions').update({
+            mes_contable: t.mes_contable,
+            es_sueldo:    t.es_sueldo ?? false,
+          }).eq('id', t.id)
+        ))
+      }
     }
 
     console.log(`[sync] ${newIds.length} emails — ${parserCount} parser | ${groqCount} Groq | ${omitidosCount} omitidos | ${preauthIds.length} Uber preauth | ${errores.length} errores`)
