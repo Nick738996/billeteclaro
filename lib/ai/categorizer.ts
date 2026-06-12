@@ -1,7 +1,11 @@
 import Groq from 'groq-sdk'
 import type { Categoria } from '@/lib/types'
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
+let _groq: Groq | null = null
+function getGroq(): Groq {
+  if (!_groq) _groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
+  return _groq
+}
 
 const VALID_CATS: Categoria[] = [
   'HOGAR', 'TRANSPORTE', 'SALIDAS', 'SALUD', 'SUSCRIPCIONES',
@@ -36,7 +40,7 @@ Responde ÚNICAMENTE con JSON válido, sin markdown:
 {"results": [{"id": 1, "categoria": "CATEGORIA"}, ...]}`
 
     try {
-      const completion = await groq.chat.completions.create({
+      const completion = await getGroq().chat.completions.create({
         model: 'llama-3.3-70b-versatile',
         temperature: 0.1,
         max_tokens: 400,
