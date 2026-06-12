@@ -5,7 +5,11 @@ import { buildAdvisorContext, hashContext } from '@/lib/ai/buildAdvisorContext'
 import { CATEGORIA_LABELS, isGasto } from '@/lib/types'
 import type { Transaction, Insight } from '@/lib/types'
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
+let _groq: Groq | null = null
+function getGroq(): Groq {
+  if (!_groq) _groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
+  return _groq
+}
 
 // ── Prompts ──────────────────────────────────────────────────────────────────
 
@@ -243,7 +247,7 @@ export async function getInsights(
 
   let completion
   try {
-    completion = await groq.chat.completions.create({
+    completion = await getGroq().chat.completions.create({
       model: 'llama-3.3-70b-versatile',
       temperature: 0.1,
       max_tokens: 1024,
@@ -296,7 +300,7 @@ export async function sendChatMessage(
     { role: 'user', content: message },
   ]
 
-  const completion = await groq.chat.completions.create({
+  const completion = await getGroq().chat.completions.create({
     model: 'llama-3.3-70b-versatile',
     temperature: 0.4,
     max_tokens: 512,
