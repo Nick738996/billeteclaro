@@ -220,16 +220,78 @@ Flujos a cubrir (en orden de prioridad):
 | ---- | ------ | ----------- |
 | 1 | ⬜ | `npm run build` sin errores |
 | 2 | ⬜ | Crear proyecto en [vercel.com](https://vercel.com) → Import Git Repository → conectar repo |
-| 3 | ⬜ | En Vercel: Settings → Environment Variables → agregar todas las vars de `.env.local` |
+| 3 | ⬜ | En Vercel: Settings → Environment Variables → agregar las vars de abajo (ver tabla) |
 | 4 | ⬜ | En Vercel: Settings → Domains → agregar `billeteclaro.com` y `www.billeteclaro.com` → Vercel muestra los registros DNS a agregar |
 | 5 | ⬜ | En Cloudflare: DNS → agregar los registros que dio Vercel (tipo `A` o `CNAME`). **Desactivar el proxy naranja (nube)** en el registro que apunta a Vercel — dejarlo solo como DNS |
 | 6 | ⬜ | Esperar propagación DNS (5-30 min). Verificar en Vercel que el dominio aparece con ✓ |
-| 7 | ⬜ | Google Cloud Console → APIs → Credenciales → OAuth 2.0 → agregar URIs autorizadas: `https://billeteclaro.com/api/auth/callback` y `https://billeteclaro.com/api/auth/gmail-callback` |
+| 7 | ⬜ | Google Cloud Console → APIs → Credenciales → OAuth 2.0 → agregar URIs autorizados: `https://billeteclaro.com/api/auth/callback` y `https://billeteclaro.com/api/auth/gmail-callback` |
 | 8 | ⬜ | Supabase Dashboard → Authentication → URL Configuration → agregar `https://billeteclaro.com` en Site URL y Redirect URLs |
-| 9 | ⬜ | Probar login con Google en prod |
-| 10 | ⬜ | Probar sync de emails end-to-end en prod |
+| 9 | ⬜ | Google Cloud Console → OAuth consent screen → "Test users" → agregar los emails de cada persona que vaya a usar la app (mientras esté en modo Testing) |
+| 10 | ⬜ | Probar login con Google en prod con tu propia cuenta |
+| 11 | ⬜ | Probar sync de emails end-to-end en prod |
+
+**Variables de entorno en Vercel (paso 3):**
+
+| Variable | Valor en producción |
+| -------- | ------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL` | igual que en `.env.local` |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | igual que en `.env.local` |
+| `SUPABASE_SERVICE_ROLE_KEY` | igual que en `.env.local` |
+| `DATABASE_URL` | igual que en `.env.local` (Session Pooler de Supabase) |
+| `GOOGLE_CLIENT_ID` | igual que en `.env.local` |
+| `GOOGLE_CLIENT_SECRET` | igual que en `.env.local` |
+| `GROQ_API_KEY` | igual que en `.env.local` |
+| `NEXT_PUBLIC_APP_URL` | `https://billeteclaro.com` ← cambiar esto en prod |
 
 **Notas:**
 - Vercel plan Hobby es gratis e incluye dominio custom y SSL automático
 - El SSL de Cloudflare no se necesita activar — Vercel lo gestiona. Cloudflare actúa solo como DNS
 - Si en algún paso Vercel da error de SSL, verificar que el proxy de Cloudflare (nube naranja) esté desactivado en el registro DNS
+- Groq free tier: 100k tokens/día compartidos entre todos los usuarios. Con 5-10 personas no hay problema; si crece, activar plan de pago en console.groq.com (~$0.06/millón tokens)
+- Mientras la app esté en modo "Testing" de Google, solo los emails agregados en el paso 9 pueden hacer login. Para abrir a cualquiera se necesita verificación de Google (proceso largo).
+
+---
+
+### CI/CD
+
+**Vercel lo hace automático** una vez conectado el repo en el paso 2:
+
+| Evento | Resultado |
+| ------ | --------- |
+| Push a `main` | Deploy a producción en `billeteclaro.com` |
+| Push a `feature/*` o PR | Preview deployment con URL única (ej. `billeteclaro-git-feature-x.vercel.app`) |
+
+No se necesita configurar nada extra — Vercel detecta Next.js y corre `npm run build` en cada push.
+
+**Para agregar tests antes del deploy (opcional):**
+
+Crear `.github/workflows/ci.yml`:
+
+```yaml
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npx tsc --noEmit
+```
+
+Con esto, cada PR corre los 115 tests y el type check antes de mergear. Vercel deployea igualmente en paralelo pero el PR queda bloqueado si los tests fallan.
+
+**Flujo de trabajo normal:**
+```
+feature/xxx → PR → CI corre tests → merge a main → Vercel deploya a prod automáticamente
+```
