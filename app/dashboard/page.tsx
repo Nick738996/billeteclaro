@@ -1,4 +1,11 @@
+import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
+
+export const metadata: Metadata = {
+  title: 'Dashboard',
+  description: 'Tu dashboard financiero personal.',
+  robots: { index: false, follow: false },
+}
 import { format, parseISO, addMonths, subMonths } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
