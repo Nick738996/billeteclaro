@@ -10,7 +10,7 @@ interface Props {
 // Después: balance ocupa full-width con número grande en verde/rojo
 
 export default function StatsCards({ stats }: Props) {
-  const { gastos, ingresos, balance, transacciones } = stats
+  const { gastos, ingresos, ahorros, balance, transacciones } = stats
   const surplus = balance >= 0
   const bColor  = surplus ? 'var(--green)' : 'var(--red)'
   const bSoft   = surplus ? 'var(--green-soft)' : 'var(--red-soft)'
@@ -71,10 +71,11 @@ export default function StatsCards({ stats }: Props) {
       </div>
 
       {/* Gastos + Ingresos secundarios */}
-      <div className="grid grid-cols-2 gap-2">
+      <div className={`grid gap-2 ${ahorros > 0 ? 'grid-cols-3' : 'grid-cols-2'}`}>
         {[
-          { label: 'Gastos',   arrow: '↓', value: formatCOPCompact(gastos),   color: 'var(--red)',   sub: `${transacciones} mov.`,  isIncome: false, testId: TEST_IDS.DASHBOARD_GASTOS_AMOUNT },
-          { label: 'Ingresos', arrow: '↑', value: formatCOPCompact(ingresos), color: 'var(--green)', sub: 'este mes',               isIncome: true,  testId: TEST_IDS.DASHBOARD_INGRESOS_AMOUNT },
+          { label: 'Gastos',   arrow: '↓', value: formatCOPCompact(gastos),   color: 'var(--red)',    sub: `${transacciones} mov.`, isIncome: false, testId: TEST_IDS.DASHBOARD_GASTOS_AMOUNT },
+          { label: 'Ingresos', arrow: '↑', value: formatCOPCompact(ingresos), color: 'var(--green)',  sub: 'este mes',              isIncome: true,  testId: TEST_IDS.DASHBOARD_INGRESOS_AMOUNT },
+          ...(ahorros > 0 ? [{ label: 'Ahorrado', arrow: '→', value: formatCOPCompact(ahorros), color: 'var(--blue)', sub: 'este mes', isIncome: false, testId: '' }] : []),
         ].map(({ label, arrow, value, color, sub, isIncome, testId }) => (
           <div
             key={label}

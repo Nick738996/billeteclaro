@@ -31,7 +31,11 @@ const BANCOS: { value: Banco; label: string }[] = [
   { value: 'OTRO',      label: 'Otro banco' },
 ]
 
-const today = () => new Date().toISOString().slice(0, 10)
+const today = () => {
+  const d = new Date()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
 
 let keyCounter = 0
 const newDraft = (): DraftTx => ({
@@ -117,7 +121,7 @@ export default function ManualTransactions({ onSaved, onClose }: Props) {
               <div className="flex gap-2" style={{ marginBottom: 6 }}>
                 <input
                   className="input-field"
-                  type="date"
+                  type="datetime-local"
                   value={item.fecha}
                   onChange={e => update(item._key, 'fecha', e.target.value)}
                   aria-label={`Fecha de la transacción ${idx + 1}`}

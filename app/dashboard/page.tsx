@@ -3,6 +3,7 @@ import { format, parseISO, addMonths, subMonths } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import type { Transaction } from '@/lib/types'
+import { getTourCompleted } from '@/lib/services/settingsService'
 import DashboardClient from './DashboardClient'
 
 // Never cache — data changes after each sync and on month navigation
@@ -32,6 +33,8 @@ export default async function DashboardPage({ searchParams }: Props) {
     .single()
   const gmailConnected = !!tokenRow?.gmail_refresh_token
 
+  const tourCompleted = await getTourCompleted(supabase, user.id)
+
   const { data: transactions } = await supabase
     .from('transactions')
     .select('*')
@@ -58,6 +61,7 @@ export default async function DashboardPage({ searchParams }: Props) {
       nextMonth={nextMonth}
       isCurrentMonth={isCurrentMonth}
       gmailConnected={gmailConnected}
+      tourCompleted={tourCompleted}
     />
   )
 }

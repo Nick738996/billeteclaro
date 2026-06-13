@@ -109,6 +109,7 @@ export interface MonthlyStats {
   gastos: number
   gastosReales: number
   ingresos: number
+  ahorros: number
   balance: number
   transacciones: number
   porCategoria: Record<Categoria, number>
@@ -194,14 +195,40 @@ export interface AdvisorContext {
   mes: string
   dias_transcurridos: number
   dias_restantes: number
+  dias_totales_mes: number
   dias_restantes_semana: number
-  gastos_por_categoria: Record<Categoria, number>
-  presupuesto_por_categoria: Record<Categoria, number>
   total_gastado: number
   total_presupuestado: number
   ingreso_estimado: number
+  gastos_por_categoria: Record<Categoria, number>
+  presupuesto_por_categoria: Record<Categoria, number>
+
+  porcentaje_mes_transcurrido: number
   gasto_diario_promedio: number
   proyeccion_cierre: number
+  exceso_proyectado: number
+  gasto_esperado_a_esta_fecha: number
+  diferencia_vs_esperado: number
+
+  categorias_excedidas: string[]
+  categorias_en_riesgo: string[]
+  categorias_sin_presupuesto: string[]
+
+  top_3_gastos: Array<{
+    comercio: string
+    monto: number
+    categoria: string
+    num_transacciones: number
+  }>
+
+  top_categoria_excedida: {
+    categoria: string
+    gasto: number
+    presupuesto: number
+    exceso: number
+    porcentaje: number
+    top_comercio?: string
+  } | null
 }
 
 export interface AiInsight {

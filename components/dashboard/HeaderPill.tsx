@@ -12,12 +12,13 @@ import { TEST_IDS } from '@/lib/testIds'
 interface Props {
   onSyncComplete: () => void
   onSignOut:      () => void
+  onHelp:         () => void
 }
 
 type SyncState  = 'idle' | 'syncing' | 'done'  | 'error'
 type ResetState = 'idle' | 'confirm' | 'resetting' | 'done'
 
-export default function HeaderPill({ onSyncComplete, onSignOut }: Props) {
+export default function HeaderPill({ onSyncComplete, onSignOut, onHelp }: Props) {
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
   useEffect(() => setMounted(true), [])
@@ -58,9 +59,7 @@ export default function HeaderPill({ onSyncComplete, onSignOut }: Props) {
       try {
         const res = await fetch('/api/transactions', { method: 'DELETE' })
         if (!res.ok) throw new Error('Error al borrar')
-        setResetState('done')
-        onSyncComplete()
-        setTimeout(() => setResetState('idle'), 3000)
+        window.location.href = '/onboarding'
       } catch {
         setResetState('idle')
       }
@@ -170,6 +169,15 @@ export default function HeaderPill({ onSyncComplete, onSignOut }: Props) {
         title={resetTitle}
         ariaLabel="Borrar todos los datos"
         data-testid={TEST_IDS.DASHBOARD_RESET_BUTTON}
+      />
+      <Divider/>
+      <PillBtn
+        onClick={onHelp}
+        icon={<span style={{ fontSize: 13, fontWeight: 600, lineHeight: 1 }}>?</span>}
+        color="var(--text-muted)"
+        title="Ayuda y tour del dashboard"
+        ariaLabel="Ayuda y tour del dashboard"
+        data-testid={TEST_IDS.DASHBOARD_HELP_BUTTON}
       />
       <Divider/>
       <PillBtn

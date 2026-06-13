@@ -53,8 +53,11 @@ export default function OnboardingStep2() {
         return
       }
       const count: number = body?.data?.transacciones_nuevas ?? 0
+      const totalBanco: number = body?.data?.total_correos_banco ?? 0
+      const revisados: number = body?.data?.correos_revisados ?? 0
       setTxCount(count)
-      setState(count === 0 ? 'no_emails' : 'success')
+      // no_emails solo si Gmail no tiene ningún correo de banco (nunca llegó ninguno)
+      setState(totalBanco === 0 && revisados === 0 ? 'no_emails' : 'success')
     } catch {
       setErrorType('sync_timeout')
       setState('error')

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { format, parseISO, addMonths, subMonths } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -16,6 +16,10 @@ import TransactionsList from '@/components/dashboard/TransactionsList'
 import HeaderPill from '@/components/dashboard/HeaderPill'
 import AIAdvisorPanel from '@/components/dashboard/AIAdvisorPanel'
 import ManualTransactions from '@/components/dashboard/ManualTransactions'
+import TourTooltip from '@/components/tour/TourTooltip'
+import HelpModal from '@/components/tour/HelpModal'
+import { useTour } from '@/hooks/useTour'
+import { TOUR_STEPS } from '@/lib/tour/tourSteps'
 
 interface Props {
   user: { name: string }
@@ -26,6 +30,7 @@ interface Props {
   nextMonth: string
   isCurrentMonth: boolean
   gmailConnected: boolean
+  tourCompleted: boolean
 }
 
 function buildStats(txs: Transaction[]): MonthlyStats {
@@ -33,6 +38,7 @@ function buildStats(txs: Transaction[]): MonthlyStats {
   const gastos       = gastosTxs.reduce((s, t) => s + t.monto, 0)
   const gastosReales = gastos
   const ingresos     = txs.filter(t => isIngreso(t.tipo)).reduce((s, t) => s + t.monto, 0)
+  const ahorros      = txs.filter(t => t.categoria === 'AHORROS').reduce((s, t) => s + t.monto, 0)
   const porCategoria = gastosTxs.reduce<Record<string, number>>((acc, t) => {
     acc[t.categoria] = (acc[t.categoria] ?? 0) + t.monto
     return acc
@@ -41,7 +47,8 @@ function buildStats(txs: Transaction[]): MonthlyStats {
     gastos,
     gastosReales,
     ingresos,
-    balance: ingresos - gastosReales,
+    ahorros,
+    balance: ingresos - gastosReales - ahorros,
     transacciones: txs.length,
     porCategoria: porCategoria as Record<Categoria, number>,
   }
@@ -54,6 +61,7 @@ export default function DashboardClient({
   currentMonth: initMonth,
   isCurrentMonth: initIsCurrent,
   gmailConnected,
+  tourCompleted,
 }: Props) {
   const router = useRouter()
   const supabase = createClient()
@@ -69,10 +77,30 @@ export default function DashboardClient({
   const [budgets, setBudgets] = useState<Record<string, number>>({})
   const [showChart, setShowChart] = useState(false)
   const [manualOpen, setManualOpen] = useState(false)
+  const [showHelpModal, setShowHelpModal] = useState(false)
 
   // Versión de contexto: sube cada vez que cambian datos relevantes para el asesor
   const [contextVersion, setContextVersion] = useState(0)
   const bumpContext = useCallback(() => setContextVersion(v => v + 1), [])
+
+  const tour = useTour()
+
+  // Auto-activar tour al primer login (si no fue completado)
+  const hasAutoStartedRef = useRef(false)
+  useEffect(() => {
+    if (tourCompleted || hasAutoStartedRef.current) return
+    hasAutoStartedRef.current = true
+    const timer = setTimeout(() => tour.startTour(), 800)
+    return () => clearTimeout(timer)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleHelp = useCallback(() => {
+    if (tourCompleted) {
+      setShowHelpModal(true)
+    } else {
+      tour.startTour()
+    }
+  }, [tourCompleted, tour])
 
   const stats = useMemo(() => buildStats(txs), [txs])
 
@@ -145,7 +173,7 @@ export default function DashboardClient({
             </span>
           </div>
           <div className="flex items-center gap-2">
-          <HeaderPill onSyncComplete={handleSyncComplete} onSignOut={handleSignOut}/>
+          <HeaderPill onSyncComplete={handleSyncComplete} onSignOut={handleSignOut} onHelp={handleHelp}/>
           </div>
         </div>
       </header>
@@ -221,7 +249,7 @@ export default function DashboardClient({
         <MonthHero
           gastos={stats.gastos}
           ingresos={stats.ingresos}
-          totalPresupuestado={Object.values(budgets).reduce((s, v) => s + v, 0)}
+          ahorros={stats.ahorros}
           transacciones={stats.transacciones}
           mes={month}
           showChart={showChart}
@@ -236,53 +264,79 @@ export default function DashboardClient({
           />
         )}
 
-        <BudgetOverview
-          mes={month}
-          gastosPorCategoria={stats.porCategoria}
-          onBudgetsChange={setBudgets}
-          onSaved={bumpContext}
-        />
-
-        <AIAdvisorPanel
-          mes={month}
-          budgetCount={Object.values(budgets).filter(v => v > 0).length}
-          txCount={txs.length}
-          contextVersion={contextVersion}
-        />
-
-        <div className="flex items-center justify-between px-1">
-          <h2 className="font-medium" style={{ fontSize: 'var(--text-sm)', color: 'var(--text)' }}>
-            Transacciones
-          </h2>
-          <button
-            onClick={() => setManualOpen(v => !v)}
-            className="flex items-center gap-1"
-            style={{
-              background: 'none', border: 'none', cursor: 'pointer',
-              fontSize: 'var(--text-xs)', color: 'var(--text-muted)',
-              padding: '4px 0',
-            }}
-          >
-            <Plus size={12} />
-            Agregar
-          </button>
+        <div data-testid="tour-budget">
+          <BudgetOverview
+            mes={month}
+            gastosPorCategoria={stats.porCategoria}
+            onBudgetsChange={setBudgets}
+            onSaved={bumpContext}
+          />
         </div>
 
-        {manualOpen && (
-          <ManualTransactions
-            onSaved={() => { loadMonth(month); bumpContext() }}
-            onClose={() => setManualOpen(false)}
+        <div data-testid="tour-advisor">
+          <AIAdvisorPanel
+            mes={month}
+            budgetCount={Object.values(budgets).filter(v => v > 0).length}
+            txCount={txs.length}
+            contextVersion={contextVersion}
           />
-        )}
+        </div>
 
-        <TransactionsList
-          transactions={txs}
-          activeFilter={activeFilter}
-          onFilterChange={setActiveFilter}
-          onCategoriesUpdated={() => { loadMonth(month); bumpContext() }}
-          onTransactionDeleted={() => { loadMonth(month); bumpContext() }}
-        />
+        <div data-testid="tour-transactions">
+          <div className="flex items-center justify-between px-1">
+            <h2 className="font-medium" style={{ fontSize: 'var(--text-sm)', color: 'var(--text)' }}>
+              Transacciones
+            </h2>
+            <button
+              onClick={() => setManualOpen(v => !v)}
+              className="flex items-center gap-1"
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                fontSize: 'var(--text-xs)', color: 'var(--text-muted)',
+                padding: '4px 0',
+              }}
+            >
+              <Plus size={12} />
+              Agregar
+            </button>
+          </div>
+
+          {manualOpen && (
+            <ManualTransactions
+              onSaved={() => { loadMonth(month); bumpContext() }}
+              onClose={() => setManualOpen(false)}
+            />
+          )}
+
+          <TransactionsList
+            transactions={txs}
+            activeFilter={activeFilter}
+            onFilterChange={setActiveFilter}
+            onCategoriesUpdated={() => { loadMonth(month); bumpContext() }}
+            onTransactionDeleted={() => { loadMonth(month); bumpContext() }}
+          />
+        </div>
       </main>
+
+      {/* Product tour */}
+      {tour.isActive && (
+        <TourTooltip
+          step={TOUR_STEPS[tour.currentStep]}
+          stepIndex={tour.currentStep}
+          onNext={tour.nextStep}
+          onPrev={tour.prevStep}
+          onSkip={tour.skipTour}
+          onComplete={tour.completeTour}
+        />
+      )}
+
+      {/* Help modal */}
+      {showHelpModal && (
+        <HelpModal
+          onClose={() => setShowHelpModal(false)}
+          onStartTour={() => { setShowHelpModal(false); tour.startTour() }}
+        />
+      )}
     </div>
   )
 }
