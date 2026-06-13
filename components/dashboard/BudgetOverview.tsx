@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Pencil, X, Info } from 'lucide-react'
+import { Pencil, Info } from 'lucide-react'
 import {
   CATEGORIA_LABELS,
   CATEGORIA_COLORS,
@@ -30,6 +30,13 @@ function urgencyRank(pct: number): number {
 function barColor(pct: number): string {
   if (pct >= 100) return 'var(--red)'
   if (pct >= 80)  return 'var(--yellow)'
+  return 'var(--green)'
+}
+
+function badgeColor(pct: number): string {
+  if (pct === 0)   return 'var(--text-subtle)'
+  if (pct >= 100)  return 'var(--red)'
+  if (pct >= 80)   return 'var(--yellow)'
   return 'var(--green)'
 }
 
@@ -103,6 +110,32 @@ export default function BudgetOverview({ mes, gastosPorCategoria, onBudgetsChang
 
   const hasContent = sorted.length > 0 || noBudget.length > 0 || sinCategoria.length > 0
 
+  if (editing) {
+    return (
+      <BudgetManager
+        mes={mes}
+        gastosPorCategoria={gastosPorCategoria}
+        initialBudgets={draftMap}
+        onBudgetsChange={newTotals => {
+          setDraftMap(prev => {
+            const next: DraftMap = {}
+            for (const [k, v] of Object.entries(newTotals)) {
+              next[k] = prev[k] ? { ...prev[k], monto: v } : { monto: v, subcategorias: [] }
+            }
+            return next
+          })
+          onBudgetsChange(newTotals)
+        }}
+        onSaved={() => {
+          onSaved()
+          setEditing(false)
+          loadBudgets()
+        }}
+        onClose={() => setEditing(false)}
+      />
+    )
+  }
+
   return (
     <div>
       {/* Category bars card */}
@@ -113,24 +146,20 @@ export default function BudgetOverview({ mes, gastosPorCategoria, onBudgetsChang
           className="flex items-center justify-between"
           style={{ padding: '14px 16px 10px', borderBottom: hasContent ? '1px solid var(--border-soft)' : 'none' }}
         >
-          <p style={{
-            fontSize: 'var(--text-xs)', fontWeight: 600,
-            color: 'var(--text-muted)',
-            letterSpacing: '0.07em', textTransform: 'uppercase',
-          }}>
+          <p style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text)' }}>
             Presupuesto
           </p>
           <button
-            onClick={() => setEditing(e => !e)}
+            onClick={() => setEditing(true)}
             className="flex items-center gap-1.5 transition-opacity hover:opacity-70"
             style={{
               background: 'none', border: 'none', cursor: 'pointer',
-              color: editing ? 'var(--text)' : 'var(--text-muted)',
+              color: 'var(--text-muted)',
               fontSize: 'var(--text-xs)', fontWeight: 500, padding: '2px 0',
             }}
           >
-            {editing ? <X size={11} /> : <Pencil size={11} />}
-            {editing ? 'Cerrar' : 'Editar'}
+            <Pencil size={11} />
+            Editar
           </button>
         </div>
 
@@ -159,7 +188,6 @@ export default function BudgetOverview({ mes, gastosPorCategoria, onBudgetsChang
           const gasto  = gastosPorCategoria[cat] ?? 0
           const limite = budgets[cat] ?? 0
           const pct    = limite > 0 ? (gasto / limite) * 100 : 0
-          const over   = pct >= 100
           const color  = barColor(pct)
           const dot    = CATEGORIA_COLORS[cat]
 
@@ -167,33 +195,30 @@ export default function BudgetOverview({ mes, gastosPorCategoria, onBudgetsChang
             <div
               key={cat}
               style={{
-                padding: '12px 16px',
+                padding: '11px 16px',
                 borderBottom: i < sorted.length - 1 || noBudget.length > 0 ? '1px solid var(--border-soft)' : 'none',
               }}
             >
               {/* Name + amounts */}
-              <div className="flex items-center gap-2" style={{ marginBottom: 7 }}>
-                <span style={{ width: 7, height: 7, borderRadius: '50%', background: dot, flexShrink: 0 }} />
-                <span className="flex-1 truncate" style={{ fontSize: 'var(--text-sm)', color: 'var(--text)', fontWeight: 500 }}>
+              <div className="flex items-center gap-2" style={{ marginBottom: 8 }}>
+                <span style={{ width: 9, height: 9, borderRadius: '50%', background: dot, flexShrink: 0 }} />
+                <span className="flex-1 truncate" style={{ fontSize: 'var(--text-sm)', color: 'var(--text)', fontWeight: 600 }}>
                   {CATEGORIA_LABELS[cat]}
                 </span>
-                <span className="tabular-nums flex-shrink-0" style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
-                  {formatCOPCompact(gasto)} / {formatCOPCompact(limite)}
+                <span className="tabular-nums flex-shrink-0" style={{ fontSize: 'var(--text-xs)' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>{formatCOPCompact(gasto)}</span>
+                  <span style={{ color: 'var(--text-subtle)' }}> / {formatCOPCompact(limite)}</span>
                 </span>
                 <span
                   className="tabular-nums flex-shrink-0"
-                  style={{
-                    fontSize: 'var(--text-xs)', fontWeight: 700,
-                    color: color,
-                    minWidth: 38, textAlign: 'right',
-                  }}
+                  style={{ fontSize: 12, fontWeight: 700, color: badgeColor(pct), minWidth: 40, textAlign: 'right' }}
                 >
-                  {over ? `+${Math.round(pct - 100)}%` : `${Math.round(pct)}%`}
+                  {pct > 100 ? `+${Math.round(pct - 100)}%` : `${Math.round(pct)}%`}
                 </span>
               </div>
 
               {/* Bar */}
-              <div style={{ height: 3, background: 'var(--border)', borderRadius: 99, overflow: 'hidden' }}>
+              <div style={{ height: 4, background: 'var(--border)', borderRadius: 99, overflow: 'hidden' }}>
                 <div style={{
                   width: `${Math.min(pct, 100)}%`,
                   height: '100%',
@@ -206,44 +231,51 @@ export default function BudgetOverview({ mes, gastosPorCategoria, onBudgetsChang
           )
         })}
 
-        {/* Sin presupuesto */}
+        {/* Sin presupuesto — separador */}
         {noBudget.length > 0 && (
-          <div style={{ padding: '8px 16px 4px', borderTop: '1px solid var(--border-soft)' }}>
-            <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-subtle)', fontWeight: 500 }}>Sin presupuesto</p>
+          <div className="flex items-center gap-3" style={{ padding: '10px 16px 6px', borderTop: '1px solid var(--border-soft)' }}>
+            <div style={{ flex: 1, height: 1, background: 'var(--border-soft)' }} />
+            <p style={{ fontSize: 10, color: 'var(--text-subtle)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap' }}>
+              Sin presupuesto
+            </p>
+            <div style={{ flex: 1, height: 1, background: 'var(--border-soft)' }} />
           </div>
         )}
         {noBudget.map((cat, i) => {
           const gasto = gastosPorCategoria[cat] ?? 0
           const pct   = (gasto / maxGasto) * 100
           return (
-            <div key={cat} style={{ padding: '10px 16px', borderBottom: i < noBudget.length - 1 ? '1px solid var(--border-soft)' : 'none' }}>
-              <div className="flex items-center gap-2" style={{ marginBottom: 7 }}>
-                <span style={{ width: 7, height: 7, borderRadius: '50%', background: CATEGORIA_COLORS[cat], flexShrink: 0 }} />
-                <span className="flex-1 truncate" style={{ fontSize: 'var(--text-sm)', color: 'var(--text)', fontWeight: 500 }}>
+            <div key={cat} style={{ padding: '13px 16px 25px', borderBottom: i < noBudget.length - 1 ? '1px solid var(--border-soft)' : 'none' }}>
+              <div className="flex items-center gap-2" style={{ marginBottom: 8 }}>
+                <span style={{ width: 9, height: 9, borderRadius: '50%', background: CATEGORIA_COLORS[cat], flexShrink: 0 }} />
+                <span className="flex-1 truncate" style={{ fontSize: 'var(--text-sm)', color: 'var(--text)', fontWeight: 600 }}>
                   {CATEGORIA_LABELS[cat]}
                 </span>
                 <span className="tabular-nums flex-shrink-0" style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
-                  {formatCOPCompact(gasto)} / $0
+                  {formatCOPCompact(gasto)}
                 </span>
-                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-subtle)', minWidth: 38, textAlign: 'right' }}>—</span>
+                <span style={{ fontSize: 12, color: 'var(--text-subtle)', minWidth: 40, textAlign: 'right' }}>—</span>
               </div>
-              <div style={{ height: 3, background: 'var(--border)', borderRadius: 99, overflow: 'hidden' }}>
-                <div style={{ width: `${pct}%`, height: '100%', background: 'var(--blue)', borderRadius: 99, transition: 'width 0.3s ease' }} />
+              <div style={{ height: 4, background: 'var(--border)', borderRadius: 99, overflow: 'hidden' }}>
+                <div style={{ width: `${pct}%`, height: '100%', background: CATEGORIA_COLORS[cat], opacity: 0.5, borderRadius: 99, transition: 'width 0.3s ease' }} />
               </div>
             </div>
           )
         })}
 
-        {/* Sin categoría — TRANSFERENCIA, necesitan recategorizarse */}
+        {/* Sin categoría — TRANSFERENCIA */}
         {sinCategoria.length > 0 && (
-          <div
-            className="flex items-center gap-1.5"
-            style={{ padding: '8px 16px 4px', borderTop: '1px solid var(--border-soft)' }}
-          >
-            <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-subtle)', fontWeight: 500 }}>Sin categoría</p>
-            <span title="Estas transacciones están marcadas como Transferencia — considera recategorizarlas en la lista de movimientos">
-              <Info size={11} style={{ color: 'var(--text-subtle)', cursor: 'help', flexShrink: 0 }} />
-            </span>
+          <div className="flex items-center gap-3" style={{ padding: '10px 16px 6px', borderTop: '1px solid var(--border-soft)' }}>
+            <div style={{ flex: 1, height: 1, background: 'var(--border-soft)' }} />
+            <div className="flex items-center gap-1">
+              <p style={{ fontSize: 10, color: 'var(--text-subtle)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap' }}>
+                Sin categoría
+              </p>
+              <span title="Transferencias — considera recategorizarlas en la lista de movimientos">
+                <Info size={10} style={{ color: 'var(--text-subtle)', cursor: 'help', flexShrink: 0 }} />
+              </span>
+            </div>
+            <div style={{ flex: 1, height: 1, background: 'var(--border-soft)' }} />
           </div>
         )}
         {sinCategoria.map((cat, i) => {
@@ -251,16 +283,16 @@ export default function BudgetOverview({ mes, gastosPorCategoria, onBudgetsChang
           const pct   = (gasto / maxGasto) * 100
           return (
             <div key={cat} style={{ padding: '10px 16px', borderBottom: i < sinCategoria.length - 1 ? '1px solid var(--border-soft)' : 'none' }}>
-              <div className="flex items-center gap-2" style={{ marginBottom: 7 }}>
-                <span style={{ width: 7, height: 7, borderRadius: '50%', background: CATEGORIA_COLORS[cat], flexShrink: 0 }} />
-                <span className="flex-1 truncate" style={{ fontSize: 'var(--text-sm)', color: 'var(--text)', fontWeight: 500 }}>
+              <div className="flex items-center gap-2" style={{ marginBottom: 8 }}>
+                <span style={{ width: 9, height: 9, borderRadius: '50%', background: CATEGORIA_COLORS[cat], flexShrink: 0 }} />
+                <span className="flex-1 truncate" style={{ fontSize: 'var(--text-sm)', color: 'var(--text)', fontWeight: 600 }}>
                   {CATEGORIA_LABELS[cat]}
                 </span>
                 <span className="tabular-nums flex-shrink-0" style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
                   {formatCOPCompact(gasto)}
                 </span>
               </div>
-              <div style={{ height: 3, background: 'var(--border)', borderRadius: 99, overflow: 'hidden' }}>
+              <div style={{ height: 4, background: 'var(--border)', borderRadius: 99, overflow: 'hidden' }}>
                 <div style={{ width: `${pct}%`, height: '100%', background: 'var(--yellow)', borderRadius: 99, transition: 'width 0.3s ease' }} />
               </div>
             </div>
@@ -268,31 +300,6 @@ export default function BudgetOverview({ mes, gastosPorCategoria, onBudgetsChang
         })}
       </div>
 
-      {/* Budget editor — inline collapse */}
-      {editing && (
-        <div style={{ marginTop: 8 }}>
-          <BudgetManager
-            mes={mes}
-            gastosPorCategoria={gastosPorCategoria}
-            initialBudgets={draftMap}
-            onBudgetsChange={newTotals => {
-              setDraftMap(prev => {
-                const next: DraftMap = {}
-                for (const [k, v] of Object.entries(newTotals)) {
-                  next[k] = prev[k] ? { ...prev[k], monto: v } : { monto: v, subcategorias: [] }
-                }
-                return next
-              })
-              onBudgetsChange(newTotals)
-            }}
-            onSaved={() => {
-              onSaved()
-              setEditing(false)
-              loadBudgets()
-            }}
-          />
-        </div>
-      )}
     </div>
   )
 }

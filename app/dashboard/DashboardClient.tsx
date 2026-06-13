@@ -4,7 +4,7 @@ import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { format, parseISO, addMonths, subMonths } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { ChevronLeft, ChevronRight, AlertTriangle, Plus } from 'lucide-react'
+import { ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { Transaction, MonthlyStats, Categoria } from '@/lib/types'
 import { isIngreso, isGasto } from '@/lib/types'
@@ -283,24 +283,6 @@ export default function DashboardClient({
         </div>
 
         <div data-testid="tour-transactions">
-          <div className="flex items-center justify-between px-1">
-            <h2 className="font-medium" style={{ fontSize: 'var(--text-sm)', color: 'var(--text)' }}>
-              Transacciones
-            </h2>
-            <button
-              onClick={() => setManualOpen(v => !v)}
-              className="flex items-center gap-1"
-              style={{
-                background: 'none', border: 'none', cursor: 'pointer',
-                fontSize: 'var(--text-xs)', color: 'var(--text-muted)',
-                padding: '4px 0',
-              }}
-            >
-              <Plus size={12} />
-              Agregar
-            </button>
-          </div>
-
           {manualOpen && (
             <ManualTransactions
               onSaved={() => { loadMonth(month); bumpContext() }}
@@ -312,8 +294,9 @@ export default function DashboardClient({
             transactions={txs}
             activeFilter={activeFilter}
             onFilterChange={setActiveFilter}
-            onCategoriesUpdated={() => { loadMonth(month); bumpContext() }}
+            onCategoryChange={() => loadMonth(month)}
             onTransactionDeleted={() => { loadMonth(month); bumpContext() }}
+            onAdd={() => setManualOpen(v => !v)}
           />
         </div>
       </main>

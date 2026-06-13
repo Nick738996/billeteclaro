@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, Trash2, Check, RefreshCw } from 'lucide-react'
+import { Plus, Trash2, Check, RefreshCw, X } from 'lucide-react'
 import { CATEGORIA_LABELS, type Categoria, type TipoTransaccion, type Banco } from '@/lib/types'
 import { TEST_IDS } from '@/lib/testIds'
 
@@ -100,8 +100,26 @@ export default function ManualTransactions({ onSaved, onClose }: Props) {
   const inputStyle = { padding: '5px 8px', width: '100%' }
 
   return (
-    <div className="card">
-      <div style={{ padding: '12px 16px 16px' }}>
+    <div className="card" style={{ marginBottom: 8 }}>
+
+      {/* Header */}
+      <div
+        className="flex items-center justify-between"
+        style={{ padding: '13px 16px 11px', borderBottom: '1px solid var(--border-soft)' }}
+      >
+        <p style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text)' }}>
+          Nueva transacción
+        </p>
+        <button
+          onClick={onClose}
+          aria-label="Cerrar formulario"
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', padding: 4, margin: -4 }}
+        >
+          <X size={15} />
+        </button>
+      </div>
+
+      <div style={{ padding: '14px 16px 16px' }}>
 
           {/* Filas de transacciones */}
           {items.map((item, idx) => (
