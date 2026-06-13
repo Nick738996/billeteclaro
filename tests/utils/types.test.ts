@@ -58,6 +58,41 @@ describe('isGasto', () => {
     expect(isGasto(tipo)).toBe(false)
     expect(isIngreso(tipo)).toBe(false)
   })
+
+  describe('con categoria (Feature 7/8 — AHORROS y PRESTAMO)', () => {
+    it('COMPRA con categoria AHORROS → false (no cuenta como gasto del mes)', () => {
+      expect(isGasto('COMPRA', 'AHORROS')).toBe(false)
+    })
+
+    it('COMPRA con categoria PRESTAMO → false (movimiento propio, no gasto)', () => {
+      expect(isGasto('COMPRA', 'PRESTAMO')).toBe(false)
+    })
+
+    it('PAGO_SERVICIO con categoria AHORROS → false', () => {
+      expect(isGasto('PAGO_SERVICIO', 'AHORROS')).toBe(false)
+    })
+
+    it('RETIRO con categoria PRESTAMO → false', () => {
+      expect(isGasto('RETIRO', 'PRESTAMO')).toBe(false)
+    })
+
+    it('COMPRA con categoria HOGAR → true (categoria normal no anula el tipo)', () => {
+      expect(isGasto('COMPRA', 'HOGAR')).toBe(true)
+    })
+
+    it('COMPRA con categoria SALIDAS → true', () => {
+      expect(isGasto('COMPRA', 'SALIDAS')).toBe(true)
+    })
+
+    it('INGRESO con categoria AHORROS → false (tipo ya lo excluye)', () => {
+      expect(isGasto('INGRESO', 'AHORROS')).toBe(false)
+    })
+
+    it('sin categoria (undefined) mantiene retrocompatibilidad', () => {
+      expect(isGasto('COMPRA', undefined)).toBe(true)
+      expect(isGasto('INGRESO', undefined)).toBe(false)
+    })
+  })
 })
 
 describe('formatCOPCompact', () => {

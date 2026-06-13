@@ -23,7 +23,7 @@ export function buildAdvisorContext(
   const diasRestantesSemana = diaSemana === 0 ? 0 : 7 - diaSemana
 
   const gastosPorCategoria = transactions
-    .filter(t => isGasto(t.tipo))
+    .filter(t => isGasto(t.tipo, t.categoria))
     .reduce<Record<string, number>>((acc, t) => {
       acc[t.categoria] = (acc[t.categoria] ?? 0) + t.monto
       return acc
@@ -38,6 +38,15 @@ export function buildAdvisorContext(
   const totalGastado = Object.values(gastosPorCategoria).reduce((s, v) => s + v, 0)
   const totalPresupuestado = Object.values(presupuestoPorCategoria).reduce((s, v) => s + v, 0)
 
+  // Gastos reales = sin transferencias propias (que no son gasto real de consumo)
+  const transferencias = (gastosPorCategoria as Record<string, number>)['TRANSFERENCIA'] ?? 0
+  const gastosReales = totalGastado - transferencias
+  const diasTotales = diasTranscurridos + diasRestantes
+  const gastoDiarioPromedio = diasTranscurridos > 0
+    ? Math.round(gastosReales / diasTranscurridos)
+    : 0
+  const proyeccionCierre = Math.round(gastoDiarioPromedio * diasTotales)
+
   return {
     mes: format(ref, 'MMMM yyyy', { locale: es }),
     dias_transcurridos: diasTranscurridos,
@@ -48,6 +57,8 @@ export function buildAdvisorContext(
     total_gastado: totalGastado,
     total_presupuestado: totalPresupuestado,
     ingreso_estimado: ingresoEstimado,
+    gasto_diario_promedio: gastoDiarioPromedio,
+    proyeccion_cierre: proyeccionCierre,
   }
 }
 

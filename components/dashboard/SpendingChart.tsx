@@ -63,7 +63,7 @@ function buildChartData(transactions: Transaction[]): ChartEntry[] {
   const totals: Partial<Record<Categoria, number>> = {}
   for (const t of transactions) {
     if (!TIPOS_GASTO.has(t.tipo)) continue
-    if (t.categoria === 'INGRESO') continue
+    if (t.categoria === 'INGRESO' || t.categoria === 'AHORROS' || t.categoria === 'PRESTAMO') continue
     totals[t.categoria] = (totals[t.categoria] ?? 0) + t.monto
   }
   const sorted = Object.entries(totals)

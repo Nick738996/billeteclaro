@@ -18,20 +18,22 @@ Analiza el mes del usuario. Genera máximo 5 insights directos, específicos, si
 
 TIPOS DE INSIGHT:
 
-"alerta" — categoría excedida (gastado >= 100% del presupuesto)
+"alerta" — categoría excedida (gastado >= 100% del presupuesto configurado)
   Formato: "[Categoría] excedida: $X gastados de $Y — te pasaste $Z. [Si hay comercio top: Principal: Comercio $W]"
-  NUNCA usar para categorías bajo el 100%.
+  NUNCA usar para categorías bajo el 100%. NUNCA usar para categorías sin presupuesto.
 
-"consejo" — acción concreta ejecutable hoy, con comercio o número de impacto
+"consejo" — acción concreta ejecutable hoy, SOLO para categorías CON presupuesto configurado
   Siempre: verbo imperativo + nombre del comercio o categoría + cifra COP
-  Ejemplo: "Cancela [servicio] — ahorras $X/mes"
   Ejemplo: "Solo $X disponibles en Salidas los próximos N días — evita bares y restaurantes costosos"
   NUNCA decir "máximo $0 más" si el presupuesto está agotado: di cuánto se excedió y qué evitar.
+  PROHIBIDO para categorías sin presupuesto: no puedes recomendar cancelar ni reducir sin una referencia.
 
-"observacion" — dato relevante sin acción inmediata obvia
-  Para categorías sin presupuesto o patrones llamativos.
-  Siempre incluir el comercio top si está disponible.
-  Ejemplo: "$X en Suscripciones (Y% del gasto total) — top: Netflix $A, Spotify $B"
+"observacion" — dato relevante sin acción, OBLIGATORIO para categorías sin presupuesto
+  Informa el monto y su proporción sobre ingresos o gasto total. Incluye comercio top si está disponible.
+  ✓ "$X en Suscripciones sin presupuesto — es el Y% de tus ingresos del mes — top: Netflix $A, Spotify $B"
+  ✓ "$X en [Categoría] — top: Comercio $Y (¿lo sigues usando activamente?)"
+  ✗ PROHIBIDO: "Cancela [servicio] — ahorras $X/mes" → no sabes qué servicios tiene ni si puede cancelarlos
+  ✗ PROHIBIDO: "Deberías reducir tus [gastos]" → no tienes base sin presupuesto de referencia
 
 "positivo" — categoría notablemente bajo presupuesto para los días transcurridos
   Formato: "[Categoría] bajo control: llevas $X de $Y esperado a este punto — vas a cerrar ~$Z bajo presupuesto si mantienes el ritmo"
@@ -39,13 +41,16 @@ TIPOS DE INSIGHT:
   Calcula esperado_hoy = (dias_transcurridos / total_dias) * presupuesto_categoria
   Solo aplica si gasto_actual < 60% de esperado_hoy
 
-"proyeccion" — proyección al cierre del mes basada en el ritmo diario actual
-  Formato: "Al ritmo actual (~$X/día) cierras el mes en ~$Y — [bajo presupuesto en $Z / sobre presupuesto en $Z]"
+"proyeccion" — proyección al cierre del mes
+  El contexto incluye GASTO_DIARIO_PROMEDIO y PROYECCION_CIERRE ya calculados correctamente.
+  DEBES usar esos valores exactos del contexto — NUNCA calcules tu propio ritmo diario.
+  Formato: "Al ritmo actual (~$[GASTO_DIARIO_PROMEDIO]/día) cierras el mes en ~$[PROYECCION_CIERRE] — [bajo presupuesto en $Z / sobre presupuesto en $Z]"
 
 REGLAS CRÍTICAS:
 - Máximo 5 insights, uno por categoría
 - Cada insight: máximo 2 oraciones, nunca sin cifra COP
 - Transferencias entre cuentas propias NO son gastos — ignóralas completamente
+- Categorías sin presupuesto: usa SOLO "observacion" — nunca "consejo", "alerta" ni "positivo"
 - Si el límite restante es $0 o negativo: nunca digas "máximo $0 más" — di el exceso y qué comercio o hábito evitar
 - Nunca: "considera", "podrías", "sería recomendable", "te sugerimos", "para evitar exceder"
 - Usa los comercios del contexto siempre que refuercen el punto
@@ -69,7 +74,7 @@ function catLabel(cat: string): string {
 function topMerchantsPerCat(transactions: Transaction[]): Record<string, string> {
   const agg: Record<string, Record<string, number>> = {}
   for (const t of transactions) {
-    if (!isGasto(t.tipo) || t.categoria === 'TRANSFERENCIA' || !t.comercio) continue
+    if (!isGasto(t.tipo, t.categoria) || t.categoria === 'TRANSFERENCIA' || !t.comercio) continue
     if (!agg[t.categoria]) agg[t.categoria] = {}
     agg[t.categoria][t.comercio] = (agg[t.categoria][t.comercio] ?? 0) + t.monto
   }
@@ -89,15 +94,13 @@ function buildInsightsContextPrompt(ctx: ReturnType<typeof buildAdvisorContext>,
   const pctMes = Math.round((ctx.dias_transcurridos / diasDelMes) * 100)
   const transferencias = ctx.gastos_por_categoria['TRANSFERENCIA' as keyof typeof ctx.gastos_por_categoria] ?? 0
   const gastosReales = ctx.total_gastado - transferencias
-  const gastoDiario = ctx.dias_transcurridos > 0 ? Math.round(gastosReales / ctx.dias_transcurridos) : 0
-  const proyeccionCierre = gastoDiario * diasDelMes
   const margenIngreso = ctx.ingreso_estimado > 0 ? ctx.ingreso_estimado - gastosReales : null
   const topMerchants = topMerchantsPerCat(transactions)
 
   // Top 5 comercios globales del mes
   const globalMerchants: Record<string, number> = {}
   for (const t of transactions) {
-    if (!isGasto(t.tipo) || t.categoria === 'TRANSFERENCIA' || !t.comercio) continue
+    if (!isGasto(t.tipo, t.categoria) || t.categoria === 'TRANSFERENCIA' || !t.comercio) continue
     globalMerchants[t.comercio] = (globalMerchants[t.comercio] ?? 0) + t.monto
   }
   const top5Global = Object.entries(globalMerchants)
@@ -143,7 +146,8 @@ Mes: ${ctx.mes} | Día ${ctx.dias_transcurridos} de ${diasDelMes} (${pctMes}% tr
 Ingresos del mes: $${ctx.ingreso_estimado.toLocaleString('es-CO')}
 Gastos reales (sin transferencias): $${gastosReales.toLocaleString('es-CO')}
 ${margenIngreso !== null ? `Margen ingreso − gasto: $${margenIngreso.toLocaleString('es-CO')} (${margenIngreso >= 0 ? 'positivo' : 'NEGATIVO'})` : ''}
-Ritmo: ~$${gastoDiario.toLocaleString('es-CO')}/día → proyección al cierre: ~$${proyeccionCierre.toLocaleString('es-CO')}
+GASTO_DIARIO_PROMEDIO (usa este valor en el insight de proyección): $${ctx.gasto_diario_promedio.toLocaleString('es-CO')}/día
+PROYECCION_CIERRE (usa este valor en el insight de proyección): $${ctx.proyeccion_cierre.toLocaleString('es-CO')}
 ${transferencias > 0 ? `Transferencias propias (NO analizar como gasto): $${transferencias.toLocaleString('es-CO')}` : ''}
 Top 5 comercios del mes: ${top5Global || 'sin datos'}
 
@@ -158,7 +162,6 @@ function buildChatContextBlock(ctx: ReturnType<typeof buildAdvisorContext>, tran
   const diasDelMes = ctx.dias_transcurridos + ctx.dias_restantes
   const transferencias = ctx.gastos_por_categoria['TRANSFERENCIA' as keyof typeof ctx.gastos_por_categoria] ?? 0
   const gastosReales = ctx.total_gastado - transferencias
-  const gastoDiario = ctx.dias_transcurridos > 0 ? Math.round(gastosReales / ctx.dias_transcurridos) : 0
   const topMerchants = topMerchantsPerCat(transactions)
 
   const conPresupuesto = Object.entries(ctx.presupuesto_por_categoria)
@@ -181,7 +184,7 @@ function buildChatContextBlock(ctx: ReturnType<typeof buildAdvisorContext>, tran
 
   return `=== CONTEXTO FINANCIERO ===
 Mes: ${ctx.mes} | Día ${ctx.dias_transcurridos} de ${diasDelMes} | Restantes: ${ctx.dias_restantes} días (${ctx.dias_restantes_semana} de semana)
-Ingresos: $${ctx.ingreso_estimado.toLocaleString('es-CO')} | Gastos reales: $${gastosReales.toLocaleString('es-CO')} (~$${gastoDiario.toLocaleString('es-CO')}/día)
+Ingresos: $${ctx.ingreso_estimado.toLocaleString('es-CO')} | Gastos reales: $${gastosReales.toLocaleString('es-CO')} (~$${ctx.gasto_diario_promedio.toLocaleString('es-CO')}/día)
 Con presupuesto: ${conPresupuesto || 'ninguno'}
 Sin presupuesto: ${sinPresupuesto || 'ninguno'}
 ${insights.length ? `Insights activos:\n${insights.map(i => `- [${i.tipo}] ${i.texto}`).join('\n')}` : ''}
@@ -228,6 +231,11 @@ export async function getInsights(
   force: boolean
 ): Promise<InsightsResult> {
   const { transactions, budgets } = await fetchMonthContext(supabase, userId, mes)
+
+  if (transactions.length === 0) {
+    return { insights: [], cached: true }
+  }
+
   const ctx = buildAdvisorContext(mes, transactions, budgets)
   const hash = hashContext(ctx)
 

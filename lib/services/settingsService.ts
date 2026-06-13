@@ -10,9 +10,10 @@ export async function getOnboardingCompleted(supabase: SupabaseClient, userId: s
 }
 
 export async function completeOnboarding(supabase: SupabaseClient, userId: string): Promise<void> {
-  await supabase.from('user_settings').upsert({
+  const { error } = await supabase.from('user_settings').upsert({
     user_id: userId,
     onboarding_completed: true,
     onboarding_completed_at: new Date().toISOString(),
   }, { onConflict: 'user_id' })
+  if (error) throw new Error(`completeOnboarding: ${error.message}`)
 }

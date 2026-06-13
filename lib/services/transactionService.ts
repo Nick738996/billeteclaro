@@ -58,6 +58,7 @@ export async function createManualTransactions(
       tipo:             tx.tipo,
       categoria:        tx.categoria,
       id_auditoria:     await generateAuditId(admin, userId, fecha),
+      mes_contable:     tx.fecha.slice(0, 7),
       procesado:        true,
     })
   }
