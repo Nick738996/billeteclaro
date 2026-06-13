@@ -1,9 +1,8 @@
 import Groq from 'groq-sdk'
-import { startOfMonth, endOfMonth, parseISO } from 'date-fns'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { buildAdvisorContext, hashContext } from '@/lib/ai/buildAdvisorContext'
 import { CATEGORIA_LABELS, isGasto } from '@/lib/types'
-import type { Transaction, Insight } from '@/lib/types'
+import type { Transaction, Insight, AdvisorContext } from '@/lib/types'
 
 let _groq: Groq | null = null
 function getGroq(): Groq {
@@ -13,57 +12,102 @@ function getGroq(): Groq {
 
 // ── Prompts ──────────────────────────────────────────────────────────────────
 
-const INSIGHTS_SYSTEM_PROMPT = `Eres BilleteClaro, asesor financiero personal de colombianos.
-Analiza el mes del usuario. Genera máximo 5 insights directos, específicos, siempre con cifras reales en COP.
+const INSIGHTS_SYSTEM_PROMPT = `Eres el asesor financiero personal de un colombiano. Tienes sus datos reales de este mes.
+Genera exactamente 5 insights que SOLO TÚ podrías dar porque tienes sus números reales.
 
-TIPOS DE INSIGHT:
+═══════════════════════════════
+TEST DEL ESPEJO (aplicar a cada insight)
+═══════════════════════════════
+"¿Podría cualquier app decir esto sin ver los datos del usuario?"
+Si SÍ → inválido. Reescríbelo con sus números reales del contexto.
 
-"alerta" — categoría excedida (gastado >= 100% del presupuesto configurado)
-  Formato: "[Categoría] excedida: $X gastados de $Y — te pasaste $Z. [Si hay comercio top: Principal: Comercio $W]"
-  NUNCA usar para categorías bajo el 100%. NUNCA usar para categorías sin presupuesto.
+═══════════════════════════════
+FORMATO DE MONEDA — Colombia
+═══════════════════════════════
+✓ $45.000 / $1.200.000 / $3.5M / $450K
+✗ $45,000.00 / $1.200.000,00
 
-"consejo" — acción concreta ejecutable hoy, SOLO para categorías CON presupuesto configurado
-  Siempre: verbo imperativo + nombre del comercio o categoría + cifra COP
-  Ejemplo: "Solo $X disponibles en Salidas los próximos N días — evita bares y restaurantes costosos"
-  NUNCA decir "máximo $0 más" si el presupuesto está agotado: di cuánto se excedió y qué evitar.
-  PROHIBIDO para categorías sin presupuesto: no puedes recomendar cancelar ni reducir sin una referencia.
+═══════════════════════════════
+NÚMEROS — SOLO del contexto JSON
+═══════════════════════════════
+NUNCA calcules tú mismo. Usa directamente:
+→ gasto_diario_promedio (ritmo actual)
+→ proyeccion_cierre (cierre del mes)
+→ exceso_proyectado (cuánto te pasas o ahorras)
+→ porcentaje_mes_transcurrido (% del mes)
+→ top_3_gastos[].comercio (nombres reales)
+→ top_categoria_excedida (categoría más crítica)
 
-"observacion" — dato relevante sin acción, OBLIGATORIO para categorías sin presupuesto
-  Informa el monto y su proporción sobre ingresos o gasto total. Incluye comercio top si está disponible.
-  ✓ "$X en Suscripciones sin presupuesto — es el Y% de tus ingresos del mes — top: Netflix $A, Spotify $B"
-  ✓ "$X en [Categoría] — top: Comercio $Y (¿lo sigues usando activamente?)"
-  ✗ PROHIBIDO: "Cancela [servicio] — ahorras $X/mes" → no sabes qué servicios tiene ni si puede cancelarlos
-  ✗ PROHIBIDO: "Deberías reducir tus [gastos]" → no tienes base sin presupuesto de referencia
+═══════════════════════════════
+TIPOS — reglas estrictas
+═══════════════════════════════
+"alerta" → SOLO si categorias_excedidas no está vacío
+  ✓ "Te pasaste $[exceso] en [cat] — [top_comercio] fue $[monto]. Quedan [dias] días sin más [cat]."
+  limite_sugerido: presupuesto original de esa categoría
 
-"positivo" — categoría notablemente bajo presupuesto para los días transcurridos
-  Formato: "[Categoría] bajo control: llevas $X de $Y esperado a este punto — vas a cerrar ~$Z bajo presupuesto si mantienes el ritmo"
-  NUNCA decir "puedes gastar más". El mensaje es que va bien, no que gaste más.
-  Calcula esperado_hoy = (dias_transcurridos / total_dias) * presupuesto_categoria
-  Solo aplica si gasto_actual < 60% de esperado_hoy
+"consejo" → acción concreta ejecutable HOY con número exacto
+  ✓ "Para cerrar [cat] dentro del límite: máximo $[presupuesto-gasto] más este mes"
+  limite_sugerido: presupuesto - gasto_actual (lo que puede gastar aún)
 
-"proyeccion" — proyección al cierre del mes
-  El contexto incluye GASTO_DIARIO_PROMEDIO y PROYECCION_CIERRE ya calculados correctamente.
-  DEBES usar esos valores exactos del contexto — NUNCA calcules tu propio ritmo diario.
-  Formato: "Al ritmo actual (~$[GASTO_DIARIO_PROMEDIO]/día) cierras el mes en ~$[PROYECCION_CIERRE] — [bajo presupuesto en $Z / sobre presupuesto en $Z]"
+"positivo" → solo si gasto_categoria < presupuesto_categoria * (porcentaje_mes_transcurrido/100)
+  ✓ "[Cat] al [X]% con [porcentaje_mes]% del mes — $[Z] disponibles esta semana"
+  Z = (presupuesto - gasto) / dias_restantes * 7
+  limite_sugerido: null
 
-REGLAS CRÍTICAS:
-- Máximo 5 insights, uno por categoría
-- Cada insight: máximo 2 oraciones, nunca sin cifra COP
-- Transferencias entre cuentas propias NO son gastos — ignóralas completamente
-- Categorías sin presupuesto: usa SOLO "observacion" — nunca "consejo", "alerta" ni "positivo"
-- Si el límite restante es $0 o negativo: nunca digas "máximo $0 más" — di el exceso y qué comercio o hábito evitar
-- Nunca: "considera", "podrías", "sería recomendable", "te sugerimos", "para evitar exceder"
-- Usa los comercios del contexto siempre que refuercen el punto
+"proyeccion" → SIEMPRE usa proyeccion_cierre y exceso_proyectado del contexto
+  ✓ "Al ritmo de $[gasto_diario_promedio]/día, cierras [mes] en $[proyeccion_cierre] — [sobre/bajo] presupuesto en $[abs(exceso_proyectado)]"
+  limite_sugerido: null
 
-Responde ÚNICAMENTE con este JSON (sin texto extra):
-{"insights": [{"tipo": "alerta|consejo|observacion|positivo|proyeccion", "texto": "...", "categoria": "CATEGORIA_EN_MAYUSCULAS", "limite_sugerido": null}]}`
+"observacion" → categorias_sin_presupuesto con gasto > 5% del total
+  ✓ "$[monto] en [cat] ([X]% del gasto total) — top: [comercio] $[monto]"
+  Para Suscripciones: ✓ "$[monto] en Suscripciones — ¿sabes cuáles sigues usando?"
+  NUNCA: "considera cancelar / reducir / revisar"
+  limite_sugerido: null
 
-const CHAT_SYSTEM_PROMPT = `Eres BilleteClaro, el asesor financiero personal de colombianos.
-Hablas como un amigo contador: directo, sin rodeos, con números concretos en pesos colombianos.
-Estás en modo conversacional. El usuario puede preguntarte sobre sus finanzas.
-Tienes acceso al contexto completo de su mes: gastos, presupuestos y días restantes.
-Responde máximo en 3 oraciones. Si el usuario pregunta por un límite concreto (finde, semana), calcula con los datos del contexto.
-Nada de perogrulladas — siempre con cifras específicas.`
+═══════════════════════════════
+PRIORIDAD DE LOS 5 INSIGHTS
+═══════════════════════════════
+1. alerta (top_categoria_excedida, si existe)
+2. proyeccion del mes
+3. positivo (mejor categoría controlada)
+4. consejo o segunda alerta
+5. observacion (categoría sin presupuesto más relevante)
+
+═══════════════════════════════
+PROHIBIDO absolutamente
+═══════════════════════════════
+"Considera..." / "Podrías..." / "Sería bueno..." / "Deberías..."
+Dos insights sobre la misma categoría
+Números que no están en el contexto
+Transferencias entre cuentas propias (ignóralas completamente)
+
+Responde ÚNICAMENTE con JSON válido, sin texto antes ni después:
+{"insights":[{"tipo":"...","texto":"...","categoria":"...","limite_sugerido":null}]}`
+
+function buildChatSystemPrompt(ctx: AdvisorContext): string {
+  const topComerciosStr = ctx.top_3_gastos
+    .map(t => `${t.comercio} $${t.monto.toLocaleString('es-CO')}`)
+    .join(', ') || 'sin datos'
+  return `Eres el asesor financiero personal de este colombiano. Modo conversacional.
+
+DATOS DE SU MES:
+- Gasto diario promedio: $${ctx.gasto_diario_promedio.toLocaleString('es-CO')}
+- Días restantes: ${ctx.dias_restantes}
+- Proyección de cierre: $${ctx.proyeccion_cierre.toLocaleString('es-CO')}
+- Top comercios: ${topComerciosStr}
+
+REGLAS:
+1. Máximo 2-3 oraciones. Nunca párrafos.
+2. Siempre con al menos un número de sus datos reales.
+3. Nombra sus comercios reales ("tus Ubers", "los pedidos de Rappi").
+4. Límites por tiempo:
+   - finde: (presupuesto_cat - gasto_cat) / dias_restantes * 3
+   - semana: (presupuesto_cat - gasto_cat) / dias_restantes * 7
+   - hoy: (total_presupuestado - total_gastado) / dias_restantes
+5. Si no tienes el dato exacto: "No tengo ese dato este mes."
+6. Tono: directo, colombiano. Puedes usar "ojo que", "de una", "parce".
+NUNCA: "considera", "podrías", "sería bueno".`
+}
 
 // ── Helpers de contexto ───────────────────────────────────────────────────────
 
@@ -89,72 +133,65 @@ function topMerchantsPerCat(transactions: Transaction[]): Record<string, string>
   return result
 }
 
-function buildInsightsContextPrompt(ctx: ReturnType<typeof buildAdvisorContext>, transactions: Transaction[]): string {
-  const diasDelMes = ctx.dias_transcurridos + ctx.dias_restantes
-  const pctMes = Math.round((ctx.dias_transcurridos / diasDelMes) * 100)
-  const transferencias = ctx.gastos_por_categoria['TRANSFERENCIA' as keyof typeof ctx.gastos_por_categoria] ?? 0
+function buildInsightsContextPrompt(ctx: AdvisorContext, transactions: Transaction[]): string {
+  const transferencias = (ctx.gastos_por_categoria as Record<string, number>)['TRANSFERENCIA'] ?? 0
   const gastosReales = ctx.total_gastado - transferencias
-  const margenIngreso = ctx.ingreso_estimado > 0 ? ctx.ingreso_estimado - gastosReales : null
   const topMerchants = topMerchantsPerCat(transactions)
-
-  // Top 5 comercios globales del mes
-  const globalMerchants: Record<string, number> = {}
-  for (const t of transactions) {
-    if (!isGasto(t.tipo, t.categoria) || t.categoria === 'TRANSFERENCIA' || !t.comercio) continue
-    globalMerchants[t.comercio] = (globalMerchants[t.comercio] ?? 0) + t.monto
-  }
-  const top5Global = Object.entries(globalMerchants)
-    .sort(([, a], [, b]) => b - a)
-    .slice(0, 5)
-    .map(([c, m]) => `${c} $${m.toLocaleString('es-CO')}`)
-    .join(', ')
-
-  // Frecuencia de transacciones por categoría
-  const txCountByCat: Record<string, number> = {}
-  for (const t of transactions) {
-    if (!isGasto(t.tipo) || t.categoria === 'TRANSFERENCIA') continue
-    txCountByCat[t.categoria] = (txCountByCat[t.categoria] ?? 0) + 1
-  }
 
   const conPresupuesto = Object.entries(ctx.presupuesto_por_categoria)
     .filter(([, limite]) => limite > 0)
     .map(([cat, limite]) => {
-      const gastado = ctx.gastos_por_categoria[cat as keyof typeof ctx.gastos_por_categoria] ?? 0
-      const pct = Math.round((gastado / limite) * 100)
-      const esperadoHoy = Math.round((ctx.dias_transcurridos / diasDelMes) * limite)
-      const exceso = gastado - limite
-      const estado = pct >= 100 ? `EXCEDIDO en $${exceso.toLocaleString('es-CO')}` : pct >= 80 ? 'CERCA DEL LÍMITE' : 'OK'
-      const txCount = txCountByCat[cat] ?? 0
+      const gastado = (ctx.gastos_por_categoria as Record<string, number>)[cat] ?? 0
+      const pct = Math.round(gastado / limite * 100)
+      const esperadoHoy = Math.round(ctx.porcentaje_mes_transcurrido / 100 * limite)
+      const estado = gastado > limite
+        ? `EXCEDIDO en $${(gastado - limite).toLocaleString('es-CO')}`
+        : pct >= 80 ? 'EN RIESGO' : 'OK'
       const merchants = topMerchants[cat] ? ` | top: ${topMerchants[cat]}` : ''
-      return `  ${catLabel(cat)}: $${gastado.toLocaleString('es-CO')} / $${limite.toLocaleString('es-CO')} (${pct}% — ${estado}) | esperado hoy: $${esperadoHoy.toLocaleString('es-CO')} | ${txCount} transacciones${merchants}`
+      return `  ${catLabel(cat)}: gastado=$${gastado.toLocaleString('es-CO')} presupuesto=$${limite.toLocaleString('es-CO')} (${pct}% — ${estado}) esperado_hoy=$${esperadoHoy.toLocaleString('es-CO')}${merchants}`
     })
 
   const sinPresupuesto = Object.entries(ctx.gastos_por_categoria)
     .filter(([cat, val]) =>
       cat !== 'TRANSFERENCIA' && val > 0 &&
-      (ctx.presupuesto_por_categoria[cat as keyof typeof ctx.gastos_por_categoria] ?? 0) === 0
+      ((ctx.presupuesto_por_categoria as Record<string, number>)[cat] ?? 0) === 0
     )
     .map(([cat, val]) => {
-      const pctDelTotal = gastosReales > 0 ? Math.round((val / gastosReales) * 100) : 0
-      const txCount = txCountByCat[cat] ?? 0
+      const pct = gastosReales > 0 ? Math.round(val / gastosReales * 100) : 0
       const merchants = topMerchants[cat] ? ` | top: ${topMerchants[cat]}` : ''
-      return `  ${catLabel(cat)}: $${val.toLocaleString('es-CO')} (${pctDelTotal}% del gasto total, ${txCount} transacciones, sin presupuesto)${merchants}`
+      return `  ${catLabel(cat)}: $${val.toLocaleString('es-CO')} (${pct}% del gasto total, sin presupuesto)${merchants}`
     })
 
-  return `=== RESUMEN DEL MES ===
-Mes: ${ctx.mes} | Día ${ctx.dias_transcurridos} de ${diasDelMes} (${pctMes}% transcurrido) | ${ctx.dias_restantes} días restantes
-Ingresos del mes: $${ctx.ingreso_estimado.toLocaleString('es-CO')}
-Gastos reales (sin transferencias): $${gastosReales.toLocaleString('es-CO')}
-${margenIngreso !== null ? `Margen ingreso − gasto: $${margenIngreso.toLocaleString('es-CO')} (${margenIngreso >= 0 ? 'positivo' : 'NEGATIVO'})` : ''}
-GASTO_DIARIO_PROMEDIO (usa este valor en el insight de proyección): $${ctx.gasto_diario_promedio.toLocaleString('es-CO')}/día
-PROYECCION_CIERRE (usa este valor en el insight de proyección): $${ctx.proyeccion_cierre.toLocaleString('es-CO')}
-${transferencias > 0 ? `Transferencias propias (NO analizar como gasto): $${transferencias.toLocaleString('es-CO')}` : ''}
-Top 5 comercios del mes: ${top5Global || 'sin datos'}
+  const ctxJson = JSON.stringify({
+    mes: ctx.mes,
+    porcentaje_mes_transcurrido: ctx.porcentaje_mes_transcurrido,
+    dias_transcurridos: ctx.dias_transcurridos,
+    dias_restantes: ctx.dias_restantes,
+    dias_totales_mes: ctx.dias_totales_mes,
+    ingreso_estimado: ctx.ingreso_estimado,
+    gasto_diario_promedio: ctx.gasto_diario_promedio,
+    proyeccion_cierre: ctx.proyeccion_cierre,
+    exceso_proyectado: ctx.exceso_proyectado,
+    gasto_esperado_a_esta_fecha: ctx.gasto_esperado_a_esta_fecha,
+    diferencia_vs_esperado: ctx.diferencia_vs_esperado,
+    categorias_excedidas: ctx.categorias_excedidas,
+    categorias_en_riesgo: ctx.categorias_en_riesgo,
+    categorias_sin_presupuesto: ctx.categorias_sin_presupuesto,
+    top_3_gastos: ctx.top_3_gastos,
+    top_categoria_excedida: ctx.top_categoria_excedida,
+  }, null, 2)
 
-=== CATEGORÍAS CON PRESUPUESTO ===
+  return `=== CONTEXTO JSON (usa estos valores exactos) ===
+${ctxJson}
+
+=== DETALLE POR CATEGORÍA ===
+Gastos reales (excluye transferencias entre cuentas): $${gastosReales.toLocaleString('es-CO')}
+${transferencias > 0 ? `Transferencias propias (NO analizar): $${transferencias.toLocaleString('es-CO')}` : ''}
+
+Con presupuesto:
 ${conPresupuesto.length ? conPresupuesto.join('\n') : '  (ninguna configurada)'}
 
-=== CATEGORÍAS SIN PRESUPUESTO ===
+Sin presupuesto:
 ${sinPresupuesto.length ? sinPresupuesto.join('\n') : '  (ninguna)'}`
 }
 
@@ -194,14 +231,12 @@ ${insights.length ? `Insights activos:\n${insights.map(i => `- [${i.tipo}] ${i.t
 // ── Queries de datos ──────────────────────────────────────────────────────────
 
 async function fetchMonthContext(supabase: SupabaseClient, userId: string, mes: string) {
-  const ref = parseISO(`${mes}-01`)
   const [{ data: txData }, { data: budgetData }] = await Promise.all([
     supabase
       .from('transactions')
       .select('*')
       .eq('user_id', userId)
-      .gte('fecha', startOfMonth(ref).toISOString())
-      .lte('fecha', endOfMonth(ref).toISOString()),
+      .eq('mes_contable', mes),
     supabase
       .from('budgets')
       .select('categoria, monto_presupuestado')
@@ -239,7 +274,19 @@ export async function getInsights(
   const ctx = buildAdvisorContext(mes, transactions, budgets)
   const hash = hashContext(ctx)
 
-  // Cache hit: mismo hash + menos de 6h
+  console.log('[ADVISOR AUDIT] ' + JSON.stringify({
+    mes: ctx.mes,
+    porcentaje_mes: ctx.porcentaje_mes_transcurrido + '%',
+    total_gastado: ctx.total_gastado,
+    gasto_diario_promedio: ctx.gasto_diario_promedio,
+    proyeccion_cierre: ctx.proyeccion_cierre,
+    exceso_proyectado: ctx.exceso_proyectado,
+    categorias_excedidas: ctx.categorias_excedidas,
+    top_3_gastos: ctx.top_3_gastos.map(t => `${t.comercio}: $${t.monto}`),
+    top_categoria_excedida: ctx.top_categoria_excedida?.categoria ?? 'ninguna',
+  }))
+
+  // Cache hit: mismo hash
   if (!force) {
     const { data: cached } = await supabase
       .from('ai_insights')
@@ -271,7 +318,13 @@ export async function getInsights(
   }
 
   const text = completion.choices[0]?.message?.content?.trim() ?? ''
-  const insights: Insight[] = Array.isArray(JSON.parse(text).insights) ? JSON.parse(text).insights : []
+  let insights: Insight[] = []
+  try {
+    const parsed = JSON.parse(text)
+    if (Array.isArray(parsed.insights)) insights = parsed.insights
+  } catch {
+    console.error('[ADVISOR] JSON.parse failed:', text)
+  }
 
   await supabase.from('ai_insights').upsert(
     { user_id: userId, mes, insights, context_hash: hash, generated_at: new Date().toISOString() },
@@ -303,7 +356,7 @@ export async function sendChatMessage(
   const historial = (history ?? []).reverse()
 
   const messages: Groq.Chat.ChatCompletionMessageParam[] = [
-    { role: 'system', content: `${CHAT_SYSTEM_PROMPT}\n\n${buildChatContextBlock(ctx, transactions, insights)}` },
+    { role: 'system', content: `${buildChatSystemPrompt(ctx)}\n\n${buildChatContextBlock(ctx, transactions, insights)}` },
     ...historial.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content as string })),
     { role: 'user', content: message },
   ]

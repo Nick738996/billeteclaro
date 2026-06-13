@@ -30,4 +30,6 @@ export const TEST_IDS = {
   ONBOARDING_STEP3_CONTINUE:'onboarding-step3-continue',
   AUTH_GOOGLE_BUTTON:       'auth-google-button',
   AUTH_LOGOUT_BUTTON:       'auth-logout-button',
+  DASHBOARD_MONTH_PROGRESS: 'dashboard-month-progress',
+  DASHBOARD_HELP_BUTTON:    'dashboard-help-button',
 } as const

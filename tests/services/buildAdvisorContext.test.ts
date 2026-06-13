@@ -98,11 +98,12 @@ describe('buildAdvisorContext', () => {
       expect(ctx.proyeccion_cierre).toBe(Math.round(ctx.gasto_diario_promedio * diasTotales))
     })
 
-    it('proyeccion_cierre con solo transferencias es 0 (no cuenta como gasto real)', () => {
+    it('proyeccion_cierre con solo transferencias usa total_gastado (incluye TRANSFERENCIA)', () => {
       const txs = [tx('a', 'TRANSFERENCIA_ENVIADA', 1_000_000, 'TRANSFERENCIA')]
       const ctx = buildAdvisorContext('2026-06', txs, {})
-      expect(ctx.gasto_diario_promedio).toBe(0)
-      expect(ctx.proyeccion_cierre).toBe(0)
+      // gasto_diario_promedio = total_gastado / dias_transcurridos (sin excluir TRANSFERENCIA)
+      expect(ctx.gasto_diario_promedio).toBe(Math.round(ctx.total_gastado / ctx.dias_transcurridos))
+      expect(ctx.proyeccion_cierre).toBe(Math.round(ctx.gasto_diario_promedio * ctx.dias_totales_mes))
     })
   })
 
@@ -187,9 +188,9 @@ describe('hashContext', () => {
     expect(hashContext(baseCtx)).not.toBe(hashContext(ctx2))
   })
 
-  it('cambiar solo dias_transcurridos no cambia el hash', () => {
+  it('cambiar dias_transcurridos SÍ cambia el hash (afecta proyecciones)', () => {
     const ctx2 = { ...baseCtx, dias_transcurridos: baseCtx.dias_transcurridos + 3 }
-    expect(hashContext(baseCtx)).toBe(hashContext(ctx2))
+    expect(hashContext(baseCtx)).not.toBe(hashContext(ctx2))
   })
 
   it('cambiar solo dias_restantes no cambia el hash', () => {

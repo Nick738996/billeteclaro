@@ -3,37 +3,38 @@
 import { getDaysInMonth, parseISO } from 'date-fns'
 import { BarChart2 } from 'lucide-react'
 import { formatCOPCompact } from '@/lib/types'
+import { TEST_IDS } from '@/lib/testIds'
 
 interface Props {
   gastos: number
   ingresos: number
-  totalPresupuestado: number
+  ahorros: number
   transacciones: number
   mes: string
   showChart: boolean
   onChartToggle: () => void
 }
 
-export default function MonthHero({ gastos, ingresos, totalPresupuestado, transacciones, mes, showChart, onChartToggle }: Props) {
+export default function MonthHero({ gastos, ingresos, ahorros, transacciones, mes, showChart, onChartToggle }: Props) {
   const ref = parseISO(`${mes}-01`)
   const today = new Date()
   const isCurrentMonth =
     today.getFullYear() === ref.getFullYear() && today.getMonth() === ref.getMonth()
   const diasRestantes = isCurrentMonth ? getDaysInMonth(ref) - today.getDate() : 0
 
-  const hasBudget = totalPresupuestado > 0
-  const pct       = hasBudget ? (gastos / totalPresupuestado) * 100 : 0
-  const over      = hasBudget && gastos > totalPresupuestado
-  const disponible = totalPresupuestado - gastos
+  const hasIncome = ingresos > 0
+  const pct        = hasIncome ? (gastos / ingresos) * 100 : 0
+  const over       = hasIncome && gastos > ingresos
+  const disponible = ingresos - gastos - ahorros
 
   const barColor = over ? 'var(--red)' : pct >= 80 ? 'var(--yellow)' : 'var(--green)'
   const pctBadgeBg = over ? 'var(--red-soft)' : pct >= 80 ? 'var(--yellow-soft)' : 'var(--green-soft)'
 
   return (
-    <div style={{ padding: '8px 0 4px' }}>
+    <div data-testid={TEST_IDS.DASHBOARD_MONTH_PROGRESS} style={{ padding: '8px 0 4px' }}>
 
       {/* Amount row */}
-      <div className="flex items-end justify-between" style={{ marginBottom: hasBudget ? 12 : 8 }}>
+      <div className="flex items-end justify-between" style={{ marginBottom: hasIncome ? 12 : 8 }}>
         <div>
           <p style={{
             fontSize: 'var(--text-xs)', fontWeight: 500,
@@ -50,15 +51,15 @@ export default function MonthHero({ gastos, ingresos, totalPresupuestado, transa
             >
               {formatCOPCompact(gastos)}
             </span>
-            {hasBudget && (
+            {hasIncome && (
               <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>
-                de {formatCOPCompact(totalPresupuestado)}
+                de {formatCOPCompact(ingresos)}
               </span>
             )}
           </div>
         </div>
 
-        {hasBudget && (
+        {hasIncome && (
           <span
             className="tabular-nums"
             style={{
@@ -74,7 +75,7 @@ export default function MonthHero({ gastos, ingresos, totalPresupuestado, transa
       </div>
 
       {/* Progress bar */}
-      {hasBudget && (
+      {hasIncome && (
         <div style={{ height: 5, background: 'var(--border)', borderRadius: 99, marginBottom: 10, overflow: 'hidden' }}>
           <div style={{
             width: `${Math.min(pct, 100)}%`,
@@ -88,16 +89,11 @@ export default function MonthHero({ gastos, ingresos, totalPresupuestado, transa
 
       {/* Subtext + chart toggle */}
       <div className="flex items-center gap-4">
-        {hasBudget && (
+        {hasIncome && (
           <p style={{ fontSize: 'var(--text-xs)', color: over ? 'var(--red)' : 'var(--text-muted)' }}>
             {over
               ? `${formatCOPCompact(Math.abs(disponible))} sobre el límite`
               : `${formatCOPCompact(disponible)} disponibles`}
-          </p>
-        )}
-        {ingresos > 0 && (
-          <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-subtle)' }}>
-            ↑ {formatCOPCompact(ingresos)} ingresados
           </p>
         )}
         {isCurrentMonth && diasRestantes > 0 && (

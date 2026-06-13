@@ -18,6 +18,7 @@ const BATCH_SIZE  = 10
 
 export interface SyncResult {
   correos_revisados:    number
+  total_correos_banco:  number
   transacciones_nuevas: number
   parser:   number
   omitidos: number
@@ -164,7 +165,7 @@ export async function runSync(userId: string, admin: Admin): Promise<SyncResult>
       status: errores.length > 0 && transaccionesNuevas === 0 ? 'ERROR' : 'DONE',
     }).eq('id', syncId)
 
-    return { correos_revisados: newIds.length, transacciones_nuevas: transaccionesNuevas, parser: parserCount, omitidos: omitidosCount, errores }
+    return { correos_revisados: newIds.length, total_correos_banco: allMessageIds.length, transacciones_nuevas: transaccionesNuevas, parser: parserCount, omitidos: omitidosCount, errores }
 
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)

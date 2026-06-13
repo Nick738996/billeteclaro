@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { Search, Check, RefreshCw, X, Trash2 } from 'lucide-react'
@@ -11,6 +12,7 @@ import {
   CATEGORIA_LABELS,
   formatCOP,
   isIngreso,
+  isGasto,
 } from '@/lib/types'
 import { TEST_IDS } from '@/lib/testIds'
 
@@ -317,11 +319,25 @@ function CategoryPicker({ current, onSelect, onClose }: {
   onSelect: (c: Categoria) => void
   onClose: () => void
 }) {
+  if (typeof document === 'undefined') return null
   const cats = Object.keys(CATEGORIA_LABELS) as Categoria[]
-  return (
+  return createPortal(
     <>
       <div className="fixed inset-0 z-50" style={{ background: 'var(--overlay)' }} onClick={onClose} aria-hidden="true" />
-      <div role="dialog" aria-modal="true" aria-label="Cambiar categoría" className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-lg z-50" onKeyDown={e => { if (e.key === 'Escape') onClose() }} style={{ background: 'var(--surface-2)', borderTop: '1px solid var(--border)', borderRadius: 'var(--radius-xl) var(--radius-xl) 0 0', padding: '16px 20px 40px' }}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Cambiar categoría"
+        className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-lg z-50"
+        onKeyDown={e => { if (e.key === 'Escape') onClose() }}
+        style={{
+          background: 'var(--surface-2)',
+          borderTop: '1px solid var(--border)',
+          borderRadius: 'var(--radius-xl) var(--radius-xl) 0 0',
+          padding: '16px 20px',
+          paddingBottom: 'max(32px, env(safe-area-inset-bottom))',
+        }}
+      >
         <div className="flex items-center justify-between mb-4">
           <p className="font-semibold" style={{ fontSize: 'var(--text-sm)', color: 'var(--text)' }}>Cambiar categoría</p>
           <button onClick={onClose} aria-label="Cerrar selector de categoría" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', padding: 4 }}>
@@ -340,7 +356,8 @@ function CategoryPicker({ current, onSelect, onClose }: {
           })}
         </div>
       </div>
-    </>
+    </>,
+    document.body
   )
 }
 
@@ -385,14 +402,10 @@ function TransactionRow({ t, pendingCat, onCategoryClick, onDelete }: {
     <div
       className="flex items-center gap-3"
       style={{
-        padding: '12px 0 12px 14px',
+        padding: '10px 0',
         borderBottom: '1px solid var(--border-soft)',
-        borderLeft: `2.5px solid ${theme.color}55`,
-        marginLeft: -16,
       }}
     >
-      <div className="rounded-full flex-shrink-0" style={{ width: 8, height: 8, background: theme.color }} />
-
       <div className="flex-1 min-w-0">
         <p className="font-medium truncate" style={{ fontSize: 'var(--text-sm)', color: 'var(--text)' }}>
           {getDisplayName(t)}
@@ -401,12 +414,20 @@ function TransactionRow({ t, pendingCat, onCategoryClick, onDelete }: {
           <button
             onClick={onCategoryClick}
             aria-label={`Cambiar categoría: ${CATEGORIA_LABELS[displayCat]}`}
-            style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}
+            style={{
+              background: isDirty ? 'var(--yellow-soft)' : theme.bg,
+              border: `1px solid ${isDirty ? 'var(--yellow)' : 'transparent'}`,
+              borderRadius: 'var(--radius-badge)',
+              padding: '1px 6px',
+              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3,
+            }}
           >
             <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: isDirty ? 'var(--yellow)' : theme.color }}>
               {CATEGORIA_LABELS[displayCat]}
             </span>
-            {isDirty && <span style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--yellow)', display: 'inline-block' }} />}
+            {!isDirty && (
+              <span style={{ fontSize: 9, color: theme.color, opacity: 0.55, lineHeight: 1 }}>✎</span>
+            )}
           </button>
           <span style={{ fontSize: 10, color: 'var(--text-subtle)' }}>·</span>
           <span style={{ fontSize: 10, color: chip.color }}>{chip.label}</span>
@@ -427,9 +448,10 @@ function TransactionRow({ t, pendingCat, onCategoryClick, onDelete }: {
           <button
             onClick={startConfirm}
             aria-label={`Eliminar transacción: ${getDisplayName(t)}`}
-            style={{ background: 'none', border: 'none', padding: 4, cursor: 'pointer', color: 'var(--text-subtle)', display: 'flex' }}
+            className="delete-btn"
+            style={{ background: 'none', border: 'none', padding: 4, cursor: 'pointer', color: 'var(--text-subtle)', display: 'flex', opacity: 0.3 }}
           >
-            <Trash2 size={13} />
+            <Trash2 size={12} />
           </button>
         )}
         {deletePhase === 'confirming' && (
@@ -544,7 +566,7 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
     return matchesCategory && matchesSearch
   }), [transactions, activeFilter, search, deletedIds])
 
-  const totalGastos   = useMemo(() => filtered.filter(t => !isIngreso(t.tipo)).reduce((s, t) => s + t.monto, 0), [filtered])
+  const totalGastos   = useMemo(() => filtered.filter(t => isGasto(t.tipo, t.categoria)).reduce((s, t) => s + t.monto, 0), [filtered])
   const totalIngresos = useMemo(() => filtered.filter(t =>  isIngreso(t.tipo)).reduce((s, t) => s + t.monto, 0), [filtered])
   const groups        = useMemo(() => groupByDate(filtered), [filtered])
 
@@ -579,6 +601,17 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
       <div className="px-4 pb-3" style={{ borderBottom: (hasPendingCats || savingCats || savedCatsOk) ? 'none' : '1px solid var(--border-soft)' }}>
         <FilterChips active={activeFilterKey} onChange={key => onFilterChange(key)} />
       </div>
+
+      {/* Hint de categorización — solo cuando no hay cambios pendientes */}
+      {!hasPendingCats && !savingCats && !savedCatsOk && (
+        <p style={{
+          fontSize: 11, color: 'var(--text-subtle)',
+          padding: '0 16px 10px',
+          borderBottom: '1px solid var(--border-soft)',
+        }}>
+          Toca la etiqueta de categoría en cualquier fila para cambiarla
+        </p>
+      )}
 
       {/* Botón guardar categorías — fila separada, solo visible cuando hay cambios */}
       {(hasPendingCats || savingCats || savedCatsOk) && (
