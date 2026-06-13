@@ -182,7 +182,7 @@ export default function OnboardingStep2() {
           Sincroniza tus correos
         </h1>
         <p style={{ fontSize: 'var(--text-base)', color: 'var(--text-muted)', lineHeight: 1.6 }}>
-          Vamos a leer tus notificaciones de RappiCard y RappiPay. Solo lectura — nunca escribimos nada en tu nombre.
+          Vamos a leer tus notificaciones de RappiCard, RappiPay y Bancolombia. Solo lectura — nunca escribimos nada en tu nombre.
         </p>
       </div>
 

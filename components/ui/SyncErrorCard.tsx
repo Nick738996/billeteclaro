@@ -28,7 +28,7 @@ const ERROR_MESSAGES: Record<SyncErrorType, ErrorInfo> = {
   },
   no_emails_found: {
     titulo: 'No encontramos correos de banco',
-    descripcion: 'Revisamos tu Gmail y no hay notificaciones de RappiCard ni RappiPay. ¿Los correos llegan a esta cuenta?',
+    descripcion: 'Revisamos tu Gmail y no hay notificaciones de RappiCard, RappiPay ni Bancolombia. Verifica que tengas las notificaciones de transacciones activadas en tu banco.',
   },
   sync_timeout: {
     titulo: 'La sincronización tardó demasiado',

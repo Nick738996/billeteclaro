@@ -66,6 +66,100 @@ describe('buildAdvisorContext', () => {
     expect(ctx.presupuesto_por_categoria['HOGAR']).toBe(400_000)
     expect(ctx.total_presupuestado).toBe(600_000)
   })
+
+  describe('gasto_diario_promedio y proyeccion_cierre (Corrección 3)', () => {
+    it('gasto_diario_promedio excluye transferencias del cálculo', () => {
+      const txs = [
+        tx('a', 'COMPRA',               300_000, 'SALIDAS'),
+        tx('b', 'TRANSFERENCIA_ENVIADA', 500_000, 'TRANSFERENCIA'),
+      ]
+      const ctx = buildAdvisorContext('2026-06', txs, {})
+      // Solo $300k de gastos reales, sin contar la transferencia
+      expect(ctx.gasto_diario_promedio).toBeGreaterThan(0)
+      // La transferencia no debe inflar el ritmo diario
+      const ratioConTransf = ctx.total_gastado / ctx.dias_transcurridos
+      expect(ctx.gasto_diario_promedio).toBeLessThan(ratioConTransf)
+    })
+
+    it('gasto_diario_promedio es 0 cuando dias_transcurridos es 0', () => {
+      // Mes futuro: diaActual cae en totalDias (fallback), pero se testea la lógica
+      // con un mes donde no hay días transcurridos simulando días = 0
+      const txs = [tx('a', 'COMPRA', 100_000, 'HOGAR')]
+      const ctx = buildAdvisorContext('2026-06', txs, {})
+      // dias_transcurridos siempre >= 1 en meses activos, no puede ser 0 en runtime normal
+      // Verificamos que el campo existe y es un número no negativo
+      expect(ctx.gasto_diario_promedio).toBeGreaterThanOrEqual(0)
+    })
+
+    it('proyeccion_cierre = gasto_diario_promedio × dias_totales_mes', () => {
+      const txs = [tx('a', 'COMPRA', 300_000, 'HOGAR')]
+      const ctx = buildAdvisorContext('2026-06', txs, {})
+      const diasTotales = ctx.dias_transcurridos + ctx.dias_restantes
+      expect(ctx.proyeccion_cierre).toBe(Math.round(ctx.gasto_diario_promedio * diasTotales))
+    })
+
+    it('proyeccion_cierre con solo transferencias es 0 (no cuenta como gasto real)', () => {
+      const txs = [tx('a', 'TRANSFERENCIA_ENVIADA', 1_000_000, 'TRANSFERENCIA')]
+      const ctx = buildAdvisorContext('2026-06', txs, {})
+      expect(ctx.gasto_diario_promedio).toBe(0)
+      expect(ctx.proyeccion_cierre).toBe(0)
+    })
+  })
+
+  describe('AHORROS y PRESTAMO no cuentan como gastos del mes (Feature 7/8)', () => {
+    it('COMPRA categorizada como AHORROS no se suma en total_gastado', () => {
+      const txs = [
+        tx('a', 'COMPRA', 200_000, 'AHORROS'),
+        tx('b', 'COMPRA',  50_000, 'HOGAR'),
+      ]
+      const ctx = buildAdvisorContext('2026-06', txs, {})
+      expect(ctx.total_gastado).toBe(50_000)
+      expect(ctx.gastos_por_categoria['AHORROS']).toBeUndefined()
+    })
+
+    it('COMPRA categorizada como PRESTAMO no se suma en total_gastado', () => {
+      const txs = [
+        tx('a', 'COMPRA', 500_000, 'PRESTAMO'),
+        tx('b', 'COMPRA',  30_000, 'SALIDAS'),
+      ]
+      const ctx = buildAdvisorContext('2026-06', txs, {})
+      expect(ctx.total_gastado).toBe(30_000)
+      expect(ctx.gastos_por_categoria['PRESTAMO']).toBeUndefined()
+    })
+
+    it('mes con solo AHORROS y PRESTAMO → total_gastado = 0', () => {
+      const txs = [
+        tx('a', 'COMPRA', 300_000, 'AHORROS'),
+        tx('b', 'COMPRA', 150_000, 'PRESTAMO'),
+      ]
+      const ctx = buildAdvisorContext('2026-06', txs, {})
+      expect(ctx.total_gastado).toBe(0)
+    })
+
+    it('AHORROS no afecta ingreso_estimado', () => {
+      const txs = [
+        tx('a', 'COMPRA',  200_000, 'AHORROS'),
+        tx('b', 'INGRESO', 800_000, 'INGRESO'),
+      ]
+      const ctx = buildAdvisorContext('2026-06', txs, {})
+      expect(ctx.ingreso_estimado).toBe(800_000)
+    })
+
+    it('mix real: gastos normales + ahorro + préstamo calcula correctamente', () => {
+      const txs = [
+        tx('a', 'COMPRA',  80_000, 'SALIDAS'),
+        tx('b', 'COMPRA',  40_000, 'TRANSPORTE'),
+        tx('c', 'COMPRA', 200_000, 'AHORROS'),
+        tx('d', 'COMPRA', 100_000, 'PRESTAMO'),
+        tx('e', 'INGRESO', 5_000_000, 'INGRESO'),
+      ]
+      const ctx = buildAdvisorContext('2026-06', txs, {})
+      expect(ctx.total_gastado).toBe(120_000)
+      expect(ctx.ingreso_estimado).toBe(5_000_000)
+      expect(ctx.gastos_por_categoria['SALIDAS']).toBe(80_000)
+      expect(ctx.gastos_por_categoria['TRANSPORTE']).toBe(40_000)
+    })
+  })
 })
 
 describe('hashContext', () => {

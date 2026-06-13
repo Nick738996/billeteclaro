@@ -174,9 +174,11 @@ export default function AIAdvisorPanel({ mes, budgetCount, txCount, contextVersi
 
   const chatEndRef = useRef<HTMLDivElement>(null)
   const inputRef   = useRef<HTMLInputElement>(null)
+  const currentMesRef = useRef(mes)
 
   // Reset chat cuando cambia el mes
   useEffect(() => {
+    currentMesRef.current = mes
     setHistory([])
     setInsights([])
     setInsightsError(null)
@@ -198,11 +200,13 @@ export default function AIAdvisorPanel({ mes, budgetCount, txCount, contextVersi
   }, [history, chatOpen, sending])
 
   async function fetchInsights() {
+    const fetchMes = mes
     setLoadingInsights(true)
     setInsightsError(null)
     try {
-      const res = await fetch(`/api/ai/insights?mes=${mes}`)
+      const res = await fetch(`/api/ai/insights?mes=${fetchMes}`)
       const data = await res.json()
+      if (currentMesRef.current !== fetchMes) return
       if (!res.ok) {
         throw new Error(res.status === 429
           ? (data?.error ?? 'Límite diario de IA alcanzado — vuelve en unos minutos')
@@ -210,9 +214,10 @@ export default function AIAdvisorPanel({ mes, budgetCount, txCount, contextVersi
       }
       setInsights(data.insights ?? [])
     } catch (e) {
+      if (currentMesRef.current !== fetchMes) return
       setInsightsError(e instanceof Error ? e.message : 'Error desconocido.')
     } finally {
-      setLoadingInsights(false)
+      if (currentMesRef.current === fetchMes) setLoadingInsights(false)
     }
   }
 

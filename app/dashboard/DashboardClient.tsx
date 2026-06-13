@@ -29,7 +29,7 @@ interface Props {
 }
 
 function buildStats(txs: Transaction[]): MonthlyStats {
-  const gastosTxs    = txs.filter(t => isGasto(t.tipo))
+  const gastosTxs    = txs.filter(t => isGasto(t.tipo, t.categoria))
   const gastos       = gastosTxs.reduce((s, t) => s + t.monto, 0)
   const gastosReales = gastos
   const ingresos     = txs.filter(t => isIngreso(t.tipo)).reduce((s, t) => s + t.monto, 0)

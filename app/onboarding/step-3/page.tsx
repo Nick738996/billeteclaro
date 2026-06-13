@@ -27,7 +27,7 @@ export default function OnboardingStep3() {
       .then(({ data }) => {
         const s: Record<string, number> = {}
         for (const t of (data ?? []) as Pick<Transaction, 'tipo' | 'categoria' | 'monto'>[]) {
-          if (isGasto(t.tipo)) s[t.categoria] = (s[t.categoria] ?? 0) + t.monto
+          if (isGasto(t.tipo, t.categoria)) s[t.categoria] = (s[t.categoria] ?? 0) + t.monto
         }
         setSpending(s)
       })
@@ -49,7 +49,8 @@ export default function OnboardingStep3() {
           })
         }
       }
-      await fetch('/api/onboarding/complete', { method: 'POST' })
+      const completeRes = await fetch('/api/onboarding/complete', { method: 'POST' })
+      if (!completeRes.ok) throw new Error('Error al completar onboarding')
       router.push('/dashboard')
     } catch {
       setSaving(false)

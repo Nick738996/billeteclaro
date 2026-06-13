@@ -22,6 +22,7 @@ export type Categoria =
   | 'COMPRAS_ONLINE'
   | 'INVERSION'
   | 'AHORROS'
+  | 'PRESTAMO'
   | 'DEUDA'
   | 'DONACIONES'
   | 'EDUCACION'
@@ -84,7 +85,7 @@ export interface BudgetEntry {
   subcategorias: BudgetSubcat[]
 }
 
-/** Categorías disponibles para presupuesto mensual (excluye TRANSFERENCIA e INGRESO) */
+/** Categorías disponibles para presupuesto mensual (excluye TRANSFERENCIA, INGRESO, PRESTAMO) */
 export const PRESUPUESTO_CATS: Categoria[] = [
   'HOGAR', 'TRANSPORTE', 'SALIDAS', 'SALUD', 'SUSCRIPCIONES',
   'COMPRAS_ONLINE', 'INVERSION', 'AHORROS', 'DEUDA', 'DONACIONES', 'EDUCACION', 'REEMBOLSABLE', 'OTRO',
@@ -122,6 +123,7 @@ export const CATEGORIA_LABELS: Record<Categoria, string> = {
   COMPRAS_ONLINE: 'Compras Online',
   INVERSION: 'Inversión',
   AHORROS: 'Ahorros',
+  PRESTAMO: 'Préstamo',
   DEUDA: 'Deuda',
   DONACIONES: 'Donaciones',
   EDUCACION: 'Educación',
@@ -140,6 +142,7 @@ export const CATEGORIA_COLORS: Record<Categoria, string> = {
   COMPRAS_ONLINE: '#0ea5e9', // sky   — compras digitales
   INVERSION: '#14b8a6',   // teal     — inversión
   AHORROS: '#06b6d4',     // cyan     — ahorros
+  PRESTAMO: '#a78bfa',    // violet   — préstamos
   DEUDA: '#ef4444',       // red      — deudas/créditos
   DONACIONES: '#f97316',  // orange   — donaciones
   EDUCACION: '#84cc16',   // lime     — educación
@@ -197,6 +200,8 @@ export interface AdvisorContext {
   total_gastado: number
   total_presupuestado: number
   ingreso_estimado: number
+  gasto_diario_promedio: number
+  proyeccion_cierre: number
 }
 
 export interface AiInsight {
@@ -222,6 +227,8 @@ export function isIngreso(tipo: TipoTransaccion): boolean {
 }
 
 // ABONO_DEUDA = pago de tarjeta desde tu propia cuenta → no es gasto ni ingreso
-export function isGasto(tipo: TipoTransaccion): boolean {
+// AHORROS / PRESTAMO = movimientos propios que no son gastos del mes
+export function isGasto(tipo: TipoTransaccion, categoria?: Categoria): boolean {
+  if (categoria === 'AHORROS' || categoria === 'PRESTAMO') return false
   return !isIngreso(tipo) && tipo !== 'ABONO_DEUDA'
 }
