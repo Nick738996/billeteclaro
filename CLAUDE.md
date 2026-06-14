@@ -212,23 +212,30 @@ Flujos a cubrir (en orden de prioridad):
 
 **Setup:** `brew install maestro` · `maestro test maestro/flows/login.yaml` · Requiere app en `:3000`
 
-### ⬜ Deploy
+### ✅ Deploy — COMPLETADO (2026-06-12)
 
 **Dominio:** `billeteclaro.com` — comprado en Cloudflare ($10.44/yr). DNS gestionado desde Cloudflare (CDN + SSL + DDoS gratis).
 
 | Paso | Estado | Descripción |
 | ---- | ------ | ----------- |
-| 1 | ⬜ | `npm run build` sin errores |
-| 2 | ⬜ | Crear proyecto en [vercel.com](https://vercel.com) → Import Git Repository → conectar repo |
-| 3 | ⬜ | En Vercel: Settings → Environment Variables → agregar las vars de abajo (ver tabla) |
-| 4 | ⬜ | En Vercel: Settings → Domains → agregar `billeteclaro.com` y `www.billeteclaro.com` → Vercel muestra los registros DNS a agregar |
-| 5 | ⬜ | En Cloudflare: DNS → agregar los registros que dio Vercel (tipo `A` o `CNAME`). **Desactivar el proxy naranja (nube)** en el registro que apunta a Vercel — dejarlo solo como DNS |
-| 6 | ⬜ | Esperar propagación DNS (5-30 min). Verificar en Vercel que el dominio aparece con ✓ |
-| 7 | ⬜ | Google Cloud Console → APIs → Credenciales → OAuth 2.0 → agregar URIs autorizados: `https://billeteclaro.com/api/auth/callback` y `https://billeteclaro.com/api/auth/gmail-callback` |
-| 8 | ⬜ | Supabase Dashboard → Authentication → URL Configuration → agregar `https://billeteclaro.com` en Site URL y Redirect URLs |
-| 9 | ⬜ | Google Cloud Console → OAuth consent screen → "Test users" → agregar los emails de cada persona que vaya a usar la app (mientras esté en modo Testing) |
-| 10 | ⬜ | Probar login con Google en prod con tu propia cuenta |
-| 11 | ⬜ | Probar sync de emails end-to-end en prod |
+| 1 | ✅ | `npm run build` sin errores |
+| 2 | ✅ | Proyecto en Vercel conectado a `github.com/Nick738996/billeteclaro` |
+| 3 | ✅ | Variables de entorno configuradas en Vercel |
+| 4 | ✅ | Dominios `billeteclaro.com` y `www.billeteclaro.com` agregados en Vercel |
+| 5 | ✅ | CNAME en Cloudflare apuntando a `d9491c5a8e86fc88.vercel-dns-017.com` (proxy desactivado) |
+| 6 | ✅ | DNS propagado — ambos dominios con "Valid Configuration" en Vercel |
+| 7 | ✅ | Google OAuth: URIs autorizados para `billeteclaro.com` y `www.billeteclaro.com` |
+| 8 | ✅ | Supabase: Site URL `https://billeteclaro.com`, Redirect URLs para ambos dominios |
+| 9 | ✅ | Test users: `raul7389@gmail.com`, `caterine7226@gmail.com`, `isabellaaprada@gmail.com` |
+| 10 | ✅ | Login con Google funcionando en prod |
+| 11 | ✅ | Sync de emails funcionando en prod |
+
+**Notas del deploy:**
+- `www.billeteclaro.com` y `billeteclaro.com` son ambos Production en Vercel (sin redirect entre ellos)
+- Supabase Redirect URLs incluye `https://billeteclaro.com/**` y `https://www.billeteclaro.com/**`
+- Google OAuth tiene URIs para ambos dominios (con y sin www)
+- Se corrigió instanciación de Groq a nivel de módulo en `advisorService.ts`, `extractor.ts` y `categorizer.ts` — movida a getter lazy para que el build funcione sin `GROQ_API_KEY`
+- `lucide-react` faltaba en `package.json` — agregado
 
 **Variables de entorno en Vercel (paso 3):**
 
@@ -263,9 +270,11 @@ Flujos a cubrir (en orden de prioridad):
 
 No se necesita configurar nada extra — Vercel detecta Next.js y corre `npm run build` en cada push.
 
-**Para agregar tests antes del deploy (opcional):**
+**GitHub Actions CI — ACTIVO** (`.github/workflows/ci.yml` ya creado):
 
-Crear `.github/workflows/ci.yml`:
+Cada PR y push a `main` corre automáticamente `npm test` y `npx tsc --noEmit`.
+
+**Ejemplo del workflow:**
 
 ```yaml
 name: CI
