@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { AlertTriangle, Lightbulb, CircleCheck, TrendingUp, Eye, Send, ChevronDown, ChevronUp, type LucideIcon } from 'lucide-react'
+import { AlertTriangle, Lightbulb, CircleCheck, TrendingUp, Eye, Send, ChevronDown, ChevronUp, RefreshCw, type LucideIcon } from 'lucide-react'
 import type { Insight, InsightTipo } from '@/lib/types'
 import { formatCOP, CATEGORIA_LABELS } from '@/lib/types'
 import { TEST_IDS } from '@/lib/testIds'
@@ -51,66 +51,51 @@ function InsightCard({ insight }: { insight: Insight }) {
       aria-label={`${c.label}${insight.categoria ? ` — ${CATEGORIA_LABELS[insight.categoria as keyof typeof CATEGORIA_LABELS] ?? insight.categoria}` : ''}`}
       style={{
         background: 'var(--surface)',
-        border: '1px solid var(--border)',
-        borderLeft: `3px solid ${c.accent}`,
-        borderRadius: 'var(--radius-sm)',
-        padding: '10px 12px',
+        border: '1px solid var(--border-soft)',
+        borderRadius: 'var(--radius-md)',
+        padding: '14px',
         display: 'flex',
-        flexDirection: 'column',
-        gap: 6,
+        flexDirection: 'row',
+        gap: 12,
+        alignItems: 'flex-start',
       }}
     >
-      {/* Header row: icon + label badge + optional categoria badge */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <span style={{ color: c.accent, flexShrink: 0, display: 'flex' }}><c.Icon size={13} /></span>
-        <span
-          style={{
-            fontSize: 'var(--text-xs)',
-            fontWeight: 600,
-            color: c.badgeText,
-            background: c.badgeBg,
-            borderRadius: 'var(--radius-badge)',
-            padding: '1px 7px',
-          }}
-        >
-          {c.label}
-        </span>
-        {categoriaLabel && (
-          <span
-            style={{
-              fontSize: 'var(--text-xs)',
-              color: 'var(--text-muted)',
-              background: 'var(--surface-2)',
-              borderRadius: 'var(--radius-badge)',
-              padding: '1px 7px',
-            }}
-          >
-            {categoriaLabel}
+      {/* Ícono en círculo tenue */}
+      <div style={{
+        width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
+        background: `color-mix(in srgb, ${c.accent} 12%, transparent)`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        <c.Icon size={17} color={c.accent} />
+      </div>
+
+      {/* Contenido */}
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
+        {/* Tipo + categoría */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: c.accent, letterSpacing: '0.01em' }}>
+            {c.label}
+          </span>
+          {categoriaLabel && (
+            <>
+              <span style={{ fontSize: 10, color: 'var(--text-subtle)' }}>·</span>
+              <span style={{ fontSize: 11, color: 'var(--text-subtle)' }}>{categoriaLabel}</span>
+            </>
+          )}
+        </div>
+
+        {/* Texto principal */}
+        <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text)', lineHeight: 1.45, margin: 0 }}>
+          {insight.texto}
+        </p>
+
+        {/* Límite sugerido */}
+        {showLimiteBadge && (
+          <span style={{ fontSize: 11, fontWeight: 600, color: c.accent, marginTop: 2 }}>
+            Límite: {limiteStr}
           </span>
         )}
       </div>
-
-      {/* Text */}
-      <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text)', lineHeight: 1.45, margin: 0 }}>
-        {insight.texto}
-      </p>
-
-      {/* Límite sugerido badge — only when not already mentioned */}
-      {showLimiteBadge && (
-        <span
-          style={{
-            alignSelf: 'flex-start',
-            fontSize: 'var(--text-xs)',
-            fontWeight: 600,
-            color: c.accent,
-            background: c.badgeBg,
-            borderRadius: 'var(--radius-badge)',
-            padding: '2px 8px',
-          }}
-        >
-          Límite: {limiteStr}
-        </span>
-      )}
     </div>
   )
 }
@@ -323,6 +308,7 @@ export default function AIAdvisorPanel({ mes, budgetCount, txCount, contextVersi
                 onClick={fetchInsights}
                 data-testid={TEST_IDS.ADVISOR_REFRESH_BUTTON}
                 aria-label="Actualizar análisis"
+                className="flex items-center gap-1.5 transition-opacity hover:opacity-70"
                 style={{
                   fontSize: 'var(--text-xs)',
                   color: 'var(--text-muted)',
@@ -330,8 +316,10 @@ export default function AIAdvisorPanel({ mes, budgetCount, txCount, contextVersi
                   border: 'none',
                   cursor: 'pointer',
                   padding: 0,
+                  fontWeight: 500,
                 }}
               >
+                <RefreshCw size={11} />
                 Actualizar
               </button>
             )}
