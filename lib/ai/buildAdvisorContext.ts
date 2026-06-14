@@ -51,10 +51,17 @@ export function buildAdvisorContext(
   const totalGastado = Object.values(gastosPorCategoria).reduce((s, v) => s + v, 0)
   const totalPresupuestado = Object.values(presupuestoPorCategoria).reduce((s, v) => s + v, 0)
 
+  // Calculate totalGastadoSinTransferencias for gasto_diario_promedio
+  const totalGastadoSinTransferencias = Object.entries(gastosPorCategoria)
+    .filter(([cat]) => cat !== 'TRANSFERENCIA')
+    .reduce((s, [, v]) => s + v, 0)
+
   // Métricas calculadas
   const porcentajeMesTranscurrido = Math.round(diasTranscurridos / diasTotalesMes * 100)
   const gastoDiarioPromedio = diasTranscurridos > 0
-    ? Math.round(totalGastado / diasTranscurridos)
+    ? totalGastadoSinTransferencias > 0
+      ? Math.round(totalGastadoSinTransferencias / diasTranscurridos)
+      : Math.round(totalGastado / diasTranscurridos)
     : 0
   const proyeccionCierre = Math.round(gastoDiarioPromedio * diasTotalesMes)
   const excesoProyectado = proyeccionCierre - totalPresupuestado
