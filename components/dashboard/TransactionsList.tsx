@@ -583,7 +583,7 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
     return matchesCategory && matchesSearch
   }), [transactions, activeFilter, search, deletedIds])
 
-  const totalGastos   = useMemo(() => filtered.filter(t => isGasto(t.tipo, t.categoria)).reduce((s, t) => s + t.monto, 0), [filtered])
+  const totalGastos   = useMemo(() => filtered.filter(t => isGasto(t.tipo, t.categoria) || t.categoria === 'AHORROS' || t.categoria === 'PRESTAMO' || (t.categoria === 'TRANSFERENCIA' && !isIngreso(t.tipo))).reduce((s, t) => s + t.monto, 0), [filtered])
   const totalIngresos = useMemo(() => filtered.filter(t =>  isIngreso(t.tipo)).reduce((s, t) => s + t.monto, 0), [filtered])
   const groups        = useMemo(() => groupByDate(filtered), [filtered])
 

@@ -25,7 +25,7 @@ export default function MonthHero({ gastos, ingresos, ahorros, transacciones, me
   const hasIncome = ingresos > 0
   const pct        = hasIncome ? (gastos / ingresos) * 100 : 0
   const over       = hasIncome && gastos > ingresos
-  const disponible = ingresos - gastos - ahorros
+  const disponible = ingresos - gastos
 
   const barColor = over ? 'var(--red)' : pct >= 80 ? 'var(--yellow)' : 'var(--green)'
   const pctBadgeBg = over ? 'var(--red-soft)' : pct >= 80 ? 'var(--yellow-soft)' : 'var(--green-soft)'
