@@ -15,6 +15,7 @@ import SpendingChart from '@/components/dashboard/SpendingChart'
 import TransactionsList from '@/components/dashboard/TransactionsList'
 import HeaderPill from '@/components/dashboard/HeaderPill'
 import AIAdvisorPanel from '@/components/dashboard/AIAdvisorPanel'
+import SavingsOverview from '@/components/dashboard/SavingsOverview'
 import ManualTransactions from '@/components/dashboard/ManualTransactions'
 import TourTooltip from '@/components/tour/TourTooltip'
 import HelpModal from '@/components/tour/HelpModal'
@@ -34,21 +35,21 @@ interface Props {
 }
 
 function buildStats(txs: Transaction[]): MonthlyStats {
-  const gastosTxs    = txs.filter(t => isGasto(t.tipo, t.categoria))
-  const gastos       = gastosTxs.reduce((s, t) => s + t.monto, 0)
-  const gastosReales = gastos
-  const ingresos     = txs.filter(t => isIngreso(t.tipo)).reduce((s, t) => s + t.monto, 0)
-  const ahorros      = txs.filter(t => t.categoria === 'AHORROS').reduce((s, t) => s + t.monto, 0)
+  // AHORROS, PRESTAMO y TRANSFERENCIA (salientes) cuentan como salidas del mes
+  const gastosTxs = txs.filter(t => isGasto(t.tipo, t.categoria) || t.categoria === 'AHORROS' || t.categoria === 'PRESTAMO' || (t.categoria === 'TRANSFERENCIA' && !isIngreso(t.tipo)))
+  const gastos    = gastosTxs.reduce((s, t) => s + t.monto, 0)
+  const ingresos  = txs.filter(t => isIngreso(t.tipo)).reduce((s, t) => s + t.monto, 0)
+  const ahorros   = txs.filter(t => t.categoria === 'AHORROS').reduce((s, t) => s + t.monto, 0)
   const porCategoria = gastosTxs.reduce<Record<string, number>>((acc, t) => {
     acc[t.categoria] = (acc[t.categoria] ?? 0) + t.monto
     return acc
   }, {})
   return {
     gastos,
-    gastosReales,
+    gastosReales: gastos,
     ingresos,
     ahorros,
-    balance: ingresos - gastosReales - ahorros,
+    balance: ingresos - gastos,
     transacciones: txs.length,
     porCategoria: porCategoria as Record<Categoria, number>,
   }
@@ -263,6 +264,8 @@ export default function DashboardClient({
             onFilterChange={setActiveFilter}
           />
         )}
+
+        <SavingsOverview />
 
         <div data-testid="tour-budget">
           <BudgetOverview

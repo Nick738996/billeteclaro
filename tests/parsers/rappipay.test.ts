@@ -126,6 +126,84 @@ Fecha de corte
   })
 })
 
+describe('parseRappiPay — compra con PSE', () => {
+  const bodyETB = `
+¡Hola, Brandon Nick!
+
+Te compartimos toda la información de tu compra.
+
+Monto
+$22.450,00
+
+CUS (Código de transacción)
+384659088
+
+RappiCuenta de origen
+149739514
+
+Comercio
+EMPRESA DE TELECOMUNICACIONES DE BOGOTA S. A. E.S.P
+
+Tipo de transacción
+PSE
+
+Número de aprobación
+3561150
+
+Fecha de la transacción
+12 de junio de 2026
+
+Hora de la transacción
+09:46 am
+`
+
+  const bodyFondo = `
+¡Hola, Brandon Nick!
+
+Monto
+$1.382.000,00
+
+Comercio
+Fondo de Inversion Colectiva Consolidar
+
+Tipo de transacción
+PSE
+
+Fecha de la transacción
+13 de junio de 2026
+
+Hora de la transacción
+07:53 pm
+`
+
+  it('parses PSE purchase from subject', () => {
+    const result = parseRappiPay({ ...BASE_EMAIL, subject: 'Resumen compra con Pse', body: bodyETB })
+    expect(result).not.toBeNull()
+    expect(result!.tipo).toBe('COMPRA')
+    expect(result!.monto).toBe(22450)
+    expect(result!.comercio).toBe('Empresa de Telecomunicaciones de Bogota S. A. E.s.p')
+    expect(result!.banco).toBe('RAPPIPAY')
+  })
+
+  it('parses PSE purchase with large amount', () => {
+    const result = parseRappiPay({ ...BASE_EMAIL, subject: 'Resumen compra con Pse', body: bodyFondo })
+    expect(result).not.toBeNull()
+    expect(result!.tipo).toBe('COMPRA')
+    expect(result!.monto).toBe(1382000)
+  })
+
+  it('parses PSE purchase from body fallback when subject is different', () => {
+    const result = parseRappiPay({ ...BASE_EMAIL, subject: 'Confirmación de pago', body: bodyETB })
+    expect(result).not.toBeNull()
+    expect(result!.tipo).toBe('COMPRA')
+  })
+
+  it('sets fecha from body', () => {
+    const result = parseRappiPay({ ...BASE_EMAIL, subject: 'Resumen compra con Pse', body: bodyETB })
+    expect(result!.fecha).toContain('2026-06-12')
+  })
+})
+
 describe('parseRappiPay — no match', () => {
   it('returns null for promotional email', () => {
     const result = parseRappiPay({

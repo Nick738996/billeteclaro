@@ -544,13 +544,20 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
     if (!pendingCount || isSaving) return
     setIsSaving(true)
     try {
-      const changes = Object.entries(pendingCats).map(([id, categoria]) => ({ id, categoria }))
-      const res = await fetch('/api/transactions/categorize', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ changes }),
-      })
-      if (!res.ok) throw new Error()
+      const results = await Promise.all(
+        Object.entries(pendingCats).map(([id, categoria]) =>
+          fetch('/api/transactions', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id, categoria }),
+          })
+        )
+      )
+      const failed = results.find(r => !r.ok)
+      if (failed) {
+        const body = await failed.json().catch(() => ({}))
+        throw new Error(`${failed.status}: ${body.error ?? 'error desconocido'}`)
+      }
       setPendingCats({})
       setSavedOk(true)
       setTimeout(() => setSavedOk(false), 1800)
@@ -583,7 +590,7 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
     return matchesCategory && matchesSearch
   }), [transactions, activeFilter, search, deletedIds])
 
-  const totalGastos   = useMemo(() => filtered.filter(t => isGasto(t.tipo, t.categoria)).reduce((s, t) => s + t.monto, 0), [filtered])
+  const totalGastos   = useMemo(() => filtered.filter(t => isGasto(t.tipo, t.categoria) || t.categoria === 'AHORROS' || t.categoria === 'PRESTAMO' || (t.categoria === 'TRANSFERENCIA' && !isIngreso(t.tipo))).reduce((s, t) => s + t.monto, 0), [filtered])
   const totalIngresos = useMemo(() => filtered.filter(t =>  isIngreso(t.tipo)).reduce((s, t) => s + t.monto, 0), [filtered])
   const groups        = useMemo(() => groupByDate(filtered), [filtered])
 
