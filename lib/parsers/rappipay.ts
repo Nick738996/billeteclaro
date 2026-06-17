@@ -1,5 +1,6 @@
 import type { EmailInput, ParseResult } from './types'
 import { parseCOPAmount, parseSpanishDate, toTitleCase } from './utils'
+import { guessCategoria } from './commerceCategories'
 
 export function parseRappiPay(email: EmailInput): ParseResult {
   const body = email.body
@@ -15,6 +16,11 @@ export function parseRappiPay(email: EmailInput): ParseResult {
   // Pago de servicio (ENEL, utilities)
   if (/pago.*servicio|resumen.*pago.*servicio/i.test(subject + body)) {
     return parsePagoServicio(email)
+  }
+
+  // Compra con PSE — "Resumen compra con Pse"
+  if (/compra.*pse|pse/i.test(subject) || /Tipo de transacci[oó]n\s+PSE/i.test(body)) {
+    return parsePSECompra(email)
   }
 
   // Depósito bancario (salary, employer transfers) — detected by subject
@@ -159,6 +165,33 @@ function parsePagoServicio(email: EmailInput): ParseResult {
     banco: 'RAPPIPAY',
     tipo: 'PAGO_SERVICIO',
     categoria: 'HOGAR',
+    subcategoria: null,
+    moneda: 'COP',
+    monto_usd: null,
+    flags: [],
+  }
+}
+
+function parsePSECompra(email: EmailInput): ParseResult {
+  const body = email.body
+
+  const montoMatch = body.match(/Monto\s+\$([\d.,]+)/i)
+  if (!montoMatch) return null
+
+  const monto = parseCOPAmount(montoMatch[1])
+  if (!monto || monto <= 0) return null
+
+  const comercioMatch = body.match(/Comercio\s+([^\n]{1,120})/i)
+  const comercio = comercioMatch ? toTitleCase(comercioMatch[1].trim()) : null
+
+  return {
+    fecha: extractFechaHora(body, email.date),
+    monto,
+    comercio,
+    descripcion: comercio ? `Pago PSE a ${comercio}` : 'Pago PSE',
+    banco: 'RAPPIPAY',
+    tipo: 'COMPRA',
+    categoria: guessCategoria(comercio ?? ''),
     subcategoria: null,
     moneda: 'COP',
     monto_usd: null,

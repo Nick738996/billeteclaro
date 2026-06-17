@@ -15,6 +15,7 @@ import SpendingChart from '@/components/dashboard/SpendingChart'
 import TransactionsList from '@/components/dashboard/TransactionsList'
 import HeaderPill from '@/components/dashboard/HeaderPill'
 import AIAdvisorPanel from '@/components/dashboard/AIAdvisorPanel'
+import SavingsOverview from '@/components/dashboard/SavingsOverview'
 import ManualTransactions from '@/components/dashboard/ManualTransactions'
 import TourTooltip from '@/components/tour/TourTooltip'
 import HelpModal from '@/components/tour/HelpModal'
@@ -263,6 +264,8 @@ export default function DashboardClient({
             onFilterChange={setActiveFilter}
           />
         )}
+
+        <SavingsOverview />
 
         <div data-testid="tour-budget">
           <BudgetOverview
