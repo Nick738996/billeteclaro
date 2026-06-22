@@ -5,6 +5,8 @@ import {
   CATEGORIA_COLORS,
   CATEGORIA_LABELS,
   formatCOPCompact,
+  isGasto,
+  isIngreso,
   type Categoria,
   type Transaction,
 } from '@/lib/types'
@@ -43,12 +45,6 @@ function donutArc(
   return `M${f(x0)},${f(y0)} A${oR},${oR} 0 ${lg},1 ${f(x1)},${f(y1)} L${f(x2)},${f(y2)} A${iR},${iR} 0 ${lg},0 ${f(x3)},${f(y3)} Z`
 }
 
-// ── Chart data builder (same logic as original) ──────────────────────────────
-
-const TIPOS_GASTO = new Set([
-  'COMPRA', 'PAGO_SERVICIO', 'RETIRO', 'TRANSFERENCIA_ENVIADA',
-])
-
 interface ChartEntry {
   name: string
   value: number
@@ -62,8 +58,12 @@ interface ChartEntry {
 function buildChartData(transactions: Transaction[]): ChartEntry[] {
   const totals: Partial<Record<Categoria, number>> = {}
   for (const t of transactions) {
-    if (!TIPOS_GASTO.has(t.tipo)) continue
-    if (t.categoria === 'INGRESO' || t.categoria === 'AHORROS' || t.categoria === 'PRESTAMO') continue
+    const include =
+      isGasto(t.tipo, t.categoria) ||
+      t.categoria === 'AHORROS' ||
+      t.categoria === 'PRESTAMO' ||
+      (t.categoria === 'TRANSFERENCIA' && !isIngreso(t.tipo))
+    if (!include) continue
     totals[t.categoria] = (totals[t.categoria] ?? 0) + t.monto
   }
   const sorted = Object.entries(totals)
