@@ -5,6 +5,13 @@ const UMBRAL_SUELDO = 9_000_000
 const VENTANA_DIAS = 5
 const FALLBACK_DIAS = 3
 
+// Colombia es UTC-5 sin horario de verano
+const COLOMBIA_OFFSET_MS = 5 * 60 * 60 * 1000
+
+function toColombiaDate(fecha: string): string {
+  return new Date(new Date(fecha).getTime() - COLOMBIA_OFFSET_MS).toISOString().slice(0, 10)
+}
+
 type TxBase = {
   fecha: string
   monto: number
@@ -49,10 +56,11 @@ function nextMonth(mes: string): string {
 export function asignarMesContable<T extends TxBase>(
   transacciones: T[]
 ): (T & { mes_contable: string; es_sueldo?: true })[] {
-  // Agrupar por mes calendario (slice(0,7) funciona tanto en ISO como en YYYY-MM-DD)
+  // Agrupar por mes calendario en hora Colombia para evitar que transacciones
+  // nocturnas (ej. 23:41 COL = 04:41 UTC del día siguiente) cambien de mes
   const porMes = new Map<string, T[]>()
   for (const t of transacciones) {
-    const mes = t.fecha.slice(0, 7)
+    const mes = toColombiaDate(t.fecha).slice(0, 7)
     if (!porMes.has(mes)) porMes.set(mes, [])
     porMes.get(mes)!.push(t)
   }
@@ -67,7 +75,7 @@ export function asignarMesContable<T extends TxBase>(
     // Detectar sueldo: primero buscar por comercio conocido, luego por monto solo
     const sueldoPorComercio = txsDelMes
       .filter(t => {
-        const dia = new Date(t.fecha).getDate()
+        const dia = parseInt(toColombiaDate(t.fecha).slice(8, 10), 10)
         return dia >= inicioVentana && esSueldo(t)
       })
       .sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime())[0]
@@ -76,7 +84,7 @@ export function asignarMesContable<T extends TxBase>(
     const sueldoPorMonto = !sueldoPorComercio
       ? txsDelMes
           .filter(t => {
-            const dia = new Date(t.fecha).getDate()
+            const dia = parseInt(toColombiaDate(t.fecha).slice(8, 10), 10)
             const esIngreso = t.tipo === 'INGRESO' || t.tipo === 'TRANSFERENCIA_RECIBIDA'
             return dia >= inicioVentana && esIngreso && t.monto >= UMBRAL_SUELDO
           })
@@ -89,13 +97,15 @@ export function asignarMesContable<T extends TxBase>(
       let mesContable: string
 
       if (sueldo) {
-        // Transacciones >= timestamp del sueldo van al mes siguiente
-        mesContable = new Date(t.fecha).getTime() >= new Date(sueldo.fecha).getTime()
+        // Todo el día del sueldo (y días posteriores) va al mes siguiente,
+        // comparando en hora Colombia para que 23:41 COL no se confunda con
+        // el día siguiente en UTC (04:41 UTC).
+        mesContable = toColombiaDate(t.fecha) >= toColombiaDate(sueldo.fecha)
           ? siguiente
           : mes
       } else {
         // Sin sueldo detectado: últimos FALLBACK_DIAS días → mes siguiente
-        const dia = new Date(t.fecha).getDate()
+        const dia = parseInt(toColombiaDate(t.fecha).slice(8, 10), 10)
         const inicioFallback = lastDay - FALLBACK_DIAS + 1
         mesContable = dia >= inicioFallback ? siguiente : mes
       }
