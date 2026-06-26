@@ -17,6 +17,7 @@ type DraftMap = Record<string, BudgetEntry>
 interface Props {
   mes: string
   gastosPorCategoria: Record<string, number>
+  ingresos: number
   onBudgetsChange: (totals: Record<string, number>) => void
   onSaved: () => void
 }
@@ -40,7 +41,7 @@ function badgeColor(pct: number): string {
   return 'var(--green)'
 }
 
-export default function BudgetOverview({ mes, gastosPorCategoria, onBudgetsChange, onSaved }: Props) {
+export default function BudgetOverview({ mes, gastosPorCategoria, ingresos, onBudgetsChange, onSaved }: Props) {
   const [draftMap, setDraftMap] = useState<DraftMap>({})
   const [editing, setEditing] = useState(false)
   const [loaded, setLoaded] = useState(false)
@@ -115,6 +116,7 @@ export default function BudgetOverview({ mes, gastosPorCategoria, onBudgetsChang
       <BudgetManager
         mes={mes}
         gastosPorCategoria={gastosPorCategoria}
+        ingresos={ingresos}
         initialBudgets={draftMap}
         onBudgetsChange={newTotals => {
           setDraftMap(prev => {

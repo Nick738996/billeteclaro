@@ -36,8 +36,8 @@ interface Props {
 }
 
 function buildStats(txs: Transaction[]): MonthlyStats {
-  // AHORROS, PRESTAMO y TRANSFERENCIA (salientes) cuentan como salidas del mes
-  const gastosTxs = txs.filter(t => isGasto(t.tipo, t.categoria) || t.categoria === 'AHORROS' || t.categoria === 'PRESTAMO' || (t.categoria === 'TRANSFERENCIA' && !isIngreso(t.tipo)))
+  // AHORROS, PRESTAMO, DEUDA y TRANSFERENCIA (salientes) cuentan como salidas del mes
+  const gastosTxs = txs.filter(t => isGasto(t.tipo, t.categoria) || t.categoria === 'AHORROS' || t.categoria === 'PRESTAMO' || t.categoria === 'DEUDA' || (t.categoria === 'TRANSFERENCIA' && !isIngreso(t.tipo)))
   const gastos    = gastosTxs.reduce((s, t) => s + t.monto, 0)
   const ingresos  = txs.filter(t => isIngreso(t.tipo)).reduce((s, t) => s + t.monto, 0)
   const ahorros   = txs.filter(t => t.categoria === 'AHORROS').reduce((s, t) => s + t.monto, 0)
@@ -280,6 +280,7 @@ export default function DashboardClient({
           <BudgetOverview
             mes={month}
             gastosPorCategoria={stats.porCategoria}
+            ingresos={stats.ingresos}
             onBudgetsChange={setBudgets}
             onSaved={bumpContext}
           />

@@ -21,13 +21,14 @@ type DraftMap = Record<string, BudgetEntry>
 interface Props {
   mes: string
   gastosPorCategoria: Record<string, number>
+  ingresos?: number
   initialBudgets?: DraftMap
   onBudgetsChange?: (totals: Record<string, number>) => void
   onSaved?: () => void
   onClose?: () => void
 }
 
-export default function BudgetManager({ mes, gastosPorCategoria, initialBudgets, onBudgetsChange, onSaved, onClose }: Props) {
+export default function BudgetManager({ mes, gastosPorCategoria, ingresos = 0, initialBudgets, onBudgetsChange, onSaved, onClose }: Props) {
   const [saved,    setSaved]    = useState<DraftMap>(initialBudgets ?? {})
   const [draft,    setDraft]    = useState<DraftMap>(initialBudgets ?? {})
   const [expanded, setExpanded] = useState<string | null>(null)
@@ -113,6 +114,9 @@ export default function BudgetManager({ mes, gastosPorCategoria, initialBudgets,
       setSaving(false)
     }
   }
+
+  const totalPresupuestado = Object.values(draft).reduce((s, v) => s + v.monto, 0)
+  const restante = ingresos - totalPresupuestado
 
   const catsWithActivity = PRESUPUESTO_CATS.filter(
     cat => (gastosPorCategoria[cat] ?? 0) > 0 || (draft[cat]?.monto ?? 0) > 0
@@ -217,6 +221,35 @@ export default function BudgetManager({ mes, gastosPorCategoria, initialBudgets,
             />
           ))}
         </details>
+      )}
+
+      {/* Footer — resumen de asignación */}
+      {(totalPresupuestado > 0 || ingresos > 0) && (
+        <div style={{ borderTop: '1px solid var(--border)', padding: '12px 16px', background: 'var(--surface-2)' }}>
+          <div className="flex items-center justify-between" style={{ marginBottom: 6 }}>
+            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>Total presupuestado</span>
+            <span className="tabular-nums" style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--text)' }}>
+              {formatCOP(totalPresupuestado)}
+            </span>
+          </div>
+          {ingresos > 0 && (
+            <div className="flex items-center justify-between">
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
+                {restante >= 0 ? 'Sin asignar' : 'Excedido'}
+              </span>
+              <span
+                className="tabular-nums"
+                style={{
+                  fontSize: 'var(--text-sm)',
+                  fontWeight: 700,
+                  color: restante >= 0 ? 'var(--green)' : 'var(--red)',
+                }}
+              >
+                {restante >= 0 ? formatCOP(restante) : `−${formatCOP(Math.abs(restante))}`}
+              </span>
+            </div>
+          )}
+        </div>
       )}
     </div>
   )
