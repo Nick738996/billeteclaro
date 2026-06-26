@@ -7,6 +7,12 @@ vi.mock('@/lib/utils/auditId', () => ({
   generateAuditId: vi.fn().mockResolvedValue('0601-01'),
 }))
 
+// Mock de mesContableService para evitar llamadas reales a Supabase en unit tests.
+// Los tests de integración del ciclo de pago se cubren en mesContable.test.ts.
+vi.mock('@/lib/services/mesContableService', () => ({
+  reassignCalendarMonths: vi.fn().mockResolvedValue(undefined),
+}))
+
 type InsertedRow = Record<string, unknown>
 
 function makeMockSupabase(): { supabase: SupabaseClient; getInserted: () => InsertedRow[] } {
@@ -22,7 +28,6 @@ function makeMockSupabase(): { supabase: SupabaseClient; getInserted: () => Inse
   return { supabase, getInserted: () => inserted }
 }
 
-// generateAuditId recibe admin como primer argumento; como está mockeado no lo necesita real
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const MOCK_ADMIN = {} as any
 

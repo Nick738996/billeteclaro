@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { format, parseISO, addMonths, subMonths } from 'date-fns'
+import { format, parseISO, addMonths, subMonths, startOfMonth } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
@@ -30,6 +30,7 @@ interface Props {
   prevMonth: string
   nextMonth: string
   isCurrentMonth: boolean
+  canGoNext: boolean
   gmailConnected: boolean
   tourCompleted: boolean
 }
@@ -61,6 +62,7 @@ export default function DashboardClient({
   monthLabel: initLabel,
   currentMonth: initMonth,
   isCurrentMonth: initIsCurrent,
+  canGoNext: initCanGoNext,
   gmailConnected,
   tourCompleted,
 }: Props) {
@@ -72,6 +74,7 @@ export default function DashboardClient({
   const [txs, setTxs] = useState(initTxs)
   const [label, setLabel] = useState(initLabel)
   const [isCurrent, setIsCurrent] = useState(initIsCurrent)
+  const [canGoNext, setCanGoNext] = useState(initCanGoNext)
   const [loading, setLoading] = useState(false)
 
   const [activeFilter, setActiveFilter] = useState<string>('TODOS')
@@ -113,15 +116,21 @@ export default function DashboardClient({
     setLoading(true)
     setActiveFilter('TODOS') // reset filter on month change
 
-    const { data } = await supabase
-      .from('transactions')
-      .select('*')
-      .eq('mes_contable', m)
-      .order('fecha', { ascending: false })
+    const nextM = format(addMonths(parseISO(`${m}-01`), 1), 'yyyy-MM')
+    const maxAllowedMonth = format(addMonths(startOfMonth(new Date()), 1), 'yyyy-MM')
+
+    const [{ data }] = await Promise.all([
+      supabase
+        .from('transactions')
+        .select('*')
+        .eq('mes_contable', m)
+        .order('fecha', { ascending: false }),
+    ])
 
     setTxs((data ?? []) as Transaction[])
     setLabel(format(parseISO(`${m}-01`), 'MMMM yyyy', { locale: es }))
     setIsCurrent(m === today)
+    setCanGoNext(nextM <= maxAllowedMonth)
     setMonth(m)
     setLoading(false)
   }, [supabase, today])
@@ -210,10 +219,10 @@ export default function DashboardClient({
 
             <button
               onClick={() => navigate(nextMonth)}
-              disabled={isCurrent}
+              disabled={!canGoNext}
               data-testid={TEST_IDS.DASHBOARD_MONTH_NEXT}
               aria-label="Mes siguiente"
-              aria-disabled={isCurrent}
+              aria-disabled={!canGoNext}
               className="w-11 h-11 rounded-full flex items-center justify-center transition-colors disabled:opacity-30"
               style={{ color: 'var(--text-muted)' }}
             >

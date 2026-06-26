@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { startOfMonth, endOfMonth, parseISO } from 'date-fns'
 import { createAdminClient } from '@/lib/supabase/server'
 import { generateAuditId } from '@/lib/utils/auditId'
+import { reassignCalendarMonths } from '@/lib/services/mesContableService'
 import type { Categoria, Banco, TipoTransaccion, Transaction } from '@/lib/types'
 
 type Admin = ReturnType<typeof createAdminClient>
@@ -65,6 +66,11 @@ export async function createManualTransactions(
 
   const { error } = await supabase.from('transactions').insert(rows)
   if (error) throw new Error(`createManualTransactions: ${error.message}`)
+
+  // Reasignar mes_contable considerando el ciclo de pago (sueldo detectado en el mes)
+  const calendarMonths = [...new Set(items.map(tx => tx.fecha.slice(0, 7)))]
+  await reassignCalendarMonths(admin, userId, calendarMonths)
+
   return rows.length
 }
 

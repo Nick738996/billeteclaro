@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   description: 'Tu dashboard financiero personal.',
   robots: { index: false, follow: false },
 }
-import { format, parseISO, addMonths, subMonths } from 'date-fns'
+import { format, parseISO, addMonths, subMonths, isBefore, startOfMonth } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import type { Transaction } from '@/lib/types'
@@ -55,6 +55,10 @@ export default async function DashboardPage({ searchParams }: Props) {
   const nextMonth = format(addMonths(ref, 1), 'yyyy-MM')
   const currentMonth = format(new Date(), 'yyyy-MM')
   const isCurrentMonth = monthParam === currentMonth
+  // Permitir navegar hasta 1 mes calendario adelante del mes actual
+  // (cubre el caso de sueldo al final del mes que mueve transacciones al mes siguiente)
+  const maxAllowedMonth = format(addMonths(startOfMonth(new Date()), 1), 'yyyy-MM')
+  const canGoNext = nextMonth <= maxAllowedMonth
 
   const monthLabel = format(ref, 'MMMM yyyy', { locale: es })
 
@@ -67,6 +71,7 @@ export default async function DashboardPage({ searchParams }: Props) {
       prevMonth={prevMonth}
       nextMonth={nextMonth}
       isCurrentMonth={isCurrentMonth}
+      canGoNext={canGoNext}
       gmailConnected={gmailConnected}
       tourCompleted={tourCompleted}
     />

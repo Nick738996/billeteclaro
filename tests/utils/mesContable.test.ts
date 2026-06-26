@@ -38,11 +38,35 @@ describe('asignarMesContable', () => {
       expect(b.es_sueldo).toBe(true)
     })
 
-    it('transacción posterior al sueldo → 2026-06', () => {
+    it('transacción posterior al sueldo (mismo día) → 2026-06', () => {
       const result = asignarMesContable(txs)
       const c = result.find(r => (r as TxInput).id === 'c')!
       expect(c.mes_contable).toBe('2026-06')
       expect(c.es_sueldo).toBeUndefined()
+    })
+
+    it('transacción anterior al sueldo pero mismo día COL → 2026-06 (todo el día va al siguiente)', () => {
+      // Caso real: gasto a las 08:00 COL, sueldo a las 14:00 COL — ambos van al mes siguiente
+      const txsConAnterior: TxInput[] = [
+        tx('a2', '2026-05-28T13:00:00Z', 30000,    'COMPRA',  'Rappi'),       // 08:00 COL mismo día
+        tx('b2', '2026-05-28T20:00:00Z', 10254616, 'INGRESO', 'Banco Citibank Colombia'), // 15:00 COL sueldo
+      ]
+      const result = asignarMesContable(txsConAnterior)
+      expect(result.find(r => (r as TxInput).id === 'a2')!.mes_contable).toBe('2026-06')
+      expect(result.find(r => (r as TxInput).id === 'b2')!.mes_contable).toBe('2026-06')
+    })
+
+    it('transacción a las 23:41 COL del día anterior no se pasa (UTC edge case)', () => {
+      // 23:41 hora Colombia = 04:41 UTC del día siguiente.
+      // Sin la corrección de timezone, slice(0,10) daría el mismo día que el sueldo
+      // y la transacción se pasaría incorrectamente al mes siguiente.
+      const txsTimezone: TxInput[] = [
+        tx('z1', '2026-05-28T04:41:00Z', 200000,   'COMPRA',  'Andres Carne de Res'), // 23:41 COL día 27
+        tx('z2', '2026-05-28T20:13:00Z', 10254616, 'INGRESO', 'Banco Citibank Colombia'), // 15:13 COL día 28
+      ]
+      const result = asignarMesContable(txsTimezone)
+      expect(result.find(r => (r as TxInput).id === 'z1')!.mes_contable).toBe('2026-05') // queda en mayo
+      expect(result.find(r => (r as TxInput).id === 'z2')!.mes_contable).toBe('2026-06') // va a junio
     })
 
     it('transacción al final del mes → 2026-06', () => {
