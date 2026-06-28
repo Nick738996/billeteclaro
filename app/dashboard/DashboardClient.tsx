@@ -4,7 +4,7 @@ import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { format, parseISO, addMonths, subMonths, startOfMonth } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { Transaction, MonthlyStats, Categoria } from '@/lib/types'
 import { isIngreso, isGasto } from '@/lib/types'
@@ -31,7 +31,6 @@ interface Props {
   nextMonth: string
   isCurrentMonth: boolean
   canGoNext: boolean
-  gmailConnected: boolean
   tourCompleted: boolean
 }
 
@@ -63,7 +62,6 @@ export default function DashboardClient({
   currentMonth: initMonth,
   isCurrentMonth: initIsCurrent,
   canGoNext: initCanGoNext,
-  gmailConnected,
   tourCompleted,
 }: Props) {
   const router = useRouter()
@@ -231,30 +229,6 @@ export default function DashboardClient({
           </div>
         </div>
 
-        {/* Alert Gmail no conectado */}
-        {!gmailConnected && (
-          <a
-            href="/api/auth/gmail-connect"
-            className="flex items-center gap-3 transition-opacity hover:opacity-80"
-            style={{
-              background: 'var(--yellow-soft)',
-              borderLeft: '3px solid var(--yellow)',
-              borderRadius: 'var(--radius-md)',
-              padding: '12px 16px',
-            }}
-          >
-            <AlertTriangle size={18} style={{ color: 'var(--yellow)', flexShrink: 0 }} />
-            <div className="flex-1 min-w-0">
-              <p className="font-medium" style={{ fontSize: 'var(--text-sm)', color: 'var(--text)' }}>
-                Gmail no conectado
-              </p>
-              <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginTop: 2 }}>
-                Toca aquí para conectar tu cuenta y sincronizar.
-              </p>
-            </div>
-            <ChevronRight size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-          </a>
-        )}
 
         <MonthHero
           gastos={stats.gastos}

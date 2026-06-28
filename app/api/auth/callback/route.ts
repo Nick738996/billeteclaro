@@ -20,9 +20,23 @@ export async function GET(request: Request) {
 
   const { session } = data
   const { provider_token, provider_refresh_token, user } = session
+  const provider = user.app_metadata?.provider as string | undefined
 
   const admin = createAdminClient()
 
+  // ── Flujo Microsoft (Azure) ──────────────────────────────────────────────
+  if (provider === 'azure') {
+    if (provider_refresh_token) {
+      await admin.from('user_tokens').upsert({
+        user_id: user.id,
+        outlook_refresh_token: provider_refresh_token,
+        updated_at: new Date().toISOString(),
+      })
+    }
+    return NextResponse.redirect(new URL('/dashboard', request.url))
+  }
+
+  // ── Flujo Google (Gmail) ─────────────────────────────────────────────────
   if (provider_refresh_token) {
     await admin.from('user_tokens').upsert({
       user_id: user.id,
@@ -34,7 +48,7 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL(next, request.url))
   }
 
-  // Supabase didn't forward the Google refresh token — check if we already have one
+  // Google sin refresh token — verificar si ya tenemos uno guardado
   const { data: existing } = await admin
     .from('user_tokens')
     .select('gmail_refresh_token')
@@ -45,6 +59,6 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL(next, request.url))
   }
 
-  // No token anywhere — redirect to direct Google OAuth flow to obtain it
+  // Sin token en ningún lado — pedir permiso de Gmail
   return NextResponse.redirect(new URL('/api/auth/gmail-connect', request.url))
 }

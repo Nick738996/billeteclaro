@@ -1,20 +1,19 @@
-import {
-  refreshGmailToken,
-  buildGmailClient,
-  listBankMessageIds,
-  getMessageDetails,
-} from '@/lib/gmail/client'
+import { GmailProvider, OutlookProvider } from '@/lib/email'
+import { detectBank } from '@/lib/email/gmail'
 import { trySpecificParser } from '@/lib/parsers'
 import { generateAuditId } from '@/lib/utils/auditId'
 import { deduplicateUber } from '@/lib/utils/deduplicateUber'
 import { reassignCalendarMonths } from '@/lib/services/mesContableService'
 import { createAdminClient } from '@/lib/supabase/server'
+import type { EmailProvider } from '@/lib/email/types'
 import type { ExtractedTransaction } from '@/lib/types'
 
 type Admin = ReturnType<typeof createAdminClient>
 
 const MAX_EMAILS  = 2000
 const BATCH_SIZE  = 10
+// Sincronizar desde esta fecha en adelante
+const SYNC_FROM   = new Date('2026-05-01')
 
 export interface SyncResult {
   correos_revisados:    number
@@ -26,12 +25,12 @@ export interface SyncResult {
 }
 
 export async function runSync(userId: string, admin: Admin): Promise<SyncResult> {
-  // 1. Gmail tokens
+  // 1. Tokens
   const { data: tokenRow } = await admin
     .from('user_tokens').select('*').eq('user_id', userId).single()
 
-  if (!tokenRow?.gmail_refresh_token) {
-    throw Object.assign(new Error('No Gmail token found. Please reconnect your Google account.'), { status: 400 })
+  if (!tokenRow?.gmail_refresh_token && !tokenRow?.outlook_refresh_token) {
+    throw Object.assign(new Error('No hay cuenta de correo conectada. Por favor conecta Gmail u Outlook.'), { status: 400 })
   }
 
   // 2. Sync log
@@ -43,21 +42,19 @@ export async function runSync(userId: string, admin: Admin): Promise<SyncResult>
   const syncId = syncLog?.id
 
   try {
-    // 3. Refresh access token
-    const { access_token, expires_at } = await refreshGmailToken(tokenRow.gmail_refresh_token)
-    await admin.from('user_tokens').update({
-      gmail_access_token: access_token,
-      token_expires_at:   expires_at.toISOString(),
-      updated_at:         new Date().toISOString(),
-    }).eq('user_id', userId)
-
-    const gmail = buildGmailClient(access_token)
+    // 3. Construir providers disponibles
+    const providers: EmailProvider[] = []
+    if (tokenRow.gmail_refresh_token) {
+      providers.push(new GmailProvider(tokenRow.gmail_refresh_token))
+    }
+    if (tokenRow.outlook_refresh_token) {
+      providers.push(new OutlookProvider(tokenRow.outlook_refresh_token))
+    }
 
     // 4. IDs ya procesados (transactions + todos los skipped_ids de sync_log)
-    const [{ data: existing }, { data: pastLogs }, allMessageIds] = await Promise.all([
+    const [{ data: existing }, { data: pastLogs }] = await Promise.all([
       admin.from('transactions').select('gmail_message_id').eq('user_id', userId),
       admin.from('sync_log').select('skipped_ids').eq('user_id', userId),
-      listBankMessageIds(gmail),
     ])
 
     const processedIds = new Set((existing ?? []).map(r => r.gmail_message_id))
@@ -65,35 +62,55 @@ export async function runSync(userId: string, admin: Admin): Promise<SyncResult>
       for (const id of (log.skipped_ids ?? []) as string[]) processedIds.add(id)
     }
 
+    // 5. Listar todos los IDs de bancos de cada provider en paralelo
+    const allIdsByProvider = await Promise.all(
+      providers.map(p => p.listBankMessageIds(SYNC_FROM))
+    )
+    const allMessageIds = allIdsByProvider.flat()
+    const providerByMessageId = new Map<string, EmailProvider>()
+    allIdsByProvider.forEach((ids, i) => ids.forEach(id => providerByMessageId.set(id, providers[i])))
+
     const newIds = allMessageIds.filter(id => !processedIds.has(id)).slice(0, MAX_EMAILS)
 
     const errores: string[] = []
     let parserCount = 0, omitidosCount = 0
     const allTransactions: Array<{ id: string; extracted: ExtractedTransaction }> = []
 
-    // 5. FASE 1 — parsers específicos (sin fallback IA)
+    // 6. FASE 1 — parsers específicos (sin fallback IA)
     for (let i = 0; i < newIds.length; i += BATCH_SIZE) {
       const batch = newIds.slice(i, i + BATCH_SIZE)
-      const emailDetails = await Promise.allSettled(batch.map(id => getMessageDetails(gmail, id)))
+      const emailResults = await Promise.allSettled(
+        batch.map(id => {
+          const provider = providerByMessageId.get(id)!
+          return provider.getMessage(id)
+        })
+      )
 
-      for (const result of emailDetails) {
+      for (const result of emailResults) {
         if (result.status === 'rejected') { errores.push(`Fetch error: ${result.reason}`); continue }
         const email = result.value
-        const parsed = trySpecificParser(email.banco, { id: email.id, from: email.from, subject: email.subject, date: email.date, body: email.body })
+        const banco = detectBank(email.from)
+        const parsed = trySpecificParser(banco, {
+          id: email.id,
+          from: email.from,
+          subject: email.subject,
+          date: email.date,
+          body: email.body,
+        })
         if (parsed) {
           parserCount++
-          allTransactions.push({ id: email.id, extracted: { ...parsed, banco: email.banco } })
+          allTransactions.push({ id: email.id, extracted: { ...parsed, banco } })
         } else {
           omitidosCount++
-          console.log(`[sync] omitido ${email.banco} — "${email.subject}"`)
+          console.log(`[sync] omitido ${banco} (${email.provider}) — "${email.subject}"`)
         }
       }
     }
 
-    // 6. FASE 2 — dedup Uber (ver lib/utils/deduplicateUber.ts)
+    // 7. FASE 2 — dedup Uber
     const { transactions: deduped, preauthIds } = deduplicateUber(allTransactions)
 
-    // 7. FASE 3 — insertar
+    // 8. FASE 3 — insertar
     let transaccionesNuevas = 0
     if (deduped.length > 0) {
       const rows = await Promise.all(
@@ -120,9 +137,7 @@ export async function runSync(userId: string, admin: Admin): Promise<SyncResult>
       else transaccionesNuevas += inserted?.length ?? 0
     }
 
-    // 8. FASE 4 — asignar mes_contable
-    // Re-computar para todos los meses calendario con transacciones nuevas,
-    // usando el set completo (existentes + nuevas) para detectar el sueldo correctamente.
+    // 9. FASE 4 — asignar mes_contable
     if (deduped.length > 0) {
       const mesesAfectados = [...new Set(deduped.map(({ extracted }) =>
         (extracted.fecha ? new Date(extracted.fecha) : new Date()).toISOString().slice(0, 7)
@@ -130,7 +145,8 @@ export async function runSync(userId: string, admin: Admin): Promise<SyncResult>
       await reassignCalendarMonths(admin, userId, mesesAfectados)
     }
 
-    console.log(`[sync] ${newIds.length} emails — ${parserCount} parser | ${omitidosCount} omitidos | ${preauthIds.length} Uber preauth | ${errores.length} errores`)
+    const providerNames = providers.map(p => p.name).join('+')
+    console.log(`[sync] ${providerNames} — ${newIds.length} emails — ${parserCount} parser | ${omitidosCount} omitidos | ${preauthIds.length} Uber preauth | ${errores.length} errores`)
 
     await admin.from('sync_log').update({
       finished_at: new Date().toISOString(),
@@ -141,7 +157,14 @@ export async function runSync(userId: string, admin: Admin): Promise<SyncResult>
       status: errores.length > 0 && transaccionesNuevas === 0 ? 'ERROR' : 'DONE',
     }).eq('id', syncId)
 
-    return { correos_revisados: newIds.length, total_correos_banco: allMessageIds.length, transacciones_nuevas: transaccionesNuevas, parser: parserCount, omitidos: omitidosCount, errores }
+    return {
+      correos_revisados: newIds.length,
+      total_correos_banco: allMessageIds.length,
+      transacciones_nuevas: transaccionesNuevas,
+      parser: parserCount,
+      omitidos: omitidosCount,
+      errores,
+    }
 
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
@@ -152,4 +175,3 @@ export async function runSync(userId: string, admin: Admin): Promise<SyncResult>
     throw err
   }
 }
-

@@ -5,14 +5,15 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- ─────────────────────────────────────
--- Tabla: user_tokens (Gmail OAuth)
+-- Tabla: user_tokens (Gmail + Outlook OAuth)
 -- ─────────────────────────────────────
 CREATE TABLE IF NOT EXISTS user_tokens (
-  user_id             uuid PRIMARY KEY REFERENCES auth.users ON DELETE CASCADE,
-  gmail_access_token  text,
-  gmail_refresh_token text NOT NULL,
-  token_expires_at    timestamptz,
-  updated_at          timestamptz DEFAULT now()
+  user_id                uuid PRIMARY KEY REFERENCES auth.users ON DELETE CASCADE,
+  gmail_access_token     text,
+  gmail_refresh_token    text,
+  outlook_refresh_token  text,
+  token_expires_at       timestamptz,
+  updated_at             timestamptz DEFAULT now()
 );
 
 ALTER TABLE user_tokens ENABLE ROW LEVEL SECURITY;
