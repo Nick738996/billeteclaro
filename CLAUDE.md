@@ -53,6 +53,9 @@ GOOGLE_CLIENT_ID
 GOOGLE_CLIENT_SECRET
 GROQ_API_KEY               # console.groq.com — gratis, 100k tokens/día
 NEXT_PUBLIC_APP_URL
+OUTLOOK_CLIENT_ID      # Azure App Registration → Application (client) ID
+OUTLOOK_CLIENT_SECRET  # Azure App Registration → Client Secret
+OUTLOOK_TENANT_ID      # 'common' para cuentas personales y corporativas
 ```
 
 ---
@@ -63,7 +66,7 @@ NEXT_PUBLIC_APP_URL
 | --------------- | --------------------------------------------------------------------------------------------------------- |
 | `transactions`  | Todas las transacciones. UNIQUE `(user_id, gmail_message_id)`. Columnas `mes_contable` y `es_sueldo`      |
 | `sync_log`      | Log de cada sync. `skipped_ids text[]` guarda IDs ignorados (Uber pre-auths, transacciones eliminadas)    |
-| `user_tokens`   | `gmail_refresh_token` por usuario                                                                         |
+| `user_tokens`   | `gmail_refresh_token` y `outlook_refresh_token` por usuario (migración 007)                               |
 | `budgets`       | `(user_id, mes, categoria, monto_presupuestado, subcategorias jsonb)`. UNIQUE `(user_id, mes, categoria)` |
 | `ai_insights`   | Cache de insights. UNIQUE `(user_id, mes)`. Columnas: `insights jsonb`, `context_hash`, `generated_at`    |
 | `chat_messages` | Historial del chat con el asesor. `role CHECK IN ('user','assistant')`                                    |
@@ -74,17 +77,26 @@ NEXT_PUBLIC_APP_URL
 
 ---
 
-## Detección de bancos (`lib/gmail/client.ts`)
+## Detección de bancos (`lib/email/gmail.ts` — `BANK_SENDERS`)
 
-| Sender                                                 | Banco       |
-| ------------------------------------------------------ | ----------- |
-| `noreply@rappicard.co`                                 | RAPPICARD   |
-| `noreply@rappipay.co`                                  | RAPPIPAY    |
-| `noreply@holdingrappipay.co`                           | RAPPIPAY    |
-| `alertasynotificaciones@an.notificacionesbancolombia.com` | BANCOLOMBIA |
-| `alertasynotificaciones@notificacionesbancolombia.com` | BANCOLOMBIA |
+| Sender                                                 | Banco detectado        |
+| ------------------------------------------------------ | ---------------------- |
+| `noreply@rappicard.co`                                 | RAPPICARD              |
+| `noreply@rappipay.co` / `noreply@holdingrappipay.co`  | RAPPIPAY               |
+| `alertasynotificaciones@*.notificacionesbancolombia.com` | BANCOLOMBIA          |
+| `notificaciones@davivienda.com` / `alertas@...`        | DAVIVIENDA (→ OTRO)    |
+| `alertas@bbva.com.co` / `notificaciones@...`           | BBVA (→ OTRO)          |
+| `notificaciones@colpatria.com`                         | SCOTIABANK_COLPATRIA (→ OTRO) |
+| `alertas@bancodebogota.com.co`                         | BANCO_DE_BOGOTA (→ OTRO) |
+| `no-reply@nu.com.co` / `notificaciones@...`            | NU (→ OTRO)            |
+| `no-reply@nequi.com.co`                                | NEQUI (→ OTRO)         |
+| `notificaciones@lulobank.com`                          | LULO_BANK (→ OTRO)     |
+| `alertas@itau.co`                                      | ITAU (→ OTRO)          |
+| `notificaciones@falabella.com.co`                      | FALABELLA (→ OTRO)     |
 
-**Para agregar un banco nuevo:** crear `lib/parsers/mibanaco.ts`, registrar en `lib/parsers/index.ts`, agregar sender en `BANK_SENDERS` en `lib/gmail/client.ts`.
+Nota: los bancos marcados **(→ OTRO)** se detectan en el query Gmail/Outlook pero no tienen parser específico. Sus correos quedan omitidos hasta que se agregue el parser.
+
+**Para agregar un banco nuevo:** crear `lib/parsers/mibanaco.ts`, registrar en `lib/parsers/index.ts`, agregar sender en `BANK_SENDERS` en `lib/email/gmail.ts` (y `lib/email/outlook.ts`).
 
 ---
 

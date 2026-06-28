@@ -7,51 +7,34 @@ function getGroq(): Groq {
   return _groq
 }
 
-const PROMPT_TEMPLATE = (params: {
-  from: string
-  subject: string
-  date: string
-  banco: Banco
-  snippet: string
-}) => `Eres un extractor de transacciones financieras colombianas.
-Analizas correos de notificación de bancos y fintechs de Colombia y extraes los datos de transacción.
-Respondes ÚNICAMENTE con JSON válido, sin texto adicional, sin markdown, sin explicaciones.
+const SYSTEM_PROMPT = `Eres un extractor de transacciones bancarias colombianas.
+Tu única función: extraer datos estructurados de correos de notificación bancaria.
 
-CORREO:
-Remitente: ${params.from}
-Asunto: ${params.subject}
-Banco detectado: ${params.banco}
-Fecha del correo: ${params.date}
-Contenido:
-${params.snippet}
+BANCOS COLOMBIANOS QUE PUEDES ENCONTRAR:
+Bancolombia, Davivienda, BBVA, Scotiabank Colpatria, Banco de Bogotá,
+Banco Popular, Itaú, Falabella, Nu Colombia, Lulo Bank, Nequi,
+RappiCard, RappiPay, Banco Caja Social, Banco Agrario, Citibank Colombia.
 
-REGLAS:
-- monto: siempre positivo, en COP. "$45.000" o "$45,000" = 45000
-- Si hay monto en USD, ponlo en monto_usd y calcula el equivalente en COP si aparece
-- fecha: ISO 8601. Si no hay fecha específica, usa la del correo
-- comercio: nombre real del establecimiento o persona (no el nombre del banco ni de Rappi)
-- Para transferencias, comercio = nombre del destinatario u origen
+CAMPOS A EXTRAER:
+- monto: número entero en COP sin decimales ni puntos (ej: 45000, no $45.000)
+- comercio: nombre del establecimiento en Title Case (ej: "Uber", "Éxito", "Netflix")
+  Si es una transferencia, usar el nombre de la persona o "Transferencia"
+  Si es un pago de servicio, usar el nombre del servicio (ej: "Acueducto", "Gas Natural")
+- tipo: uno de COMPRA | TRANSFERENCIA_ENVIADA | TRANSFERENCIA_RECIBIDA |
+         PAGO_SERVICIO | RETIRO | ABONO_DEUDA | INGRESO
+- fecha: ISO 8601 con hora si está disponible (ej: "2026-06-13T14:05:00")
+  Si no hay hora en el correo, usar "2026-06-13T00:00:00"
+- banco: nombre del banco en mayúsculas (ej: "BANCOLOMBIA", "RAPPICARD")
+- descripcion: texto corto descriptivo opcional
 
-BANCOS: RAPPICARD (tarjeta crédito Rappi) | RAPPIPAY (cuenta débito Rappi)
-TIPOS válidos: COMPRA | TRANSFERENCIA_ENVIADA | TRANSFERENCIA_RECIBIDA | PAGO_SERVICIO | RETIRO | ABONO_DEUDA | INGRESO
-CATEGORÍAS válidas: HOGAR | TRANSPORTE | SALIDAS | SALUD | SUSCRIPCIONES | COMPRAS_ONLINE | INVERSION | AHORROS | DEUDA | DONACIONES | EDUCACION | REEMBOLSABLE | TRANSFERENCIA | INGRESO | OTRO
+REGLAS CRÍTICAS:
+1. monto SIEMPRE es entero positivo en COP. Sin decimales.
+   $45.000,00 → 45000 | $1.200.000 → 1200000 | $6.790,50 → 6790
+2. Si el correo NO es una notificación de transacción bancaria → {"error": "not_a_transaction"}
+3. Si no puedes extraer monto o fecha con certeza → {"error": "not_a_transaction"}
+4. NUNCA inventes datos que no estén en el correo
 
-Responde con este JSON exacto:
-{
-  "fecha": "ISO timestamp o null",
-  "monto": number,
-  "comercio": "string o null",
-  "descripcion": "descripción completa",
-  "tipo": "TIPO",
-  "categoria": "CATEGORIA",
-  "subcategoria": "string o null",
-  "moneda": "COP",
-  "monto_usd": null,
-  "flags": [],
-  "error": null
-}
-
-Si el correo NO contiene una transacción, responde: {"error": "not_a_transaction"}`
+Responde ÚNICAMENTE con JSON válido, sin markdown:`
 
 export async function extractWithGroq(params: {
   from: string
@@ -60,7 +43,12 @@ export async function extractWithGroq(params: {
   body: string
   banco: Banco
 }): Promise<ExtractedTransaction | null> {
-  const snippet = params.body.slice(0, 400)
+  const userPrompt = `Banco detectado: ${params.banco}
+Remitente: ${params.from}
+Asunto: ${params.subject}
+Fecha del correo: ${params.date}
+Cuerpo:
+${params.body.slice(0, 1000)}`
 
   try {
     const completion = await getGroq().chat.completions.create({
@@ -68,7 +56,10 @@ export async function extractWithGroq(params: {
       temperature: 0.1,
       max_tokens: 512,
       response_format: { type: 'json_object' },
-      messages: [{ role: 'user', content: PROMPT_TEMPLATE({ ...params, snippet }) }],
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: userPrompt },
+      ],
     })
 
     const text = completion.choices[0]?.message?.content?.trim() ?? ''

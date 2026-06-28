@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 }
 import { format, parseISO, addMonths, subMonths, isBefore, startOfMonth } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'
 import type { Transaction } from '@/lib/types'
 import { getTourCompleted } from '@/lib/services/settingsService'
 import DashboardClient from './DashboardClient'
@@ -31,14 +31,6 @@ export default async function DashboardPage({ searchParams }: Props) {
   const { month } = await searchParams
   const monthParam = month ?? format(new Date(), 'yyyy-MM')
   const ref = parseISO(`${monthParam}-01`)
-
-  const admin = createAdminClient()
-  const { data: tokenRow } = await admin
-    .from('user_tokens')
-    .select('gmail_refresh_token')
-    .eq('user_id', user.id)
-    .single()
-  const gmailConnected = !!tokenRow?.gmail_refresh_token
 
   const tourCompleted = await getTourCompleted(supabase, user.id)
 
@@ -72,7 +64,6 @@ export default async function DashboardPage({ searchParams }: Props) {
       nextMonth={nextMonth}
       isCurrentMonth={isCurrentMonth}
       canGoNext={canGoNext}
-      gmailConnected={gmailConnected}
       tourCompleted={tourCompleted}
     />
   )

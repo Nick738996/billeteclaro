@@ -14,6 +14,15 @@ const GoogleIcon = () => (
   </svg>
 )
 
+const OutlookIcon = () => (
+  <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill="none">
+    <rect x="2" y="2" width="9.5" height="9.5" rx="1" fill="currentColor" opacity=".9"/>
+    <rect x="12.5" y="2" width="9.5" height="9.5" rx="1" fill="currentColor" opacity=".7"/>
+    <rect x="2" y="12.5" width="9.5" height="9.5" rx="1" fill="currentColor" opacity=".7"/>
+    <rect x="12.5" y="12.5" width="9.5" height="9.5" rx="1" fill="currentColor" opacity=".5"/>
+  </svg>
+)
+
 const Logo = () => (
   <div className="flex items-center gap-2">
     <svg viewBox="0 0 100 100" width="40" height="40" aria-hidden="true" style={{ color: 'var(--text)' }}>
@@ -32,13 +41,13 @@ const Logo = () => (
 const STEPS = [
   {
     Icon: Lock,
-    titulo: 'Conectas tu cuenta de Google',
-    descripcion: 'Solo leemos tus correos de banco, nada más.',
+    titulo: 'Conectas tu cuenta de correo',
+    descripcion: 'Gmail u Outlook. Solo leemos correos de banco, nada más.',
   },
   {
     Icon: Mail,
-    titulo: 'Leemos tus notificaciones',
-    descripcion: 'RappiCard y RappiPay por ahora. Más bancos próximamente.',
+    titulo: 'Detectamos tus movimientos',
+    descripcion: 'Bancolombia, Davivienda, BBVA, RappiCard, Nequi y más.',
   },
   {
     Icon: BarChart2,
@@ -50,7 +59,7 @@ const STEPS = [
 export default function LandingPage() {
   const supabase = createClient()
 
-  const handleLogin = async () => {
+  const handleLoginGmail = async () => {
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
@@ -64,6 +73,16 @@ export default function LandingPage() {
           access_type: 'offline',
           prompt: 'consent',
         },
+      },
+    })
+  }
+
+  const handleLoginOutlook = async () => {
+    await supabase.auth.signInWithOAuth({
+      provider: 'azure',
+      options: {
+        redirectTo: `${window.location.origin}/api/auth/callback`,
+        scopes: 'email Mail.Read offline_access User.Read',
       },
     })
   }
@@ -88,26 +107,45 @@ export default function LandingPage() {
             <span style={{ color: 'var(--green)' }}>clara.</span>
           </h1>
           <p style={{ fontSize: 'var(--text-base)', color: 'var(--text-muted)', lineHeight: 1.6, maxWidth: 320, margin: '0 auto 32px' }}>
-            BilleteClaro lee tus correos de banco automáticamente y te muestra en qué gastas, sin que hagas nada.
+            Conecta tu correo y BilleteClaro detecta automáticamente tus movimientos bancarios. Sin ingresar nada a mano.
           </p>
-          <button
-            onClick={handleLogin}
-            data-testid={TEST_IDS.AUTH_GOOGLE_BUTTON}
-            aria-label="Entrar con Google"
-            className="w-full flex items-center justify-center gap-3 font-medium transition-opacity hover:opacity-90 active:scale-95"
-            style={{
-              background: 'var(--text)',
-              color: 'var(--bg)',
-              padding: '14px 24px',
-              borderRadius: 'var(--radius-md)',
-              fontSize: 'var(--text-base)',
-              border: 'none',
-              cursor: 'pointer',
-            }}
-          >
-            <GoogleIcon />
-            Entrar con Google
-          </button>
+          <div className="flex flex-col gap-3">
+            <button
+              onClick={handleLoginGmail}
+              data-testid={TEST_IDS.AUTH_GOOGLE_BUTTON}
+              aria-label="Entrar con Gmail"
+              className="w-full flex items-center justify-center gap-3 font-medium transition-opacity hover:opacity-90 active:scale-95"
+              style={{
+                background: 'var(--text)',
+                color: 'var(--bg)',
+                padding: '14px 24px',
+                borderRadius: 'var(--radius-md)',
+                fontSize: 'var(--text-base)',
+                border: 'none',
+                cursor: 'pointer',
+              }}
+            >
+              <GoogleIcon />
+              Entrar con Gmail
+            </button>
+            <button
+              onClick={handleLoginOutlook}
+              aria-label="Entrar con Outlook"
+              className="w-full flex items-center justify-center gap-3 font-medium transition-opacity hover:opacity-80 active:scale-95"
+              style={{
+                background: 'transparent',
+                color: 'var(--text)',
+                padding: '14px 24px',
+                borderRadius: 'var(--radius-md)',
+                fontSize: 'var(--text-base)',
+                border: '1px solid var(--border)',
+                cursor: 'pointer',
+              }}
+            >
+              <OutlookIcon />
+              Entrar con Outlook
+            </button>
+          </div>
           <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-subtle)', marginTop: 10 }}>
             Gratis. Sin tarjeta. Sin trampa.
           </p>
