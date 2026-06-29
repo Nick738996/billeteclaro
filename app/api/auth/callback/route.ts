@@ -27,24 +27,26 @@ export async function GET(request: Request) {
   // ── Flujo Microsoft (Azure) ──────────────────────────────────────────────
   if (provider === 'azure') {
     console.log(`[auth/callback] Azure login user=${user.id} refresh_token=${provider_refresh_token ? 'present' : 'NULL'}`)
+
     if (provider_refresh_token) {
+      // Supabase entregó el token directamente — guardarlo
       const { error: upsertErr } = await admin.from('user_tokens').upsert({
         user_id: user.id,
         outlook_refresh_token: provider_refresh_token,
         updated_at: new Date().toISOString(),
       })
       if (upsertErr) {
-        console.error('[auth/callback] Azure upsert error:', upsertErr.message, upsertErr.code)
-        // Column might not exist — still go to onboarding so user sees the sync step
-      } else {
-        console.log('[auth/callback] Azure token saved OK')
+        console.error('[auth/callback] Azure upsert error:', upsertErr.message)
+        // Columna puede no existir — redirigir al flujo dedicado
+        return NextResponse.redirect(new URL('/api/auth/outlook-connect', request.url))
       }
+      console.log('[auth/callback] Azure token saved OK via provider_refresh_token')
       return NextResponse.redirect(new URL(next, request.url))
     }
-    // Microsoft didn't return a refresh token — sign out and ask to try again
-    console.warn('[auth/callback] Azure login without refresh_token')
-    await supabase.auth.signOut()
-    return NextResponse.redirect(new URL('/?error=outlook_no_token', request.url))
+
+    // Supabase no retornó el token — usar el flujo dedicado (igual que Gmail)
+    console.log('[auth/callback] Azure: no provider_refresh_token, redirecting to outlook-connect')
+    return NextResponse.redirect(new URL('/api/auth/outlook-connect', request.url))
   }
 
   // ── Flujo Google (Gmail) ─────────────────────────────────────────────────
