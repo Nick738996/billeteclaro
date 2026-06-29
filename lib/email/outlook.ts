@@ -13,6 +13,7 @@ const BANK_SENDERS_OUTLOOK = [
   'alertasynotificaciones@notificacionesbancolombia.com',
   'notificaciones@davivienda.com',
   'alertas@davivienda.com',
+  'DAVIbankInforma@davibank.com',
   'alertas@bbva.com.co',
   'notificaciones@bbva.com.co',
   'notificaciones@colpatria.com',
@@ -38,21 +39,30 @@ export class OutlookProvider implements EmailProvider {
       .map(s => `from/emailAddress/address eq '${s}'`)
       .join(' or ')
 
-    const sinceISO = since.toISOString()
+    const filter = `(${senderFilter}) and receivedDateTime ge ${since.toISOString()}`
+
+    // Construir URL con URLSearchParams para encoding uniforme
+    const base = new URL(`${GRAPH_BASE}/me/messages`)
+    base.searchParams.set('$filter', filter)
+    base.searchParams.set('$select', 'id,from,subject,receivedDateTime')
+    base.searchParams.set('$top', '50')
+
     const ids: string[] = []
-    let nextUrl: string | null =
-      `${GRAPH_BASE}/me/messages?$filter=(${encodeURIComponent(senderFilter)}) and receivedDateTime ge ${sinceISO}&$select=id&$top=500`
+    let nextUrl: string | null = base.toString()
 
     while (nextUrl && ids.length < 2000) {
       const res = await fetch(nextUrl, {
         headers: { Authorization: `Bearer ${access}` },
       })
-      if (!res.ok) throw new Error(`Outlook list failed: ${res.status}`)
+      if (!res.ok) {
+        const errText = await res.text()
+        console.error('[OutlookProvider] list failed:', res.status, errText.slice(0, 300))
+        throw new Error(`Outlook list failed: ${res.status}`)
+      }
       const data = await res.json() as { value: { id: string }[]; '@odata.nextLink'?: string }
       ids.push(...data.value.map(m => m.id))
       nextUrl = data['@odata.nextLink'] ?? null
     }
-
     return ids
   }
 

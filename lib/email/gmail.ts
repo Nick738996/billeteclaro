@@ -2,7 +2,7 @@ import { google } from 'googleapis'
 import type { Banco } from '@/lib/types'
 import type { EmailMessage, EmailProvider } from './types'
 
-export const BANK_SENDERS: Record<string, string> = {
+export const BANK_SENDERS: Record<string, Banco> = {
   // Rappi
   'noreply@rappicard.co':                                        'RAPPICARD',
   'noreply@rappipay.co':                                         'RAPPIPAY',
@@ -15,6 +15,7 @@ export const BANK_SENDERS: Record<string, string> = {
   // Davivienda
   'notificaciones@davivienda.com':                               'DAVIVIENDA',
   'alertas@davivienda.com':                                      'DAVIVIENDA',
+  'DAVIbankInforma@davibank.com':                                'DAVIVIENDA',
 
   // BBVA
   'alertas@bbva.com.co':                                         'BBVA',
@@ -43,18 +44,18 @@ export const BANK_SENDERS: Record<string, string> = {
   'notificaciones@falabella.com.co':                             'FALABELLA',
 }
 
-// Senders usados en la query Gmail (todos los de BANK_SENDERS)
+// Senders usados en la query Gmail
 const GMAIL_SENDER_QUERY = Object.keys(BANK_SENDERS)
   .map(s => `from:${s}`)
   .join(' OR ')
 
+// Palabras clave en asunto para capturar bancos no listados o emails reenviados
+const GMAIL_SUBJECT_QUERY = 'subject:(compra OR transacción OR transaccion OR débito OR debito OR transferencia OR retiro OR consignación OR consignacion OR "pago con tarjeta" OR "cargo en cuenta")'
+
 export function detectBank(fromHeader: string): Banco {
   const emailMatch = fromHeader.match(/<([^>]+)>/)
   const email = (emailMatch ? emailMatch[1] : fromHeader).toLowerCase().trim()
-  const found = BANK_SENDERS[email]
-  // Sólo RAPPICARD, RAPPIPAY y BANCOLOMBIA tienen parsers; el resto → OTRO
-  if (found === 'RAPPICARD' || found === 'RAPPIPAY' || found === 'BANCOLOMBIA') return found
-  return 'OTRO'
+  return BANK_SENDERS[email] ?? 'OTRO'
 }
 
 export function detectBankName(fromHeader: string): string {
@@ -74,7 +75,7 @@ export class GmailProvider implements EmailProvider {
     const gmail = this._buildClient(access)
 
     const sinceStr = `${since.getFullYear()}/${String(since.getMonth() + 1).padStart(2, '0')}/${String(since.getDate()).padStart(2, '0')}`
-    const query = `{${GMAIL_SENDER_QUERY}} after:${sinceStr}`
+    const query = `{${GMAIL_SENDER_QUERY} OR ${GMAIL_SUBJECT_QUERY}} after:${sinceStr}`
     const ids: string[] = []
     let pageToken: string | undefined
 

@@ -18,14 +18,21 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL('/?error=outlook_denied', request.url))
   }
 
+  console.log('[outlook-callback] code received, length:', code.length)
+
   // Verificar sesión de Supabase activa
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user }, error: userErr } = await supabase.auth.getUser()
+  console.log('[outlook-callback] supabase user:', user?.id ?? 'NULL', 'error:', userErr?.message ?? 'none')
   if (!user) {
+    console.error('[outlook-callback] No Supabase session — redirecting to /')
     return NextResponse.redirect(new URL('/', request.url))
   }
 
   // Intercambiar código directamente con Microsoft
+  const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/outlook-callback`
+  console.log('[outlook-callback] exchanging code, redirect_uri:', redirectUri)
+
   const tokenRes = await fetch(
     `https://login.microsoftonline.com/${process.env.OUTLOOK_TENANT_ID ?? 'common'}/oauth2/v2.0/token`,
     {
@@ -36,16 +43,22 @@ export async function GET(request: Request) {
         client_secret: process.env.OUTLOOK_CLIENT_SECRET!,
         code,
         grant_type:    'authorization_code',
-        redirect_uri:  `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/outlook-callback`,
+        redirect_uri:  redirectUri,
         scope:         'Mail.Read offline_access',
       }),
     }
   )
 
   const tokenData = await tokenRes.json() as MicrosoftTokenResponse
+  console.log('[outlook-callback] token response status:', tokenRes.status,
+    'access_token:', tokenData.access_token ? 'present' : 'NULL',
+    'refresh_token:', tokenData.refresh_token ? 'present' : 'NULL',
+    'error:', tokenData.error ?? 'none',
+    'error_description:', tokenData.error_description ?? 'none'
+  )
 
   if (!tokenData.refresh_token) {
-    console.error('[outlook-callback] No refresh_token in response:', tokenData.error, tokenData.error_description)
+    console.error('[outlook-callback] No refresh_token — redirecting to /?error=outlook_no_token')
     return NextResponse.redirect(new URL('/?error=outlook_no_token', request.url))
   }
 
@@ -61,6 +74,6 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL('/?error=outlook_save_failed', request.url))
   }
 
-  console.log('[outlook-callback] Outlook token saved OK for user', user.id)
+  console.log('[outlook-callback] ✅ token saved for user', user.id)
   return NextResponse.redirect(new URL('/dashboard', request.url))
 }
