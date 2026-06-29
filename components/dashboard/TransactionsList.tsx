@@ -229,8 +229,8 @@ function FilterChips({
 
   return (
     <>
-      <div className="flex items-center gap-1.5">
-        {/* Chip "Todos" siempre visible */}
+      <div className="flex items-center gap-1.5" style={{ minWidth: 0 }}>
+        {/* Chip "Todos" — fijo a la izquierda */}
         <button
           key="TODOS"
           onClick={() => onChange('TODOS')}
@@ -250,65 +250,65 @@ function FilterChips({
           Todos
         </button>
 
-        {/* Chips de bancos — solo los que tienen transacciones */}
-        {availableBancos.map(banco => {
-          const filterKey: FilterKey = `BANCO:${banco}`
-          const isOn  = active === filterKey
-          const info  = BANCO_LABEL[banco]
-          const testId = banco === 'RAPPICARD'   ? TEST_IDS.DASHBOARD_FILTER_RAPPICARD
-                       : banco === 'RAPPIPAY'    ? TEST_IDS.DASHBOARD_FILTER_RAPPIPAY
-                       : banco === 'BANCOLOMBIA' ? 'filter-bancolombia'
-                       : `filter-${banco.toLowerCase()}`
-          return (
+        {/* Bancos + categoría activa — scroll horizontal */}
+        <div className="scroll-x-hide flex items-center gap-1.5" style={{ flex: 1, minWidth: 0 }}>
+          {availableBancos.map(banco => {
+            const filterKey: FilterKey = `BANCO:${banco}`
+            const isOn  = active === filterKey
+            const info  = BANCO_LABEL[banco]
+            const testId = banco === 'RAPPICARD'   ? TEST_IDS.DASHBOARD_FILTER_RAPPICARD
+                         : banco === 'RAPPIPAY'    ? TEST_IDS.DASHBOARD_FILTER_RAPPIPAY
+                         : banco === 'BANCOLOMBIA' ? 'filter-bancolombia'
+                         : `filter-${banco.toLowerCase()}`
+            return (
+              <button
+                key={filterKey}
+                onClick={() => onChange(filterKey)}
+                data-testid={testId}
+                aria-pressed={isOn}
+                className="flex-shrink-0 rounded-full"
+                style={{
+                  padding: '5px 12px',
+                  background: isOn ? info.color : INACTIVE.bg,
+                  color:      isOn ? 'var(--bg)' : INACTIVE.color,
+                  border:     isOn ? 'none'      : INACTIVE.border,
+                  fontSize: 'var(--text-xs)',
+                  fontWeight: isOn ? 600 : 400,
+                  cursor: 'pointer',
+                }}
+              >
+                {info.label}
+              </button>
+            )
+          })}
+
+          {/* Badge de categoría activa (con × para limpiar) */}
+          {activeCatInfo && activeCatTheme && (
             <button
-              key={filterKey}
-              onClick={() => onChange(filterKey)}
-              data-testid={testId}
-              aria-pressed={isOn}
-              className="flex-shrink-0 rounded-full"
+              onClick={() => onChange('TODOS')}
+              className="flex-shrink-0 flex items-center gap-1.5 rounded-full"
               style={{
-                padding: '5px 12px',
-                background: isOn ? info.color : INACTIVE.bg,
-                color:      isOn ? 'var(--bg)' : INACTIVE.color,
-                border:     isOn ? 'none'      : INACTIVE.border,
+                padding: '5px 8px 5px 12px',
+                background: activeCatTheme.color,
+                color: 'var(--bg)',
+                border: 'none',
                 fontSize: 'var(--text-xs)',
-                fontWeight: isOn ? 600 : 400,
+                fontWeight: 600,
                 cursor: 'pointer',
               }}
             >
-              {info.label}
+              {activeCatInfo.label}
+              <span
+                className="flex items-center justify-center rounded-full"
+                style={{ width: 14, height: 14, background: 'rgba(0,0,0,0.2)', fontSize: 10 }}
+              >
+                ×
+              </span>
             </button>
-          )
-        })}
+          )}
+        </div>
 
-        {/* Badge de categoría activa (con × para limpiar) */}
-        {activeCatInfo && activeCatTheme && (
-          <button
-            onClick={() => onChange('TODOS')}
-            className="flex-shrink-0 flex items-center gap-1.5 rounded-full"
-            style={{
-              padding: '5px 8px 5px 12px',
-              background: activeCatTheme.color,
-              color: 'var(--bg)',
-              border: 'none',
-              fontSize: 'var(--text-xs)',
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
-          >
-            {activeCatInfo.label}
-            <span
-              className="flex items-center justify-center rounded-full"
-              style={{ width: 14, height: 14, background: 'rgba(0,0,0,0.2)', fontSize: 10 }}
-            >
-              ×
-            </span>
-          </button>
-        )}
-
-        <div className="flex-1" />
-
-        {/* Botón para abrir el sheet de categorías */}
+        {/* Botón "Categoría" — fijo a la derecha */}
         <button
           onClick={() => setSheetOpen(true)}
           className="flex-shrink-0 flex items-center gap-1 rounded-full"

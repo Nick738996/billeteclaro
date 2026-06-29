@@ -32,10 +32,11 @@ export function parseDavibank(email: EmailInput): ParseResult {
 
   // Fecha YYYY/MM/DD + Hora HH:MM:SS → ISO
   const fechaMatch = body.match(/Fecha\s+(\d{4})\/(\d{2})\/(\d{2})/)
-  const horaMatch  = body.match(/Hora\s+(\d{2}:\d{2})/)
+  const horaMatch  = body.match(/Hora\s+(\d{1,2}:\d{2})/)
   let fecha: string
   if (fechaMatch) {
-    const time = horaMatch ? horaMatch[1] : '00:00'
+    // Zero-pad single-digit hours: '9:09' → '09:09'
+    const time = horaMatch ? horaMatch[1].padStart(5, '0') : '00:00'
     fecha = `${fechaMatch[1]}-${fechaMatch[2]}-${fechaMatch[3]}T${time}:00`
   } else {
     fecha = new Date(email.date).toISOString()

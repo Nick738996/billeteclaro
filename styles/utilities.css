@@ -56,3 +56,14 @@
   border-radius: var(--radius-badge);
   flex-shrink:   0;
 }
+
+/* ── Scroll horizontal sin scrollbar visible ─────────────────────────────────
+   Uso: <div className="scroll-x-hide"> para chips, tabs, etc. ──────────── */
+.scroll-x-hide {
+  overflow-x:         auto;
+  -ms-overflow-style: none;
+  scrollbar-width:    none;
+}
+.scroll-x-hide::-webkit-scrollbar {
+  display: none;
+}

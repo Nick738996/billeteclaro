@@ -85,8 +85,8 @@ export class OutlookProvider implements EmailProvider {
 
     const rawBody = msg.body?.content ?? ''
     const body = msg.body?.contentType === 'html'
-      ? stripHtml(rawBody).slice(0, 1000)
-      : rawBody.slice(0, 1000)
+      ? stripHtml(rawBody).slice(0, 3000)
+      : rawBody.slice(0, 3000)
 
     return {
       id: msg.id,

@@ -73,13 +73,25 @@ describe('parseDavibank', () => {
     expect(r!.fecha).toContain('2026-06-07')
   })
 
-  it('extrae hora correctamente', () => {
+  it('extrae hora con dos dígitos correctamente', () => {
     const r = parseDavibank({
       ...BASE,
       subject: 'DAVIbank en Linea',
       body: davi('EXITO', '120,000', '2026/06/20', '09:15:33'),
     })
     expect(r!.fecha).toContain('09:15')
+  })
+
+  it('extrae hora con un solo dígito — "9:09:25"', () => {
+    const r = parseDavibank({
+      ...BASE,
+      subject: 'DAVIbank en Linea',
+      body: davi('FRUVER EL GRAN JARDIN', '33,809', '2026/06/23', '9:09:25'),
+    })
+    expect(r).not.toBeNull()
+    expect(r!.fecha).toContain('2026-06-23')
+    expect(r!.fecha).toContain('T09:09')
+    expect(r!.monto).toBe(33809)
   })
 
   it('retorna null si no hay monto', () => {
