@@ -3,7 +3,6 @@
 const FUENTES_SUELDO = ['citibank'] as const
 const UMBRAL_SUELDO = 9_000_000
 const VENTANA_DIAS = 5
-const FALLBACK_DIAS = 3
 
 // Colombia es UTC-5 sin horario de verano
 const COLOMBIA_OFFSET_MS = 5 * 60 * 60 * 1000
@@ -104,10 +103,8 @@ export function asignarMesContable<T extends TxBase>(
           ? siguiente
           : mes
       } else {
-        // Sin sueldo detectado: últimos FALLBACK_DIAS días → mes siguiente
-        const dia = parseInt(toColombiaDate(t.fecha).slice(8, 10), 10)
-        const inicioFallback = lastDay - FALLBACK_DIAS + 1
-        mesContable = dia >= inicioFallback ? siguiente : mes
+        // Sin sueldo ni ingreso grande detectado → todo el mes en su mes calendario
+        mesContable = mes
       }
 
       resultado.push({

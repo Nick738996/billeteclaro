@@ -76,8 +76,8 @@ describe('asignarMesContable', () => {
     })
   })
 
-  describe('sin sueldo detectado (fallback últimos 3 días)', () => {
-    // Abril 2026 tiene 30 días → fallback desde día 28
+  describe('sin sueldo detectado → todas las transacciones en su mes calendario', () => {
+    // Sin sueldo ni ingreso grande, ninguna transacción se pasa al mes siguiente
     const txs: TxInput[] = [
       tx('e', '2026-04-15T10:00:00Z', 30000, 'COMPRA', 'Netflix'),
       tx('f', '2026-04-27T10:00:00Z', 15000, 'COMPRA', 'Uber'),
@@ -87,26 +87,22 @@ describe('asignarMesContable', () => {
 
     it('transacción a mitad del mes → 2026-04', () => {
       const result = asignarMesContable(txs)
-      const e = result.find(r => (r as TxInput).id === 'e')!
-      expect(e.mes_contable).toBe('2026-04')
+      expect(result.find(r => (r as TxInput).id === 'e')!.mes_contable).toBe('2026-04')
     })
 
-    it('transacción día 27 (antes del fallback) → 2026-04', () => {
+    it('transacción día 27 → 2026-04', () => {
       const result = asignarMesContable(txs)
-      const f = result.find(r => (r as TxInput).id === 'f')!
-      expect(f.mes_contable).toBe('2026-04')
+      expect(result.find(r => (r as TxInput).id === 'f')!.mes_contable).toBe('2026-04')
     })
 
-    it('transacción día 28 (inicio fallback) → 2026-05', () => {
+    it('transacción día 28 → 2026-04 (ya no se mueve al mes siguiente)', () => {
       const result = asignarMesContable(txs)
-      const g = result.find(r => (r as TxInput).id === 'g')!
-      expect(g.mes_contable).toBe('2026-05')
+      expect(result.find(r => (r as TxInput).id === 'g')!.mes_contable).toBe('2026-04')
     })
 
-    it('último día → 2026-05', () => {
+    it('último día del mes → 2026-04 (ya no se mueve al mes siguiente)', () => {
       const result = asignarMesContable(txs)
-      const h = result.find(r => (r as TxInput).id === 'h')!
-      expect(h.mes_contable).toBe('2026-05')
+      expect(result.find(r => (r as TxInput).id === 'h')!.mes_contable).toBe('2026-04')
     })
   })
 
