@@ -3,22 +3,13 @@ import type { EmailInput, ParseResult } from './types'
 import { parseRappiCard } from './rappicard'
 import { parseRappiPay } from './rappipay'
 import { parseBancolombia } from './bancolombia'
-import { parseUniversal } from './universal'
+import { parseDavibank } from './davibank'
 
 const PARSERS: Partial<Record<Banco, (email: EmailInput) => ParseResult>> = {
-  RAPPICARD:            parseRappiCard,
-  RAPPIPAY:             parseRappiPay,
-  BANCOLOMBIA:          parseBancolombia,
-  DAVIVIENDA:           parseUniversal,
-  BBVA:                 parseUniversal,
-  SCOTIABANK_COLPATRIA: parseUniversal,
-  BANCO_DE_BOGOTA:      parseUniversal,
-  NU:                   parseUniversal,
-  NEQUI:                parseUniversal,
-  LULO_BANK:            parseUniversal,
-  ITAU:                 parseUniversal,
-  FALABELLA:            parseUniversal,
-  OTRO:                 parseUniversal,
+  RAPPICARD:   parseRappiCard,
+  RAPPIPAY:    parseRappiPay,
+  BANCOLOMBIA: parseBancolombia,
+  DAVIVIENDA:  parseDavibank,
 }
 
 export function trySpecificParser(
