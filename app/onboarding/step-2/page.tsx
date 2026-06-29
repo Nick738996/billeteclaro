@@ -206,10 +206,10 @@ export default function OnboardingStep2() {
           </div>
           <div>
             <p className="font-semibold" style={{ fontSize: 'var(--text-sm)', color: 'var(--text)', marginBottom: 4 }}>
-              Detectamos correos de los principales bancos
+              Bancos soportados
             </p>
             <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-              Bancolombia, Davivienda, BBVA, Nequi, Lulo Bank, Itaú, Falabella y más. La primera sincronización revisa los últimos 2 meses.
+              Bancolombia, Davivienda y RappiCard. La primera sincronización revisa los últimos 2 meses.
             </p>
           </div>
         </div>

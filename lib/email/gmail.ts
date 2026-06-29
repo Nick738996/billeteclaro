@@ -101,7 +101,7 @@ export class GmailProvider implements EmailProvider {
       from: getHeader('From'),
       subject: getHeader('Subject'),
       date: getHeader('Date'),
-      body: extractBody(msg.payload).slice(0, 1000),
+      body: extractBody(msg.payload).slice(0, 3000),
       provider: 'gmail',
     }
   }

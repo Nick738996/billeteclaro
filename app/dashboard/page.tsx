@@ -58,7 +58,8 @@ export default async function DashboardPage({ searchParams }: Props) {
     <DashboardClient
       user={{ name: (() => {
         const raw = user.user_metadata?.full_name ?? user.user_metadata?.name ?? ''
-        return raw && !raw.includes('@') ? raw : 'Usuario'
+        if (!raw || raw.includes('@')) return 'Usuario'
+        return raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase()
       })() }}
       transactions={txs}
       monthLabel={monthLabel}

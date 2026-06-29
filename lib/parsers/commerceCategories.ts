@@ -27,8 +27,11 @@ const CATEGORY_PATTERNS: Partial<Record<Categoria, string[]>> = {
     'gato negro', 'quiebra canto',
     // Heladerías y postres
     'popsy', "mimo's", 'mimos', 'baskin', 'häagen', 'haagen',
+    // Restaurantes genéricos
+    'restaurante', 'rest.', 'parrilla', 'asadero', 'picada',
+    'buffalo wings', 'wings', 'sushi', 'pizza', 'burger',
     // Delivery (clasificados como salida, no transporte)
-    'rappi', 'ifood', 'pedidosya', 'domicilios',
+    'rappi', 'ifood', 'pedidosya', 'domicilios', 'domicilio',
     // Cine y entretenimiento
     'cine colombia', 'cinemark', 'procinal', 'royal films',
     'multiplex', 'cinemax',
@@ -64,6 +67,8 @@ const CATEGORY_PATTERNS: Partial<Record<Categoria, string[]>> = {
     'd1', 'ara', 'justo y bueno', 'surtimax',
     'mercamas', 'surtifamiliar', 'colsubsidio super',
     'makro', 'pricesmart', 'costco',
+    // Tiendas de frutas y verduras
+    'mercar', 'fruver', 'fruteria', 'frutas y verduras', 'verduras',
     // Servicios públicos — energía
     'enel', 'codensa', 'electricaribe', 'epm', 'essa',
     'celsia', 'emcali', 'electrocaqueta',

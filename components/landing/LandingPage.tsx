@@ -47,7 +47,7 @@ const STEPS = [
   {
     Icon: Mail,
     titulo: 'Detectamos tus movimientos',
-    descripcion: 'Bancolombia, Davivienda, BBVA, RappiCard, Nequi y más.',
+    descripcion: 'Bancolombia, Davivienda y RappiCard. Más bancos próximamente.',
   },
   {
     Icon: BarChart2,
