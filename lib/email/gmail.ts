@@ -55,11 +55,6 @@ export function detectBank(fromHeader: string): Banco {
   return BANK_SENDERS[email] ?? 'OTRO'
 }
 
-export function detectBankName(fromHeader: string): string {
-  const emailMatch = fromHeader.match(/<([^>]+)>/)
-  const email = (emailMatch ? emailMatch[1] : fromHeader).toLowerCase().trim()
-  return BANK_SENDERS[email] ?? 'OTRO'
-}
 
 export class GmailProvider implements EmailProvider {
   name = 'gmail' as const
