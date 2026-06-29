@@ -47,13 +47,22 @@ const CATEGORIA_THEME: Record<Categoria, { color: string; bg: string }> = {
 }
 
 const BANCO_LABEL: Record<Banco, { label: string; color: string }> = {
-  RAPPICARD:   { label: 'RappiCard',   color: 'var(--yellow)' },
-  RAPPIPAY:    { label: 'RappiPay',    color: 'var(--blue)' },
-  BANCOLOMBIA: { label: 'Bancolombia', color: 'var(--green)' },
-  OTRO:        { label: 'Otro',        color: 'var(--text-muted)' },
+  RAPPICARD:            { label: 'RappiCard',    color: 'var(--yellow)' },
+  RAPPIPAY:             { label: 'RappiPay',     color: 'var(--blue)' },
+  BANCOLOMBIA:          { label: 'Bancolombia',  color: 'var(--green)' },
+  DAVIVIENDA:           { label: 'Davivienda',   color: 'var(--red)' },
+  BBVA:                 { label: 'BBVA',         color: 'var(--blue)' },
+  SCOTIABANK_COLPATRIA: { label: 'Scotiabank',   color: 'var(--red)' },
+  BANCO_DE_BOGOTA:      { label: 'Banco Bogotá', color: 'var(--blue)' },
+  NU:                   { label: 'Nu',           color: 'var(--purple)' },
+  NEQUI:                { label: 'Nequi',        color: 'var(--purple)' },
+  LULO_BANK:            { label: 'Lulo Bank',    color: 'var(--green)' },
+  ITAU:                 { label: 'Itaú',         color: 'var(--yellow)' },
+  FALABELLA:            { label: 'Falabella',    color: 'var(--red)' },
+  OTRO:                 { label: 'Otro',         color: 'var(--text-muted)' },
 }
 
-type FilterKey = Categoria | 'TODOS' | 'BANCO:RAPPICARD' | 'BANCO:RAPPIPAY' | 'BANCO:BANCOLOMBIA'
+type FilterKey = Categoria | 'TODOS' | `BANCO:${Banco}`
 
 // Solo las categorías (para el bottom sheet)
 const CAT_FILTER_KEYS: Array<{ key: FilterKey; label: string }> = [
@@ -193,76 +202,84 @@ function CategorySheet({
 function FilterChips({
   active,
   onChange,
+  transactions,
 }: {
   active: FilterKey
   onChange: (key: FilterKey) => void
+  transactions: Transaction[]
 }) {
   const [sheetOpen, setSheetOpen] = useState(false)
   const isCatActive    = active !== 'TODOS' && !active.startsWith('BANCO:')
   const activeCatInfo  = isCatActive ? CAT_FILTER_KEYS.find(f => f.key === active) : null
   const activeCatTheme = isCatActive ? (CATEGORIA_THEME[active as Categoria] ?? CATEGORIA_THEME['OTRO']) : null
 
-  const INACTIVE = { bg: 'transparent', border: '1px solid var(--border)', color: 'var(--text-muted)' }
+  // Bancos que realmente tienen transacciones este mes, en orden de frecuencia
+  const availableBancos = useMemo(() => {
+    const counts = new Map<Banco, number>()
+    for (const t of transactions) {
+      const b = efectivoBanco(t)
+      counts.set(b, (counts.get(b) ?? 0) + 1)
+    }
+    return [...counts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([banco]) => banco)
+  }, [transactions])
 
-  const FIXED: Array<{ key: FilterKey; label: string; bg: string; color: string; border: string; testId: string }> = [
-    {
-      key:    'TODOS',
-      label:  'Todos',
-      bg:     active === 'TODOS' ? 'var(--text)' : INACTIVE.bg,
-      color:  active === 'TODOS' ? 'var(--bg)'   : INACTIVE.color,
-      border: active === 'TODOS' ? 'none'         : INACTIVE.border,
-      testId: TEST_IDS.DASHBOARD_FILTER_TODOS,
-    },
-    {
-      key:    'BANCO:RAPPICARD',
-      label:  'RappiCard',
-      bg:     active === 'BANCO:RAPPICARD' ? 'var(--yellow)' : INACTIVE.bg,
-      color:  active === 'BANCO:RAPPICARD' ? 'var(--bg)'     : INACTIVE.color,
-      border: active === 'BANCO:RAPPICARD' ? 'none'           : INACTIVE.border,
-      testId: TEST_IDS.DASHBOARD_FILTER_RAPPICARD,
-    },
-    {
-      key:    'BANCO:RAPPIPAY',
-      label:  'RappiPay',
-      bg:     active === 'BANCO:RAPPIPAY' ? 'var(--blue)' : INACTIVE.bg,
-      color:  active === 'BANCO:RAPPIPAY' ? 'var(--bg)'   : INACTIVE.color,
-      border: active === 'BANCO:RAPPIPAY' ? 'none'         : INACTIVE.border,
-      testId: TEST_IDS.DASHBOARD_FILTER_RAPPIPAY,
-    },
-    {
-      key:    'BANCO:BANCOLOMBIA',
-      label:  'Bancolombia',
-      bg:     active === 'BANCO:BANCOLOMBIA' ? 'var(--green)' : INACTIVE.bg,
-      color:  active === 'BANCO:BANCOLOMBIA' ? 'var(--bg)'    : INACTIVE.color,
-      border: active === 'BANCO:BANCOLOMBIA' ? 'none'          : INACTIVE.border,
-      testId: 'filter-bancolombia',
-    },
-  ]
+  const INACTIVE = { bg: 'transparent', border: '1px solid var(--border)', color: 'var(--text-muted)' }
 
   return (
     <>
       <div className="flex items-center gap-1.5">
-        {/* 3 chips fijos */}
-        {FIXED.map(f => (
-          <button
-            key={f.key}
-            onClick={() => onChange(f.key)}
-            data-testid={f.testId}
-            aria-pressed={active === f.key}
-            className="flex-shrink-0 rounded-full"
-            style={{
-              padding: '5px 12px',
-              background: f.bg,
-              color: f.color,
-              border: f.border,
-              fontSize: 'var(--text-xs)',
-              fontWeight: active === f.key ? 600 : 400,
-              cursor: 'pointer',
-            }}
-          >
-            {f.label}
-          </button>
-        ))}
+        {/* Chip "Todos" siempre visible */}
+        <button
+          key="TODOS"
+          onClick={() => onChange('TODOS')}
+          data-testid={TEST_IDS.DASHBOARD_FILTER_TODOS}
+          aria-pressed={active === 'TODOS'}
+          className="flex-shrink-0 rounded-full"
+          style={{
+            padding: '5px 12px',
+            background: active === 'TODOS' ? 'var(--text)' : INACTIVE.bg,
+            color:      active === 'TODOS' ? 'var(--bg)'   : INACTIVE.color,
+            border:     active === 'TODOS' ? 'none'        : INACTIVE.border,
+            fontSize: 'var(--text-xs)',
+            fontWeight: active === 'TODOS' ? 600 : 400,
+            cursor: 'pointer',
+          }}
+        >
+          Todos
+        </button>
+
+        {/* Chips de bancos — solo los que tienen transacciones */}
+        {availableBancos.map(banco => {
+          const filterKey: FilterKey = `BANCO:${banco}`
+          const isOn  = active === filterKey
+          const info  = BANCO_LABEL[banco]
+          const testId = banco === 'RAPPICARD'   ? TEST_IDS.DASHBOARD_FILTER_RAPPICARD
+                       : banco === 'RAPPIPAY'    ? TEST_IDS.DASHBOARD_FILTER_RAPPIPAY
+                       : banco === 'BANCOLOMBIA' ? 'filter-bancolombia'
+                       : `filter-${banco.toLowerCase()}`
+          return (
+            <button
+              key={filterKey}
+              onClick={() => onChange(filterKey)}
+              data-testid={testId}
+              aria-pressed={isOn}
+              className="flex-shrink-0 rounded-full"
+              style={{
+                padding: '5px 12px',
+                background: isOn ? info.color : INACTIVE.bg,
+                color:      isOn ? 'var(--bg)' : INACTIVE.color,
+                border:     isOn ? 'none'      : INACTIVE.border,
+                fontSize: 'var(--text-xs)',
+                fontWeight: isOn ? 600 : 400,
+                cursor: 'pointer',
+              }}
+            >
+              {info.label}
+            </button>
+          )
+        })}
 
         {/* Badge de categoría activa (con × para limpiar) */}
         {activeCatInfo && activeCatTheme && (
@@ -573,12 +590,9 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
     let matchesCategory: boolean
     if (activeFilter === 'TODOS') {
       matchesCategory = true
-    } else if (activeFilter === 'BANCO:RAPPICARD') {
-      matchesCategory = efectivoBanco(t) === 'RAPPICARD'
-    } else if (activeFilter === 'BANCO:RAPPIPAY') {
-      matchesCategory = efectivoBanco(t) === 'RAPPIPAY'
-    } else if (activeFilter === 'BANCO:BANCOLOMBIA') {
-      matchesCategory = efectivoBanco(t) === 'BANCOLOMBIA'
+    } else if (activeFilter.startsWith('BANCO:')) {
+      const banco = activeFilter.slice(6) as Banco
+      matchesCategory = efectivoBanco(t) === banco
     } else {
       matchesCategory = t.categoria === activeFilter || (activeFilter === 'INGRESO' && isIngreso(t.tipo))
     }
@@ -647,7 +661,7 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
 
       {/* Chips */}
       <div className="px-4 pb-3" style={{ borderBottom: '1px solid var(--border-soft)' }}>
-        <FilterChips active={activeFilterKey} onChange={key => onFilterChange(key)} />
+        <FilterChips active={activeFilterKey} onChange={key => onFilterChange(key)} transactions={transactions} />
       </div>
 
 

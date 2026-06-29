@@ -2,6 +2,15 @@ export type Banco =
   | 'RAPPICARD'
   | 'RAPPIPAY'
   | 'BANCOLOMBIA'
+  | 'DAVIVIENDA'
+  | 'BBVA'
+  | 'SCOTIABANK_COLPATRIA'
+  | 'BANCO_DE_BOGOTA'
+  | 'NU'
+  | 'NEQUI'
+  | 'LULO_BANK'
+  | 'ITAU'
+  | 'FALABELLA'
   | 'OTRO'
 
 export type TipoTransaccion =
@@ -154,10 +163,19 @@ export const CATEGORIA_COLORS: Record<Categoria, string> = {
 }
 
 export const BANCO_LABELS: Record<Banco, string> = {
-  RAPPICARD:   'RappiCard',
-  RAPPIPAY:    'RappiPay',
-  BANCOLOMBIA: 'Bancolombia',
-  OTRO:        'Otro',
+  RAPPICARD:            'RappiCard',
+  RAPPIPAY:             'RappiPay',
+  BANCOLOMBIA:          'Bancolombia',
+  DAVIVIENDA:           'Davivienda',
+  BBVA:                 'BBVA',
+  SCOTIABANK_COLPATRIA: 'Scotiabank',
+  BANCO_DE_BOGOTA:      'Banco Bogotá',
+  NU:                   'Nu',
+  NEQUI:                'Nequi',
+  LULO_BANK:            'Lulo Bank',
+  ITAU:                 'Itaú',
+  FALABELLA:            'Falabella',
+  OTRO:                 'Otro',
 }
 
 export function formatCOP(amount: number): string {
