@@ -119,10 +119,10 @@ export default function BudgetManager({ mes, gastosPorCategoria, ingresos = 0, i
   const restante = ingresos - totalPresupuestado
 
   const catsWithActivity = PRESUPUESTO_CATS.filter(
-    cat => (gastosPorCategoria[cat] ?? 0) > 0 || (draft[cat]?.monto ?? 0) > 0
+    cat => (gastosPorCategoria[cat] ?? 0) > 0 || (draft[cat]?.monto ?? 0) > 0 || expanded === cat
   )
   const catsEmpty = PRESUPUESTO_CATS.filter(
-    cat => (gastosPorCategoria[cat] ?? 0) === 0 && (draft[cat]?.monto ?? 0) === 0
+    cat => (gastosPorCategoria[cat] ?? 0) === 0 && (draft[cat]?.monto ?? 0) === 0 && expanded !== cat
   )
 
   if (!loaded) return (
