@@ -82,7 +82,10 @@ export default function LandingPage() {
       provider: 'azure',
       options: {
         redirectTo: `${window.location.origin}/api/auth/callback`,
-        scopes: 'email Mail.Read offline_access User.Read',
+        scopes: 'openid profile email Mail.Read offline_access User.Read',
+        queryParams: {
+          prompt: 'select_account',
+        },
       },
     })
   }

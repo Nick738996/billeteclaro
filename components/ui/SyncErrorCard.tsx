@@ -3,8 +3,8 @@
 import { AlertTriangle, RefreshCw, ExternalLink } from 'lucide-react'
 
 export type SyncErrorType =
-  | 'gmail_auth_expired'
-  | 'gmail_permission_denied'
+  | 'auth_expired'
+  | 'auth_permission_denied'
   | 'no_emails_found'
   | 'sync_timeout'
   | 'unknown'
@@ -16,19 +16,19 @@ interface ErrorInfo {
 }
 
 const ERROR_MESSAGES: Record<SyncErrorType, ErrorInfo> = {
-  gmail_auth_expired: {
-    titulo: 'La sesión de Gmail expiró',
-    descripcion: 'Tu acceso a Gmail se venció. Vuelve a conectar tu cuenta para sincronizar.',
-    accion: { label: 'Reconectar Gmail', href: '/api/auth/gmail-connect' },
+  auth_expired: {
+    titulo: 'La sesión expiró',
+    descripcion: 'Tu acceso al correo se venció. Vuelve a iniciar sesión para sincronizar.',
+    accion: { label: 'Volver a entrar', href: '/' },
   },
-  gmail_permission_denied: {
-    titulo: 'Sin permiso de Gmail',
-    descripcion: 'BilleteClaro necesita permiso para leer tus correos de banco.',
-    accion: { label: 'Dar permiso', href: '/api/auth/gmail-connect' },
+  auth_permission_denied: {
+    titulo: 'Sin permiso de lectura',
+    descripcion: 'BilleteClaro necesita permiso para leer tus correos de banco. Vuelve a iniciar sesión y acepta los permisos.',
+    accion: { label: 'Volver a entrar', href: '/' },
   },
   no_emails_found: {
     titulo: 'No encontramos correos de banco',
-    descripcion: 'Revisamos tu Gmail y no hay notificaciones de RappiCard, RappiPay ni Bancolombia. Verifica que tengas las notificaciones de transacciones activadas en tu banco.',
+    descripcion: 'No detectamos notificaciones de transacciones en tu correo. Verifica que tengas las alertas de movimientos activadas en tu banco.',
   },
   sync_timeout: {
     titulo: 'La sincronización tardó demasiado',

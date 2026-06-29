@@ -12,7 +12,8 @@ export default function OnboardingStep1() {
 
   useEffect(() => {
     createClient().auth.getUser().then(({ data }) => {
-      const full = data.user?.user_metadata?.full_name ?? data.user?.email ?? ''
+      const raw = data.user?.user_metadata?.full_name ?? data.user?.user_metadata?.name ?? ''
+      const full = raw && !raw.includes('@') ? raw : ''
       setName(full.split(' ')[0])
     })
   }, [])

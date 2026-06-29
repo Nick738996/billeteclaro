@@ -7,7 +7,7 @@ import SyncErrorCard, { type SyncErrorType } from '@/components/ui/SyncErrorCard
 import { TEST_IDS } from '@/lib/testIds'
 
 const LOADING_MESSAGES = [
-  'Conectando con Gmail...',
+  'Conectando con tu correo...',
   'Leyendo correos de banco...',
   'Extrayendo transacciones...',
   'Organizando tu historial...',
@@ -16,8 +16,8 @@ const LOADING_MESSAGES = [
 
 function classifyError(status: number, message: string): SyncErrorType {
   const msg = message.toLowerCase()
-  if (status === 400 && msg.includes('token')) return 'gmail_auth_expired'
-  if (msg.includes('permission') || msg.includes('permiso')) return 'gmail_permission_denied'
+  if (status === 400 && msg.includes('token')) return 'auth_expired'
+  if (msg.includes('permission') || msg.includes('permiso')) return 'auth_permission_denied'
   if (msg.includes('timeout') || msg.includes('tarde')) return 'sync_timeout'
   return 'unknown'
 }
@@ -56,7 +56,7 @@ export default function OnboardingStep2() {
       const totalBanco: number = body?.data?.total_correos_banco ?? 0
       const revisados: number = body?.data?.correos_revisados ?? 0
       setTxCount(count)
-      // no_emails solo si Gmail no tiene ningún correo de banco (nunca llegó ninguno)
+      // no_emails solo si no hay ningún correo de banco (nunca llegó ninguno)
       setState(totalBanco === 0 && revisados === 0 ? 'no_emails' : 'success')
     } catch {
       setErrorType('sync_timeout')
@@ -185,24 +185,33 @@ export default function OnboardingStep2() {
           Sincroniza tus correos
         </h1>
         <p style={{ fontSize: 'var(--text-base)', color: 'var(--text-muted)', lineHeight: 1.6 }}>
-          Vamos a leer tus notificaciones de RappiCard, RappiPay y Bancolombia. Solo lectura — nunca escribimos nada en tu nombre.
+          Vamos a leer tus correos de notificaciones bancarias. Solo lectura — nunca escribimos nada en tu nombre.
         </p>
       </div>
 
       <div
-        className="flex items-center justify-center"
-        style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '32px 20px' }}
+        style={{
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--radius-lg)',
+          padding: '16px 18px',
+        }}
       >
-        <div className="text-center">
+        <div className="flex items-start gap-3">
           <div
-            className="flex items-center justify-center mx-auto mb-4"
-            style={{ width: 56, height: 56, borderRadius: 'var(--radius-md)', background: 'var(--green-soft)', color: 'var(--green)' }}
+            className="flex items-center justify-center flex-shrink-0"
+            style={{ width: 36, height: 36, borderRadius: 'var(--radius-sm)', background: 'var(--green-soft)', color: 'var(--green)' }}
           >
-            <Mail size={24} />
+            <Mail size={16} />
           </div>
-          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>
-            Correos de banco listos para sincronizar
-          </p>
+          <div>
+            <p className="font-semibold" style={{ fontSize: 'var(--text-sm)', color: 'var(--text)', marginBottom: 4 }}>
+              Detectamos correos de los principales bancos
+            </p>
+            <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+              Bancolombia, Davivienda, BBVA, Nequi, Lulo Bank, Itaú, Falabella y más. La primera sincronización revisa los últimos 2 meses.
+            </p>
+          </div>
         </div>
       </div>
 

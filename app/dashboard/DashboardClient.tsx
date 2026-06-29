@@ -145,7 +145,7 @@ export default function DashboardClient({
     router.push('/')
   }
 
-  const firstName = user.name.split(' ')[0]
+  const firstName = user.name !== 'Usuario' ? user.name.split(' ')[0] : ''
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--bg)' }}>
@@ -193,7 +193,7 @@ export default function DashboardClient({
         {/* Saludo + navegación de mes */}
         <div>
           <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>
-            Hola, {firstName}
+            {firstName ? `Hola, ${firstName}` : 'Hola'}
           </p>
           <div className="flex items-center justify-between mt-1">
             {/* MEJORA ⑤: w-8 h-8 → w-11 h-11 para touch target de 44px */}
