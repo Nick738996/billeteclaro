@@ -15,7 +15,7 @@ export const BANK_SENDERS: Record<string, Banco> = {
   // Davivienda
   'notificaciones@davivienda.com':                               'DAVIVIENDA',
   'alertas@davivienda.com':                                      'DAVIVIENDA',
-  'DAVIbankInforma@davibank.com':                                'DAVIVIENDA',
+  'davibankinforma@davibank.com':                                'DAVIVIENDA',
 
   // BBVA
   'alertas@bbva.com.co':                                         'BBVA',
@@ -49,20 +49,12 @@ const GMAIL_SENDER_QUERY = Object.keys(BANK_SENDERS)
   .map(s => `from:${s}`)
   .join(' OR ')
 
-// Palabras clave en asunto para capturar bancos no listados o emails reenviados
-const GMAIL_SUBJECT_QUERY = 'subject:(compra OR transacción OR transaccion OR débito OR debito OR transferencia OR retiro OR consignación OR consignacion OR "pago con tarjeta" OR "cargo en cuenta")'
-
 export function detectBank(fromHeader: string): Banco {
   const emailMatch = fromHeader.match(/<([^>]+)>/)
   const email = (emailMatch ? emailMatch[1] : fromHeader).toLowerCase().trim()
   return BANK_SENDERS[email] ?? 'OTRO'
 }
 
-export function detectBankName(fromHeader: string): string {
-  const emailMatch = fromHeader.match(/<([^>]+)>/)
-  const email = (emailMatch ? emailMatch[1] : fromHeader).toLowerCase().trim()
-  return BANK_SENDERS[email] ?? 'OTRO'
-}
 
 export class GmailProvider implements EmailProvider {
   name = 'gmail' as const
@@ -75,7 +67,7 @@ export class GmailProvider implements EmailProvider {
     const gmail = this._buildClient(access)
 
     const sinceStr = `${since.getFullYear()}/${String(since.getMonth() + 1).padStart(2, '0')}/${String(since.getDate()).padStart(2, '0')}`
-    const query = `{${GMAIL_SENDER_QUERY} OR ${GMAIL_SUBJECT_QUERY}} after:${sinceStr}`
+    const query = `${GMAIL_SENDER_QUERY} after:${sinceStr}`
     const ids: string[] = []
     let pageToken: string | undefined
 

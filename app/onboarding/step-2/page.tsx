@@ -52,9 +52,9 @@ export default function OnboardingStep2() {
         setState('error')
         return
       }
-      const count: number = body?.data?.transacciones_nuevas ?? 0
-      const totalBanco: number = body?.data?.total_correos_banco ?? 0
-      const revisados: number = body?.data?.correos_revisados ?? 0
+      const count: number = body?.transacciones_nuevas ?? 0
+      const totalBanco: number = body?.total_correos_banco ?? 0
+      const revisados: number = body?.correos_revisados ?? 0
       setTxCount(count)
       // no_emails solo si no hay ningún correo de banco (nunca llegó ninguno)
       setState(totalBanco === 0 && revisados === 0 ? 'no_emails' : 'success')

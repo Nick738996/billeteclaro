@@ -13,7 +13,7 @@ const BANK_SENDERS_OUTLOOK = [
   'alertasynotificaciones@notificacionesbancolombia.com',
   'notificaciones@davivienda.com',
   'alertas@davivienda.com',
-  'DAVIbankInforma@davibank.com',
+  'davibankinforma@davibank.com',
   'alertas@bbva.com.co',
   'notificaciones@bbva.com.co',
   'notificaciones@colpatria.com',
