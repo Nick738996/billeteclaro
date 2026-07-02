@@ -415,14 +415,15 @@ function CategoryPicker({ current, onSelect, onClose, budgetedCats }: {
 
   return createPortal(
     <>
-      <div className="fixed inset-0 z-50" style={{ background: 'var(--overlay)' }} onClick={onClose} aria-hidden="true" />
+      <div className="fixed inset-0" style={{ background: 'var(--overlay)', zIndex: 70 }} onClick={onClose} aria-hidden="true" />
       <div
         role="dialog"
         aria-modal="true"
         aria-label="Cambiar categoría"
-        className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-lg z-50"
+        className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-lg"
         onKeyDown={e => { if (e.key === 'Escape') onClose() }}
         style={{
+          zIndex: 80,
           background: 'var(--surface-2)',
           borderTop: '1px solid var(--border)',
           borderRadius: 'var(--radius-xl) var(--radius-xl) 0 0',

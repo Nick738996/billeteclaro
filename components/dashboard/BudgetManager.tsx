@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { Check, RefreshCw, ChevronRight, Plus, Trash2, Copy, ArrowLeft } from 'lucide-react'
 import { CATEGORIA_LABELS, catLabel, normalizeCatKey, getCategoryColor, formatCOP, formatCOPCompact, PRESUPUESTO_CATS, type Categoria, type BudgetEntry, type BudgetSubcat } from '@/lib/types'
 import { TEST_IDS } from '@/lib/testIds'
@@ -210,44 +211,22 @@ export default function BudgetManager({ mes, gastosPorCategoria, ingresos = 0, i
   )
 
   return (
+    <>
     <div className="card" data-testid={TEST_IDS.BUDGET_MANAGER}>
 
       {/* Header */}
       <div style={{ padding: '14px 16px 12px', borderBottom: '1px solid var(--border-soft)' }}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            {onClose && (
-              <button
-                onClick={onClose}
-                aria-label="Volver al resumen"
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', padding: '2px 4px 2px 0' }}
-              >
-                <ArrowLeft size={15} />
-              </button>
-            )}
-            <p style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text)' }}>Presupuesto mensual</p>
-          </div>
-          <button
-            onClick={handleSave}
-            disabled={saving || !isDirty}
-            data-testid={TEST_IDS.BUDGET_SAVE_BUTTON}
-            aria-label={saving ? 'Guardando presupuesto' : savedOk ? 'Presupuesto guardado' : 'Guardar presupuesto'}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 5,
-              padding: '6px 14px',
-              background: savedOk ? 'var(--green-soft)' : 'var(--surface-2)',
-              border: `1px solid ${savedOk ? 'var(--green)' : isDirty ? 'var(--text-muted)' : 'var(--border)'}`,
-              borderRadius: 'var(--radius-sm)',
-              color: savedOk ? 'var(--green)' : isDirty ? 'var(--text)' : 'var(--text-subtle)',
-              fontSize: 'var(--text-xs)', fontWeight: 500,
-              cursor: saving || !isDirty ? 'default' : 'pointer',
-              opacity: !isDirty && !savedOk && !saving ? 0.4 : 1,
-              flexShrink: 0,
-            }}
-          >
-            {saving   ? <><RefreshCw size={11} className="animate-spin" /> Guardando…</> :
-             savedOk  ? <><Check size={11} /> Guardado</> : 'Guardar'}
-          </button>
+        <div className="flex items-center gap-2">
+          {onClose && (
+            <button
+              onClick={onClose}
+              aria-label="Volver al resumen"
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', padding: '2px 4px 2px 0' }}
+            >
+              <ArrowLeft size={15} />
+            </button>
+          )}
+          <p style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text)' }}>Presupuesto mensual</p>
         </div>
         <div className="flex items-center gap-3" style={{ marginTop: 4, paddingLeft: onClose ? 23 : 0 }}>
           <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
@@ -401,6 +380,53 @@ export default function BudgetManager({ mes, gastosPorCategoria, ingresos = 0, i
         </div>
       )}
     </div>
+
+    {/* Floating save bar */}
+    {isDirty && loaded && typeof document !== 'undefined' && createPortal(
+      <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 60, width: 'calc(100% - 32px)', maxWidth: 480 }}>
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          background: 'var(--surface-2)',
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--radius-pill)',
+          padding: '10px 10px 10px 18px',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+        }}>
+          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', fontWeight: 500 }}>
+            Cambios sin guardar
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => { setDraft(saved); onBudgetsChange?.(totals(saved)) }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 'var(--text-xs)', color: 'var(--text-muted)', fontWeight: 500, padding: '6px 10px' }}
+            >
+              Descartar
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              data-testid={TEST_IDS.BUDGET_SAVE_BUTTON}
+              aria-label={saving ? 'Guardando presupuesto' : 'Guardar presupuesto'}
+              className="flex items-center gap-1.5"
+              style={{
+                background: savedOk ? 'var(--green)' : 'var(--text)',
+                border: 'none',
+                borderRadius: 'var(--radius-pill)',
+                padding: '7px 16px',
+                color: 'var(--bg)',
+                fontSize: 'var(--text-xs)', fontWeight: 600,
+                cursor: saving ? 'default' : 'pointer',
+              }}
+            >
+              {saving   ? <><RefreshCw size={11} className="animate-spin" /> Guardando…</> :
+               savedOk  ? <><Check size={11} /> Guardado</> : 'Guardar'}
+            </button>
+          </div>
+        </div>
+      </div>,
+      document.body
+    )}
+    </>
   )
 }
 
