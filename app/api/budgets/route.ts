@@ -2,7 +2,6 @@ import { ok, err } from '@/lib/api/response'
 import { withAuth } from '@/lib/api/withAuth'
 import { fetchBudgets, saveBudgets } from '@/lib/services/budgetService'
 import type { BudgetSaveItem } from '@/lib/services/budgetService'
-import type { Categoria } from '@/lib/types'
 
 // GET /api/budgets?mes=YYYY-MM
 export const GET = withAuth(async (req, user, supabase) => {
@@ -29,7 +28,7 @@ export const PUT = withAuth(async (req, user, supabase) => {
       typeof (i as BudgetSaveItem).categoria === 'string' &&
       typeof (i as BudgetSaveItem).monto === 'number'
   ).map(i => ({
-    categoria: i.categoria as Categoria,
+    categoria: i.categoria,
     monto: i.monto,
     subcategorias: Array.isArray(i.subcategorias) ? i.subcategorias : [],
   }))

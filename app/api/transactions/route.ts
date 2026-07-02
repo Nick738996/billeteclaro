@@ -6,8 +6,6 @@ import {
   patchTransaction,
   deleteAllTransactions,
 } from '@/lib/services/transactionService'
-import type { Categoria } from '@/lib/types'
-
 // GET /api/transactions?month=YYYY-MM
 export const GET = withAuth(async (req, user, supabase) => {
   const mes = new URL(req.url).searchParams.get('month') ?? new Date().toISOString().slice(0, 7)
@@ -22,7 +20,7 @@ export const GET = withAuth(async (req, user, supabase) => {
 
 // PATCH /api/transactions  body: { id, categoria?, subcategoria?, comercio? }
 export const PATCH = withAuth(async (req, user, supabase) => {
-  const body = await req.json() as { id?: string; categoria?: Categoria; subcategoria?: string; comercio?: string }
+  const body = await req.json() as { id?: string; categoria?: string; subcategoria?: string; comercio?: string }
   if (!body.id) return err('id es requerido', 400)
 
   const updates: Record<string, unknown> = {}

@@ -160,10 +160,12 @@ function extractBody(payload: any): string {
     return payload.mimeType === 'text/html' ? stripHtml(decoded) : decoded
   }
   if (!payload.parts) return ''
-  const plain = findPart(payload.parts, 'text/plain')
-  if (plain) return plain
+  // Prefer HTML: bank notification emails put all financial details in the HTML part.
+  // The plain text alternative is often just "View in browser" or an abbreviated fallback.
   const html = findPart(payload.parts, 'text/html')
   if (html) return stripHtml(html)
+  const plain = findPart(payload.parts, 'text/plain')
+  if (plain) return plain
   return ''
 }
 
@@ -190,6 +192,12 @@ export function stripHtml(html: string): string {
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
+    .replace(/&aacute;/g, 'á').replace(/&eacute;/g, 'é').replace(/&iacute;/g, 'í')
+    .replace(/&oacute;/g, 'ó').replace(/&uacute;/g, 'ú').replace(/&uuml;/g, 'ü')
+    .replace(/&ntilde;/g, 'ñ').replace(/&Ntilde;/g, 'Ñ')
+    .replace(/&Aacute;/g, 'Á').replace(/&Eacute;/g, 'É').replace(/&Iacute;/g, 'Í')
+    .replace(/&Oacute;/g, 'Ó').replace(/&Uacute;/g, 'Ú')
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
     .replace(/\s{2,}/g, ' ')
     .trim()
 }

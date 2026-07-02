@@ -109,6 +109,10 @@ describe('parseBancolombia — transferencia recibida', () => {
   it('tipo = TRANSFERENCIA_RECIBIDA', () => {
     expect(parseBancolombia(email)?.tipo).toBe('TRANSFERENCIA_RECIBIDA')
   })
+
+  it('categoria = INGRESO (no TRANSFERENCIA)', () => {
+    expect(parseBancolombia(email)?.categoria).toBe('INGRESO')
+  })
 })
 
 describe('parseBancolombia — pago código QR', () => {

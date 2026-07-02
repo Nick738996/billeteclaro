@@ -50,7 +50,7 @@ export interface Transaction {
   descripcion: string | null
   banco: Banco
   tipo: TipoTransaccion
-  categoria: Categoria
+  categoria: Categoria | string
   subcategoria: string | null
   id_auditoria: string | null
   moneda: string
@@ -186,6 +186,17 @@ export function formatCOP(amount: number): string {
   return `$${formatted}`
 }
 
+/** Label para cualquier categoría: predefinida o custom (ej. "MIS_GASTOS" → "Mis Gastos") */
+export function catLabel(cat: string): string {
+  if (cat in CATEGORIA_LABELS) return CATEGORIA_LABELS[cat as Categoria]
+  return cat.toLowerCase().replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+}
+
+/** Normaliza un nombre de categoría custom a clave: "mis gastos" → "MIS_GASTOS" */
+export function normalizeCatKey(name: string): string {
+  return name.trim().toUpperCase().replace(/\s+/g, '_')
+}
+
 export function formatCOPCompact(amount: number): string {
   const abs = Math.abs(amount)
   const sign = amount < 0 ? '-' : ''
@@ -218,8 +229,8 @@ export interface AdvisorContext {
   total_gastado: number
   total_presupuestado: number
   ingreso_estimado: number
-  gastos_por_categoria: Record<Categoria, number>
-  presupuesto_por_categoria: Record<Categoria, number>
+  gastos_por_categoria: Record<string, number>
+  presupuesto_por_categoria: Record<string, number>
 
   porcentaje_mes_transcurrido: number
   gasto_diario_promedio: number
@@ -273,7 +284,7 @@ export function isIngreso(tipo: TipoTransaccion): boolean {
 
 // ABONO_DEUDA = pago de tarjeta desde tu propia cuenta → no es gasto ni ingreso
 // AHORROS / PRESTAMO = movimientos propios que no son gastos del mes
-export function isGasto(tipo: TipoTransaccion, categoria?: Categoria): boolean {
+export function isGasto(tipo: TipoTransaccion, categoria?: Categoria | string): boolean {
   if (categoria === 'AHORROS' || categoria === 'PRESTAMO') return false
   return !isIngreso(tipo) && tipo !== 'ABONO_DEUDA'
 }

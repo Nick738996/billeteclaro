@@ -204,6 +204,58 @@ Hora de la transacción
   })
 })
 
+describe('parseRappiPay — rentabilidad formato real (post-stripHtml, espacios)', () => {
+  // Simula lo que produce stripHtml del email real de RappiPay
+  const body = '¡Hola, Brandon Nick! Este es el resumen de la rentabilidad que ganaste este mes por ahorrar en tu cuenta: Aquí los detalles: Rentabilidad de Junio $46.596,43 Fecha de corte 30 de junio de 2026 Intereses retenidos $1.110,18'
+
+  it('parsea rentabilidad con espacios (sin newlines)', () => {
+    const result = parseRappiPay({ ...BASE_EMAIL, subject: 'Rentabilidad mensual', body })
+    expect(result).not.toBeNull()
+    expect(result!.tipo).toBe('INGRESO')
+    expect(result!.monto).toBe(46596)
+    expect(result!.subcategoria).toBe('rendimiento')
+    expect(result!.comercio).toBe('RappiCuenta')
+  })
+})
+
+describe('parseRappiPay — bolsillos (multi-word name)', () => {
+  const body = `
+Tu Bolsillo Navidad sigue generando
+
+Rentabilidad de tu Bolsillo Navidad
+$50.000
+Fecha de corte
+31 de mayo de 2026
+`
+
+  it('parses bolsillo yield', () => {
+    const result = parseRappiPay({ ...BASE_EMAIL, subject: 'Rentabilidad de tu Bolsillo', body })
+    expect(result).not.toBeNull()
+    expect(result!.tipo).toBe('INGRESO')
+    expect(result!.monto).toBe(50000)
+    expect(result!.subcategoria).toBe('rendimiento')
+  })
+
+  it('comercio refleja el nombre del bolsillo sin "tu"', () => {
+    const result = parseRappiPay({ ...BASE_EMAIL, subject: 'Rentabilidad de tu Bolsillo', body })
+    expect(result!.comercio).toMatch(/bolsillo navidad/i)
+    expect(result!.comercio).not.toMatch(/^tu /i)
+  })
+})
+
+describe('parseRappiPay — transferencia enviada formato real', () => {
+  // Simula post-stripHtml del email real
+  const body = '¡Tu transferencia fue enviada con éxito! La persona que tiene la llave que usaste, ya recibió el dinero sin ningún problema. ¡Sigue utilizando nuestras transferencias inmediatas! Aquí los detalles: Monto transferido $2.910.000,00 RappiCuenta de origen ****9514 Llave destino carlosfdezmo@me.com Cuenta destino ****848 ambas de rappicuenta'
+
+  it('parsea transferencia enviada con monto grande', () => {
+    const result = parseRappiPay({ ...BASE_EMAIL, subject: 'Transferencia enviada', body })
+    expect(result).not.toBeNull()
+    expect(result!.tipo).toBe('TRANSFERENCIA_ENVIADA')
+    expect(result!.monto).toBe(2910000)
+    expect(result!.comercio).toBe('carlosfdezmo@me.com')
+  })
+})
+
 describe('parseRappiPay — no match', () => {
   it('returns null for promotional email', () => {
     const result = parseRappiPay({

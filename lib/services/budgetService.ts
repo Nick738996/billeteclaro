@@ -4,7 +4,7 @@ import type { Categoria, BudgetEntry, BudgetSubcat } from '@/lib/types'
 export type { BudgetEntry, BudgetSubcat }
 
 export interface BudgetSaveItem {
-  categoria: Categoria
+  categoria: string
   monto: number
   subcategorias: BudgetSubcat[]
 }
