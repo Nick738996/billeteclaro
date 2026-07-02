@@ -44,10 +44,13 @@ export const BANK_SENDERS: Record<string, Banco> = {
   'notificaciones@falabella.com.co':                             'FALABELLA',
 }
 
-// Senders usados en la query Gmail
-const GMAIL_SENDER_QUERY = Object.keys(BANK_SENDERS)
-  .map(s => `from:${s}`)
-  .join(' OR ')
+// Senders divididos en chunks para no superar el límite de longitud de query de Gmail
+const GMAIL_SENDERS = Object.keys(BANK_SENDERS)
+const GMAIL_CHUNK_SIZE = 5
+const GMAIL_SENDER_CHUNKS: string[][] = []
+for (let i = 0; i < GMAIL_SENDERS.length; i += GMAIL_CHUNK_SIZE) {
+  GMAIL_SENDER_CHUNKS.push(GMAIL_SENDERS.slice(i, i + GMAIL_CHUNK_SIZE))
+}
 
 export function detectBank(fromHeader: string): Banco {
   const emailMatch = fromHeader.match(/<([^>]+)>/)
@@ -67,23 +70,30 @@ export class GmailProvider implements EmailProvider {
     const gmail = this._buildClient(access)
 
     const sinceStr = `${since.getFullYear()}/${String(since.getMonth() + 1).padStart(2, '0')}/${String(since.getDate()).padStart(2, '0')}`
-    const query = `${GMAIL_SENDER_QUERY} after:${sinceStr}`
-    const ids: string[] = []
-    let pageToken: string | undefined
 
-    do {
-      const res = await gmail.users.messages.list({
-        userId: 'me',
-        q: query,
-        maxResults: 500,
-        pageToken,
-      })
-      const messages = res.data.messages ?? []
-      ids.push(...messages.map((m) => m.id!))
-      pageToken = res.data.nextPageToken ?? undefined
-    } while (pageToken && ids.length < 2000)
+    // Hacemos una query por chunk de senders para no superar el límite de longitud de Gmail.
+    // Con 18 senders en una sola query {from:a OR ... OR from:r} after:date, Gmail puede
+    // truncar silenciosamente la query y devolver muy pocos resultados.
+    const allIds = new Set<string>()
 
-    return ids
+    for (const chunk of GMAIL_SENDER_CHUNKS) {
+      const query = `{${chunk.map(s => `from:${s}`).join(' OR ')}} after:${sinceStr}`
+      let pageToken: string | undefined
+
+      do {
+        const res = await gmail.users.messages.list({
+          userId: 'me',
+          q: query,
+          maxResults: 500,
+          pageToken,
+        })
+        const messages = res.data.messages ?? []
+        messages.forEach(m => allIds.add(m.id!))
+        pageToken = res.data.nextPageToken ?? undefined
+      } while (pageToken && allIds.size < 2000)
+    }
+
+    return [...allIds]
   }
 
   async getMessage(id: string): Promise<EmailMessage> {
@@ -101,7 +111,7 @@ export class GmailProvider implements EmailProvider {
       from: getHeader('From'),
       subject: getHeader('Subject'),
       date: getHeader('Date'),
-      body: extractBody(msg.payload).slice(0, 3000),
+      body: extractBody(msg.payload).slice(0, 8000),
       provider: 'gmail',
     }
   }
@@ -160,12 +170,13 @@ function extractBody(payload: any): string {
     return payload.mimeType === 'text/html' ? stripHtml(decoded) : decoded
   }
   if (!payload.parts) return ''
-  // Prefer HTML: bank notification emails put all financial details in the HTML part.
-  // The plain text alternative is often just "View in browser" or an abbreviated fallback.
-  const html = findPart(payload.parts, 'text/html')
-  if (html) return stripHtml(html)
+  // Plain text first: RappiPay/RappiCard transaction emails contain the full
+  // financial data in the plain text part (label + amount on adjacent lines).
+  // HTML fallback for banks that only put data in the HTML part.
   const plain = findPart(payload.parts, 'text/plain')
   if (plain) return plain
+  const html = findPart(payload.parts, 'text/html')
+  if (html) return stripHtml(html)
   return ''
 }
 

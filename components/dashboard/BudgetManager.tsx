@@ -2,16 +2,18 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { Check, RefreshCw, ChevronRight, Plus, Trash2, Copy, ArrowLeft } from 'lucide-react'
-import { CATEGORIA_LABELS, catLabel, normalizeCatKey, formatCOP, formatCOPCompact, PRESUPUESTO_CATS, type Categoria, type BudgetEntry, type BudgetSubcat } from '@/lib/types'
+import { CATEGORIA_LABELS, catLabel, normalizeCatKey, getCategoryColor, formatCOP, formatCOPCompact, PRESUPUESTO_CATS, type Categoria, type BudgetEntry, type BudgetSubcat } from '@/lib/types'
 import { TEST_IDS } from '@/lib/testIds'
 
 function pctColor(pct: number) {
-  if (pct >= 100) return 'var(--red)'
+  if (pct >= 110) return 'var(--red)'
+  if (pct >= 100) return '#f97316'   // orange — usó el presupuesto, normal
   if (pct >= 80)  return 'var(--yellow)'
   return 'var(--green)'
 }
 function pctBg(pct: number) {
-  if (pct >= 100) return 'var(--red-soft)'
+  if (pct >= 110) return 'var(--red-soft)'
+  if (pct >= 100) return '#f9731620'
   if (pct >= 80)  return 'var(--yellow-soft)'
   return 'var(--green-soft)'
 }
@@ -473,6 +475,7 @@ function CategoryRow({ cat, entry, savedEntry, gasto, isExpanded, onToggle, onCh
 
         {/* Nombre + dot de cambio */}
         <div className="flex items-center gap-1.5 flex-1 min-w-0">
+          <span style={{ width: 8, height: 8, borderRadius: '50%', background: getCategoryColor(cat), flexShrink: 0 }} />
           <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text)' }}>
             {catLabel(cat)}
           </span>
@@ -492,8 +495,8 @@ function CategoryRow({ cat, entry, savedEntry, gasto, isExpanded, onToggle, onCh
             {formatCOP(gasto)}
           </span>
           {limite > 0 ? (
-            <span className="tabular-nums" style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color, background: bgColor, padding: '2px 7px', borderRadius: 'var(--radius-xs)' }}>
-              {over ? `+${Math.round(pct - 100)}%` : `${Math.round(pct)}%`}
+            <span style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color, background: bgColor, padding: '2px 7px', borderRadius: 'var(--radius-xs)', display: 'flex', alignItems: 'center' }}>
+              {pct >= 110 ? `+${Math.round(pct - 100)}%` : pct >= 100 ? <Check size={12} strokeWidth={2.5} /> : `${Math.round(pct)}%`}
             </span>
           ) : (
             <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-subtle)', minWidth: 48, textAlign: 'right' }}>sin límite</span>

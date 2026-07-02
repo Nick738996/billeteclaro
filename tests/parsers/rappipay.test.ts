@@ -32,6 +32,45 @@ Hora de la transacción
   })
 })
 
+describe('parseRappiPay — recibo de contacto P2P', () => {
+  const body = `
+¡Hola, Brandon Nick!
+Recibiste dinero de un contacto en RappiPay.
+
+Aquí los detalles:
+
+Monto recibido
+$2.700.000
+
+Tipo de transacción
+Recibo de dinero
+
+No. de contacto de origen
+3112407799
+
+Nombre de tu contacto
+RAUL GOMEZ
+
+No. de transacción
+43966185
+
+Fecha de la transacción
+01 de julio de 2026
+
+Hora de la transacción
+11:08 am
+`
+
+  it('parsea recibo de dinero de contacto', () => {
+    const result = parseRappiPay({ ...BASE_EMAIL, subject: 'Recibiste dinero en tu RappiCuenta', body })
+    expect(result).not.toBeNull()
+    expect(result!.tipo).toBe('TRANSFERENCIA_RECIBIDA')
+    expect(result!.monto).toBe(2700000)
+    expect(result!.comercio).toBe('Raul Gomez')
+    expect(result!.fecha).toContain('2026-07-01')
+  })
+})
+
 describe('parseRappiPay — transferencia enviada', () => {
   const body = `
 Tu dinero está en camino
@@ -218,6 +257,33 @@ describe('parseRappiPay — rentabilidad formato real (post-stripHtml, espacios)
   })
 })
 
+describe('parseRappiPay — espacio entre $ y monto (HTML con spans separados)', () => {
+  // Cuando el HTML tiene <span>$</span><span>203.770,46</span>, stripHtml produce "$ 203.770,46"
+  it('parsea rentabilidad con espacio después del $', () => {
+    const body = 'Rentabilidad de Abril $ 203.770,46 Fecha de corte 30 de abril de 2026'
+    const result = parseRappiPay({ ...BASE_EMAIL, subject: 'Rentabilidad mensual', body })
+    expect(result).not.toBeNull()
+    expect(result!.tipo).toBe('INGRESO')
+    expect(result!.monto).toBe(203770)
+  })
+
+  it('parsea transferencia recibida con espacio después del $', () => {
+    const body = 'tu RappiCuenta Monto recibido $ 1.050.000 Banco Bancolombia Fecha de la transacción 02 de mayo de 2026'
+    const result = parseRappiPay({ ...BASE_EMAIL, subject: 'Tu dinero ya está disponible.', body })
+    expect(result).not.toBeNull()
+    expect(result!.tipo).toBe('TRANSFERENCIA_RECIBIDA')
+    expect(result!.monto).toBe(1050000)
+  })
+
+  it('parsea ingreso bancario con espacio después del $', () => {
+    const body = 'Resumen transferencia bancaria Monto recibido $ 24.208.992 Banco BANCO CITIBANK COLOMBIA Fecha de la transacción 29 de abril de 2026'
+    const result = parseRappiPay({ ...BASE_EMAIL, subject: 'Resumen transferencia Bancaria', body })
+    expect(result).not.toBeNull()
+    expect(result!.tipo).toBe('INGRESO')
+    expect(result!.monto).toBe(24208992)
+  })
+})
+
 describe('parseRappiPay — bolsillos (multi-word name)', () => {
   const body = `
 Tu Bolsillo Navidad sigue generando
@@ -253,6 +319,59 @@ describe('parseRappiPay — transferencia enviada formato real', () => {
     expect(result!.tipo).toBe('TRANSFERENCIA_ENVIADA')
     expect(result!.monto).toBe(2910000)
     expect(result!.comercio).toBe('carlosfdezmo@me.com')
+  })
+})
+
+describe('parseRappiPay — transferencia bancaria saliente', () => {
+  const body = `
+¡Hola, Brandon Nick !
+Tu transferencia fue enviada con éxito.
+Será procesada y aprobada por el banco de destino.
+
+Aquí los detalles:
+
+Monto transferido
+$1.500.000
+
+Banco
+DAVIVIENDA
+
+No. de transacción
+12345678
+
+Fecha de la transacción
+29 de mayo de 2026
+
+Hora de la transacción
+02:15 pm
+`
+
+  it('parsea transferencia bancaria saliente como TRANSFERENCIA_ENVIADA', () => {
+    const result = parseRappiPay({ ...BASE_EMAIL, subject: 'Resumen transferencia Bancaria', body })
+    expect(result).not.toBeNull()
+    expect(result!.tipo).toBe('TRANSFERENCIA_ENVIADA')
+    expect(result!.monto).toBe(1500000)
+    expect(result!.comercio).toBe('Davivienda')
+  })
+})
+
+describe('parseRappiPay — emails ignorados', () => {
+  it('ignora "Tu compra falló"', () => {
+    const result = parseRappiPay({
+      ...BASE_EMAIL,
+      subject: 'Tu compra falló',
+      body: 'Tu compra no se procesó. Monto $110.441,00 Tipo de transacción PSE',
+    })
+    expect(result).toBeNull()
+  })
+
+  it('ignora extracto de cuenta', () => {
+    const result = parseRappiPay({
+      ...BASE_EMAIL,
+      subject: 'Extracto de RappiCuenta',
+      body: 'Ya puedes consultar el extracto de tu cuenta.',
+    })
+    expect(result).toBeNull()
   })
 })
 

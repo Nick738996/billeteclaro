@@ -24,7 +24,7 @@ function parsePurchase(email: EmailInput): ParseResult {
   const body = email.body
 
   // "Monto\n$17.934" → after stripping HTML becomes "Monto $17.934 Método..."
-  const montoMatch = body.match(/\bMonto\s+\$([\d.,]+)/i)
+  const montoMatch = body.match(/\bMonto\s+\$\s*([\d.,]+)/i)
   if (!montoMatch) return null
 
   const monto = parseCOPAmount(montoMatch[1])
