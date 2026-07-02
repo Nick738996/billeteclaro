@@ -125,7 +125,7 @@ export function parseBancolombia(email: EmailInput): ParseResult {
         descripcion:  `Transferencia recibida de ${comercio}`,
         banco:        'BANCOLOMBIA',
         tipo:         'TRANSFERENCIA_RECIBIDA',
-        categoria:    'TRANSFERENCIA',
+        categoria:    'INGRESO',
         subcategoria: null,
         moneda:       'COP',
         monto_usd:    null,

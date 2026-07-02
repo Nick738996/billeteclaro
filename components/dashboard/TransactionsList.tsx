@@ -10,6 +10,7 @@ import {
   type Categoria,
   type Banco,
   CATEGORIA_LABELS,
+  catLabel,
   formatCOP,
   formatCOPCompact,
   isIngreso,
@@ -64,26 +65,6 @@ const BANCO_LABEL: Record<Banco, { label: string; color: string }> = {
 
 type FilterKey = Categoria | 'TODOS' | `BANCO:${Banco}`
 
-// Solo las categorías (para el bottom sheet)
-const CAT_FILTER_KEYS: Array<{ key: FilterKey; label: string }> = [
-  { key: 'SALIDAS',        label: 'Salidas' },
-  { key: 'TRANSPORTE',     label: 'Transporte' },
-  { key: 'HOGAR',          label: 'Hogar' },
-  { key: 'SALUD',          label: 'Salud' },
-  { key: 'SUSCRIPCIONES',  label: 'Suscripciones' },
-  { key: 'COMPRAS_ONLINE', label: 'Online' },
-  { key: 'TRANSFERENCIA',  label: 'Transferencias' },
-  { key: 'INVERSION',      label: 'Inversión' },
-  { key: 'AHORROS',        label: 'Ahorros' },
-  { key: 'PRESTAMO',       label: 'Préstamo' },
-  { key: 'DEUDA',          label: 'Deuda' },
-  { key: 'INGRESO',        label: 'Ingresos' },
-  { key: 'DONACIONES',     label: 'Donaciones' },
-  { key: 'EDUCACION',      label: 'Educación' },
-  { key: 'REEMBOLSABLE',   label: 'Reembolsable' },
-  { key: 'OTRO',           label: 'Otro' },
-]
-
 // ── Helpers (iguales al original) ─────────────────────────────────────────────
 
 const LOWERCASE_ES = new Set(['y','e','o','de','del','la','el','los','las','en','a','con','por','al'])
@@ -134,16 +115,44 @@ function groupByDate(txs: Transaction[]): Array<{ dateLabel: string; items: Tran
 
 // ── CategorySheet ─────────────────────────────────────────────────────────────
 
+function CatFilterBtn({ cat, active, onChange }: { cat: string; active: FilterKey; onChange: (k: FilterKey) => void }) {
+  const on    = active === cat
+  const theme = CATEGORIA_THEME[cat as Categoria] ?? CATEGORIA_THEME['OTRO']
+  return (
+    <button
+      key={cat}
+      onClick={() => onChange(cat as FilterKey)}
+      className="rounded-full"
+      style={{
+        padding: '7px 14px',
+        background: on ? theme.color : theme.bg,
+        color: on ? 'var(--bg)' : theme.color,
+        border: 'none',
+        fontSize: 'var(--text-xs)',
+        fontWeight: on ? 600 : 400,
+        cursor: 'pointer',
+      }}
+    >
+      {catLabel(cat)}
+    </button>
+  )
+}
+
 function CategorySheet({
   active,
   onChange,
   onClose,
+  budgetedCats,
+  otherCats,
 }: {
   active: FilterKey
   onChange: (key: FilterKey) => void
   onClose: () => void
+  budgetedCats: string[]
+  otherCats: string[]
 }) {
-  return (
+  if (typeof document === 'undefined') return null
+  return createPortal(
     <>
       <div
         className="fixed inset-0 z-50"
@@ -168,32 +177,37 @@ function CategorySheet({
         <p className="font-semibold mb-3" style={{ fontSize: 'var(--text-sm)', color: 'var(--text)' }}>
           Categorías
         </p>
-        <div className="flex flex-wrap gap-2">
-          {CAT_FILTER_KEYS.map(f => {
-            const on    = active === f.key
-            const theme = CATEGORIA_THEME[f.key as Categoria] ?? CATEGORIA_THEME['OTRO']
-            return (
-              <button
-                key={f.key}
-                onClick={() => onChange(f.key)}
-                className="rounded-full"
-                style={{
-                  padding: '7px 14px',
-                  background: on ? theme.color : theme.bg,
-                  color: on ? 'var(--bg)' : theme.color,
-                  border: 'none',
-                  fontSize: 'var(--text-xs)',
-                  fontWeight: on ? 600 : 400,
-                  cursor: 'pointer',
-                }}
-              >
-                {f.label}
-              </button>
-            )
-          })}
-        </div>
+
+        {budgetedCats.length > 0 && (
+          <>
+            <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-subtle)', marginBottom: 8 }}>
+              Presupuestadas
+            </p>
+            <div className="flex flex-wrap gap-2 mb-4">
+              {budgetedCats.map(cat => (
+                <CatFilterBtn key={cat} cat={cat} active={active} onChange={onChange} />
+              ))}
+            </div>
+          </>
+        )}
+
+        {otherCats.length > 0 && (
+          <>
+            {budgetedCats.length > 0 && (
+              <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-subtle)', marginBottom: 8 }}>
+                Otras
+              </p>
+            )}
+            <div className="flex flex-wrap gap-2">
+              {otherCats.map(cat => (
+                <CatFilterBtn key={cat} cat={cat} active={active} onChange={onChange} />
+              ))}
+            </div>
+          </>
+        )}
       </div>
-    </>
+    </>,
+    document.body
   )
 }
 
@@ -203,14 +217,16 @@ function FilterChips({
   active,
   onChange,
   transactions,
+  budgetedCats,
 }: {
   active: FilterKey
   onChange: (key: FilterKey) => void
   transactions: Transaction[]
+  budgetedCats: string[]
 }) {
   const [sheetOpen, setSheetOpen] = useState(false)
   const isCatActive    = active !== 'TODOS' && !active.startsWith('BANCO:')
-  const activeCatInfo  = isCatActive ? CAT_FILTER_KEYS.find(f => f.key === active) : null
+  const activeCatLabel = isCatActive ? catLabel(active) : null
   const activeCatTheme = isCatActive ? (CATEGORIA_THEME[active as Categoria] ?? CATEGORIA_THEME['OTRO']) : null
 
   // Bancos que realmente tienen transacciones este mes, en orden de frecuencia
@@ -224,6 +240,21 @@ function FilterChips({
       .sort((a, b) => b[1] - a[1])
       .map(([banco]) => banco)
   }, [transactions])
+
+  // Categorías presentes en las transacciones que no están en el presupuesto
+  const otherCats = useMemo(() => {
+    const budgetSet = new Set<string>(budgetedCats)
+    const seen = new Set<string>()
+    const result: string[] = []
+    for (const t of transactions) {
+      if (!budgetSet.has(t.categoria) && !seen.has(t.categoria)) {
+        seen.add(t.categoria)
+        result.push(t.categoria)
+      }
+    }
+    if (!budgetSet.has('OTRO') && !seen.has('OTRO')) result.push('OTRO')
+    return result
+  }, [transactions, budgetedCats])
 
   const INACTIVE = { bg: 'transparent', border: '1px solid var(--border)', color: 'var(--text-muted)' }
 
@@ -283,7 +314,7 @@ function FilterChips({
           })}
 
           {/* Badge de categoría activa (con × para limpiar) */}
-          {activeCatInfo && activeCatTheme && (
+          {activeCatLabel && activeCatTheme && (
             <button
               onClick={() => onChange('TODOS')}
               className="flex-shrink-0 flex items-center gap-1.5 rounded-full"
@@ -297,7 +328,7 @@ function FilterChips({
                 cursor: 'pointer',
               }}
             >
-              {activeCatInfo.label}
+              {activeCatLabel}
               <span
                 className="flex items-center justify-center rounded-full"
                 style={{ width: 14, height: 14, background: 'rgba(0,0,0,0.2)', fontSize: 10 }}
@@ -332,6 +363,8 @@ function FilterChips({
           active={active}
           onChange={key => { onChange(key); setSheetOpen(false) }}
           onClose={() => setSheetOpen(false)}
+          budgetedCats={budgetedCats}
+          otherCats={otherCats}
         />
       )}
     </>
@@ -340,13 +373,32 @@ function FilterChips({
 
 // ── CategoryPicker bottom sheet ────────────────────────────────────────────
 
-function CategoryPicker({ current, onSelect, onClose }: {
+function CatPickerBtn({ cat, current, onSelect }: { cat: string; current: string; onSelect: (c: Categoria) => void }) {
+  const on    = cat === current
+  const theme = CATEGORIA_THEME[cat as Categoria] ?? CATEGORIA_THEME['OTRO']
+  return (
+    <button
+      key={cat}
+      onClick={() => onSelect(cat as Categoria)}
+      className="rounded-full"
+      style={{ padding: '7px 14px', background: on ? theme.color : theme.bg, color: on ? 'var(--bg)' : theme.color, border: 'none', fontSize: 'var(--text-xs)', fontWeight: on ? 600 : 400, cursor: 'pointer' }}
+    >
+      {catLabel(cat)}
+    </button>
+  )
+}
+
+function CategoryPicker({ current, onSelect, onClose, budgetedCats }: {
   current: Categoria
   onSelect: (c: Categoria) => void
   onClose: () => void
+  budgetedCats: string[]
 }) {
   if (typeof document === 'undefined') return null
-  const cats = Object.keys(CATEGORIA_LABELS) as Categoria[]
+  const allCats = Object.keys(CATEGORIA_LABELS) as Categoria[]
+  const budgetSet = new Set<string>(budgetedCats)
+  const otherCats = allCats.filter(c => !budgetSet.has(c))
+
   return createPortal(
     <>
       <div className="fixed inset-0 z-50" style={{ background: 'var(--overlay)' }} onClick={onClose} aria-hidden="true" />
@@ -370,16 +422,26 @@ function CategoryPicker({ current, onSelect, onClose }: {
             <X size={16} />
           </button>
         </div>
+
+        {budgetedCats.length > 0 && (
+          <>
+            <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-subtle)', marginBottom: 8 }}>
+              Presupuestadas
+            </p>
+            <div className="flex flex-wrap gap-2 mb-4">
+              {budgetedCats.map(cat => (
+                <CatPickerBtn key={cat} cat={cat} current={current} onSelect={onSelect} />
+              ))}
+            </div>
+            <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-subtle)', marginBottom: 8 }}>
+              Otras
+            </p>
+          </>
+        )}
         <div className="flex flex-wrap gap-2">
-          {cats.map(cat => {
-            const on    = cat === current
-            const theme = CATEGORIA_THEME[cat] ?? CATEGORIA_THEME['OTRO']
-            return (
-              <button key={cat} onClick={() => onSelect(cat)} className="rounded-full" style={{ padding: '7px 14px', background: on ? theme.color : theme.bg, color: on ? 'var(--bg)' : theme.color, border: 'none', fontSize: 'var(--text-xs)', fontWeight: on ? 600 : 400, cursor: 'pointer' }}>
-                {CATEGORIA_LABELS[cat]}
-              </button>
-            )
-          })}
+          {(budgetedCats.length > 0 ? otherCats : allCats).map(cat => (
+            <CatPickerBtn key={cat} cat={cat} current={current} onSelect={onSelect} />
+          ))}
         </div>
       </div>
     </>,
@@ -402,7 +464,7 @@ function TransactionRow({ t, pendingCat, onCategoryClick, onDelete }: {
 
   const income     = isIngreso(t.tipo)
   const displayCat = pendingCat ?? t.categoria
-  const theme      = CATEGORIA_THEME[displayCat] ?? CATEGORIA_THEME['OTRO']
+  const theme      = CATEGORIA_THEME[displayCat as Categoria] ?? CATEGORIA_THEME['OTRO']
   const banco      = efectivoBanco(t)
   const chip       = BANCO_LABEL[banco]
   const time       = format(new Date(t.fecha), 'HH:mm', { locale: es })
@@ -439,7 +501,7 @@ function TransactionRow({ t, pendingCat, onCategoryClick, onDelete }: {
         <div className="flex items-center gap-1" style={{ marginTop: 3 }}>
           <button
             onClick={onCategoryClick}
-            aria-label={`Cambiar categoría: ${CATEGORIA_LABELS[displayCat]}`}
+            aria-label={`Cambiar categoría: ${catLabel(displayCat)}`}
             style={{
               background: isDirty ? 'var(--yellow-soft)' : 'transparent',
               border: `1px solid ${isDirty ? 'var(--yellow)' : 'transparent'}`,
@@ -450,7 +512,7 @@ function TransactionRow({ t, pendingCat, onCategoryClick, onDelete }: {
           >
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: isDirty ? 'var(--yellow)' : theme.color, flexShrink: 0 }} />
             <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase', color: isDirty ? 'var(--yellow)' : theme.color }}>
-              {CATEGORIA_LABELS[displayCat]}
+              {catLabel(displayCat)}
             </span>
             <span style={{ fontSize: 9, color: isDirty ? 'var(--yellow)' : theme.color, opacity: isDirty ? 0.7 : 0.45, lineHeight: 1 }}>✎</span>
           </button>
@@ -524,9 +586,10 @@ interface Props {
   onCategoryChange?: () => void
   onTransactionDeleted?: () => void
   onAdd?: () => void
+  budgets?: Record<string, number>
 }
 
-export default function TransactionsList({ transactions, activeFilter, onFilterChange, onCategoryChange, onTransactionDeleted, onAdd }: Props) {
+export default function TransactionsList({ transactions, activeFilter, onFilterChange, onCategoryChange, onTransactionDeleted, onAdd, budgets }: Props) {
   const [search,      setSearch]      = useState('')
   const [pendingCats, setPendingCats] = useState<Record<string, Categoria>>({})
   const [isSaving,    setIsSaving]    = useState(false)
@@ -535,6 +598,8 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
   const [deletedIds,  setDeletedIds]  = useState<Set<string>>(new Set())
   const activeFilterKey = activeFilter as FilterKey
   const pendingCount    = Object.keys(pendingCats).length
+
+  const budgetedCats = useMemo(() => Object.keys(budgets ?? {}), [budgets])
 
   const handleDelete = async (t: Transaction) => {
     setDeletedIds(prev => new Set(prev).add(t.id))
@@ -600,7 +665,7 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
     const matchesSearch = !search
       || t.comercio?.toLowerCase().includes(q)
       || t.descripcion?.toLowerCase().includes(q)
-      || CATEGORIA_LABELS[t.categoria].toLowerCase().includes(q)
+      || catLabel(t.categoria).toLowerCase().includes(q)
     return matchesCategory && matchesSearch
   }), [transactions, activeFilter, search, deletedIds])
 
@@ -661,7 +726,7 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
 
       {/* Chips */}
       <div className="px-4 pb-3" style={{ borderBottom: '1px solid var(--border-soft)' }}>
-        <FilterChips active={activeFilterKey} onChange={key => onFilterChange(key)} transactions={transactions} />
+        <FilterChips active={activeFilterKey} onChange={key => onFilterChange(key)} transactions={transactions} budgetedCats={budgetedCats} />
       </div>
 
 
@@ -793,6 +858,7 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
           setPickerTxId(null)
         }}
         onClose={() => setPickerTxId(null)}
+        budgetedCats={budgetedCats}
       />
     )}
     </>

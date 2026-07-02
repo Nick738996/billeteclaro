@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { Check, RefreshCw, ChevronRight, Plus, Trash2, Copy, ArrowLeft } from 'lucide-react'
-import { CATEGORIA_LABELS, formatCOP, formatCOPCompact, PRESUPUESTO_CATS, type Categoria, type BudgetEntry, type BudgetSubcat } from '@/lib/types'
+import { CATEGORIA_LABELS, catLabel, normalizeCatKey, formatCOP, formatCOPCompact, PRESUPUESTO_CATS, type Categoria, type BudgetEntry, type BudgetSubcat } from '@/lib/types'
 import { TEST_IDS } from '@/lib/testIds'
 
 function pctColor(pct: number) {
@@ -28,14 +28,28 @@ interface Props {
   onClose?: () => void
 }
 
+function budgetedKeys(map: DraftMap): Set<string> {
+  return new Set(
+    Object.entries(map)
+      .filter(([, v]) => v.monto > 0)
+      .map(([k]) => k)
+  )
+}
+
 export default function BudgetManager({ mes, gastosPorCategoria, ingresos = 0, initialBudgets, onBudgetsChange, onSaved, onClose }: Props) {
-  const [saved,    setSaved]    = useState<DraftMap>(initialBudgets ?? {})
-  const [draft,    setDraft]    = useState<DraftMap>(initialBudgets ?? {})
-  const [expanded, setExpanded] = useState<string | null>(null)
-  const [saving,   setSaving]   = useState(false)
-  const [savedOk,  setSavedOk]  = useState(false)
-  const [loaded,   setLoaded]   = useState(!!initialBudgets)
-  const [copying,  setCopying]  = useState(false)
+  const [saved,      setSaved]      = useState<DraftMap>(initialBudgets ?? {})
+  const [draft,      setDraft]      = useState<DraftMap>(initialBudgets ?? {})
+  const [expanded,   setExpanded]   = useState<string | null>(null)
+  const [saving,     setSaving]     = useState(false)
+  const [savedOk,    setSavedOk]    = useState(false)
+  const [loaded,     setLoaded]     = useState(!!initialBudgets)
+  const [copying,    setCopying]    = useState(false)
+  const [pinnedCats,   setPinnedCats]   = useState<Set<string>>(
+    () => initialBudgets ? budgetedKeys(initialBudgets) : new Set()
+  )
+  const [showPicker,   setShowPicker]   = useState(false)
+  const [customInput,  setCustomInput]  = useState('')
+  const [inputError,   setInputError]   = useState<string | null>(null)
 
   const [yy, mm] = mes.split('-').map(Number)
   const prevMes = mm === 1 ? `${yy - 1}-12` : `${yy}-${String(mm - 1).padStart(2, '0')}`
@@ -49,6 +63,7 @@ export default function BudgetManager({ mes, gastosPorCategoria, ingresos = 0, i
       if (Object.keys(b).length > 0) {
         setDraft(b)
         onBudgetsChange?.(totals(b))
+        setPinnedCats(prev => new Set([...prev, ...budgetedKeys(b)]))
       }
     } finally {
       setCopying(false)
@@ -72,6 +87,8 @@ export default function BudgetManager({ mes, gastosPorCategoria, ingresos = 0, i
 
   useEffect(() => {
     if (initialBudgets) return  // ya tenemos los datos — no re-fetchar
+    setLoaded(false)
+    setPinnedCats(new Set())
     fetch(`/api/budgets?mes=${mes}`)
       .then(r => r.json())
       .then(d => {
@@ -79,6 +96,7 @@ export default function BudgetManager({ mes, gastosPorCategoria, ingresos = 0, i
         setSaved(b)
         setDraft(b)
         onBudgetsChange?.(totals(b))
+        setPinnedCats(budgetedKeys(b))
         setLoaded(true)
       })
       .catch(() => setLoaded(true))
@@ -95,8 +113,12 @@ export default function BudgetManager({ mes, gastosPorCategoria, ingresos = 0, i
     setSaving(true)
     setSavedOk(false)
     try {
-      const items = PRESUPUESTO_CATS.map(cat => ({
-        categoria: cat,
+      const keysToSend = new Set([
+        ...Object.keys(draft),
+        ...Object.keys(saved).filter(k => !((draft[k]?.monto ?? 0) > 0)),
+      ])
+      const items = [...keysToSend].map(cat => ({
+        categoria: cat as Categoria,
         monto: draft[cat]?.monto ?? 0,
         subcategorias: draft[cat]?.subcategorias ?? [],
       }))
@@ -118,12 +140,66 @@ export default function BudgetManager({ mes, gastosPorCategoria, ingresos = 0, i
   const totalPresupuestado = Object.values(draft).reduce((s, v) => s + v.monto, 0)
   const restante = ingresos - totalPresupuestado
 
-  const catsWithActivity = PRESUPUESTO_CATS.filter(
-    cat => (gastosPorCategoria[cat] ?? 0) > 0 || (draft[cat]?.monto ?? 0) > 0 || expanded === cat
+  const predefinedSet = useMemo(() => new Set<string>(PRESUPUESTO_CATS), [])
+
+  const activeCats = useMemo(() => {
+    const seen = new Set<string>()
+    const result: string[] = []
+    for (const cat of PRESUPUESTO_CATS) {
+      if ((gastosPorCategoria[cat] ?? 0) > 0 || (draft[cat]?.monto ?? 0) > 0 || pinnedCats.has(cat)) {
+        seen.add(cat); result.push(cat)
+      }
+    }
+    for (const cat of [...pinnedCats, ...Object.keys(draft)]) {
+      if (!seen.has(cat) && !predefinedSet.has(cat)) {
+        seen.add(cat); result.push(cat)
+      }
+    }
+    return result
+  }, [gastosPorCategoria, draft, pinnedCats, predefinedSet])
+
+  const availablePredefined = useMemo(
+    () => PRESUPUESTO_CATS.filter(cat => !activeCats.includes(cat)),
+    [activeCats]
   )
-  const catsEmpty = PRESUPUESTO_CATS.filter(
-    cat => (gastosPorCategoria[cat] ?? 0) === 0 && (draft[cat]?.monto ?? 0) === 0 && expanded !== cat
-  )
+
+  const addCategory = (cat: string) => {
+    const nextDraft = { ...draft, [cat]: draft[cat] ?? { monto: 0, subcategorias: [] } }
+    setDraft(nextDraft)
+    onBudgetsChange?.(totals(nextDraft))
+    setPinnedCats(prev => new Set([...prev, cat]))
+    setShowPicker(false)
+  }
+
+  const addCustomCategory = () => {
+    const name = customInput.trim()
+    if (!name) return
+    if (!/^[a-zA-ZáéíóúÁÉÍÓÚüÜñÑ\s]+$/.test(name)) {
+      setInputError('Solo se permiten letras')
+      return
+    }
+    if (name.length < 2) {
+      setInputError('Mínimo 2 letras')
+      return
+    }
+    const key = normalizeCatKey(name)
+    const existingLabels = activeCats.map(c => normalizeCatKey(catLabel(c)))
+    if (existingLabels.includes(key)) {
+      setInputError('Ya existe esta categoría')
+      return
+    }
+    addCategory(key)
+    setCustomInput('')
+    setInputError(null)
+  }
+
+  const removeCategory = (cat: string) => {
+    const next = { ...draft }
+    delete next[cat]
+    setDraft(next)
+    onBudgetsChange?.(totals(next))
+    setPinnedCats(prev => { const n = new Set(prev); n.delete(cat); return n })
+  }
 
   if (!loaded) return (
     <div className="card" style={{ padding: 20 }}>
@@ -188,8 +264,8 @@ export default function BudgetManager({ mes, gastosPorCategoria, ingresos = 0, i
         </div>
       </div>
 
-      {/* Categorías con actividad */}
-      {catsWithActivity.map(cat => (
+      {/* Categorías activas */}
+      {activeCats.map(cat => (
         <CategoryRow
           key={cat}
           cat={cat}
@@ -199,29 +275,100 @@ export default function BudgetManager({ mes, gastosPorCategoria, ingresos = 0, i
           isExpanded={expanded === cat}
           onToggle={() => setExpanded(prev => prev === cat ? null : cat)}
           onChange={entry => updateEntry(cat, entry)}
+          onRemove={(gastosPorCategoria[cat] ?? 0) === 0 ? () => removeCategory(cat) : undefined}
         />
       ))}
 
-      {/* Categorías sin actividad — colapsadas */}
-      {catsEmpty.length > 0 && (
-        <details>
-          <summary style={{ padding: '10px 16px', fontSize: 'var(--text-xs)', color: 'var(--text-muted)', cursor: 'pointer', listStyle: 'none', borderTop: catsWithActivity.length > 0 ? '1px solid var(--border-soft)' : 'none' }}>
-            + {catsEmpty.length} categorías sin actividad
-          </summary>
-          {catsEmpty.map(cat => (
-            <CategoryRow
-              key={cat}
-              cat={cat}
-              entry={draft[cat] ?? { monto: 0, subcategorias: [] }}
-              savedEntry={saved[cat] ?? { monto: 0, subcategorias: [] }}
-              gasto={0}
-              isExpanded={expanded === cat}
-              onToggle={() => setExpanded(prev => prev === cat ? null : cat)}
-              onChange={entry => updateEntry(cat, entry)}
-            />
-          ))}
-        </details>
-      )}
+      {/* Agregar categoría */}
+      <div style={{ borderTop: activeCats.length > 0 ? '1px solid var(--border-soft)' : 'none', padding: '10px 16px' }}>
+        {showPicker ? (
+          <div>
+            <div className="flex items-center justify-between" style={{ marginBottom: 10 }}>
+              <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', fontWeight: 500 }}>
+                Agregar categoría
+              </p>
+              <button
+                onClick={() => { setShowPicker(false); setCustomInput(''); setInputError(null) }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-subtle)', fontSize: 'var(--text-xs)', padding: 0 }}
+              >
+                Cancelar
+              </button>
+            </div>
+
+            {/* Input para categoría custom */}
+            <div style={{ marginBottom: 12 }}>
+              <div className="flex gap-2">
+                <input
+                  className="input-field"
+                  value={customInput}
+                  onChange={e => { setCustomInput(e.target.value); setInputError(null) }}
+                  onKeyDown={e => { if (e.key === 'Enter') addCustomCategory() }}
+                  placeholder="Nombre (ej. Mascotas)"
+                  maxLength={30}
+                  style={{ flex: 1, padding: '6px 10px', fontSize: 'var(--text-sm)' }}
+                />
+                <button
+                  onClick={addCustomCategory}
+                  disabled={!customInput.trim()}
+                  style={{
+                    padding: '6px 14px',
+                    background: customInput.trim() ? 'var(--text)' : 'var(--surface-2)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--radius-sm)',
+                    color: customInput.trim() ? 'var(--bg)' : 'var(--text-subtle)',
+                    fontSize: 'var(--text-xs)', fontWeight: 600,
+                    cursor: customInput.trim() ? 'pointer' : 'default',
+                    flexShrink: 0,
+                  }}
+                >
+                  Crear
+                </button>
+              </div>
+              {inputError && (
+                <p style={{ fontSize: 'var(--text-xs)', color: 'var(--red)', marginTop: 4 }}>{inputError}</p>
+              )}
+            </div>
+
+            {/* Chips de categorías predefinidas disponibles */}
+            {availablePredefined.length > 0 && (
+              <>
+                <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-subtle)', marginBottom: 8 }}>
+                  O elige una existente
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {availablePredefined.map(cat => (
+                    <button
+                      key={cat}
+                      onClick={() => addCategory(cat)}
+                      style={{
+                        padding: '6px 14px',
+                        background: 'var(--surface-2)',
+                        border: '1px solid var(--border)',
+                        borderRadius: 'var(--radius-pill)',
+                        color: 'var(--text)',
+                        fontSize: 'var(--text-xs)',
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {CATEGORIA_LABELS[cat]}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        ) : (
+          <button
+            onClick={() => setShowPicker(true)}
+            className="flex items-center gap-1.5"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 'var(--text-xs)', fontWeight: 500, padding: 0 }}
+          >
+            <Plus size={12} />
+            Agregar categoría
+          </button>
+        )}
+      </div>
 
       {/* Footer — resumen de asignación */}
       {(totalPresupuestado > 0 || ingresos > 0) && (
@@ -257,14 +404,15 @@ export default function BudgetManager({ mes, gastosPorCategoria, ingresos = 0, i
 
 // ── CategoryRow ───────────────────────────────────────────────────────────────
 
-function CategoryRow({ cat, entry, savedEntry, gasto, isExpanded, onToggle, onChange }: {
-  cat: Categoria
+function CategoryRow({ cat, entry, savedEntry, gasto, isExpanded, onToggle, onChange, onRemove }: {
+  cat: string
   entry: BudgetEntry
   savedEntry: BudgetEntry
   gasto: number
   isExpanded: boolean
   onToggle: () => void
   onChange: (e: BudgetEntry) => void
+  onRemove?: () => void
 }) {
   const limite   = entry.monto
   const hasSubs  = entry.subcategorias.length > 0
@@ -307,7 +455,7 @@ function CategoryRow({ cat, entry, savedEntry, gasto, isExpanded, onToggle, onCh
         tabIndex={0}
         className="flex items-center gap-2"
         aria-expanded={isExpanded}
-        aria-label={`${CATEGORIA_LABELS[cat]}: ${limite > 0 ? `límite ${formatCOP(limite)}` : 'sin límite'}${isExpanded ? ', expandido' : ''}`}
+        aria-label={`${catLabel(cat)}: ${limite > 0 ? `límite ${formatCOP(limite)}` : 'sin límite'}${isExpanded ? ', expandido' : ''}`}
         style={{ padding: '12px 16px', cursor: 'pointer' }}
         onClick={onToggle}
         onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle() } }}
@@ -326,7 +474,7 @@ function CategoryRow({ cat, entry, savedEntry, gasto, isExpanded, onToggle, onCh
         {/* Nombre + dot de cambio */}
         <div className="flex items-center gap-1.5 flex-1 min-w-0">
           <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text)' }}>
-            {CATEGORIA_LABELS[cat]}
+            {catLabel(cat)}
           </span>
           {isDirty && (
             <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--yellow)', display: 'inline-block', flexShrink: 0 }} />
@@ -338,7 +486,7 @@ function CategoryRow({ cat, entry, savedEntry, gasto, isExpanded, onToggle, onCh
           )}
         </div>
 
-        {/* Gasto real + badge % */}
+        {/* Gasto real + badge % + quitar */}
         <div className="flex items-center gap-2 flex-shrink-0">
           <span className="tabular-nums" style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
             {formatCOP(gasto)}
@@ -349,6 +497,15 @@ function CategoryRow({ cat, entry, savedEntry, gasto, isExpanded, onToggle, onCh
             </span>
           ) : (
             <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-subtle)', minWidth: 48, textAlign: 'right' }}>sin límite</span>
+          )}
+          {onRemove && (
+            <button
+              onClick={e => { e.stopPropagation(); onRemove() }}
+              aria-label={`Quitar ${catLabel(cat)} del presupuesto`}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-subtle)', display: 'flex', padding: 2, opacity: 0.5, lineHeight: 1, fontSize: 14 }}
+            >
+              ×
+            </button>
           )}
         </div>
       </div>
@@ -392,7 +549,7 @@ function CategoryRow({ cat, entry, savedEntry, gasto, isExpanded, onToggle, onCh
 
               {/* Total sumado */}
               <div className="flex items-center justify-between" style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border-soft)' }}>
-                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', fontWeight: 500 }}>Total {CATEGORIA_LABELS[cat]}</span>
+                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', fontWeight: 500 }}>Total {catLabel(cat)}</span>
                 <span className="tabular-nums" style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--text)' }}>
                   {formatCOPCompact(limite)}
                 </span>

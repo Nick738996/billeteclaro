@@ -8,8 +8,8 @@ export function parseRappiPay(email: EmailInput): ParseResult {
 
   // Order matters: more specific patterns first
 
-  // Rentabilidad mensual
-  if (/rentabilidad|remuneraci[oó]n/i.test(subject + body)) {
+  // Rentabilidad mensual / bolsillos
+  if (/rentabilidad|remuneraci[oó]n|bolsillo/i.test(subject + body)) {
     return parseRentabilidad(email)
   }
 
@@ -202,24 +202,33 @@ function parsePSECompra(email: EmailInput): ParseResult {
 function parseRentabilidad(email: EmailInput): ParseResult {
   const body = email.body
 
-  // "Rentabilidad de Abril\n$203.770,46"
-  const montoMatch = body.match(/Rentabilidad de \w+\s+\$([\d.,]+)/i)
+  // "Rentabilidad de Abril $203.770,46"  (stripHtml → espacios)
+  // "Rentabilidad de Abril\n$203.770,46" (tests → newlines)
+  // "Rentabilidad de tu Bolsillo Navidad $50.000" (bolsillos, multi-palabra)
+  // Grupo 1 = label (ej. "Abril", "tu Bolsillo Navidad"), Grupo 2 = monto
+  const montoMatch = body.match(/Rentabilidad\s+de\s+([\s\S]*?)\s*\$([\d.,]+)/i)
   if (!montoMatch) return null
 
-  const monto = parseCOPAmount(montoMatch[1])
+  const monto = parseCOPAmount(montoMatch[2])
   if (!monto || monto <= 0) return null
 
-  // "Fecha de corte\n30 de abril de 2026"
+  // "Fecha de corte\n30 de abril de 2026" o "Fecha de corte 30 de abril de 2026"
   const fechaMatch = body.match(/Fecha de corte\s+(\d{1,2}\s+de\s+\w+\s+de\s+\d{4})/i)
   const fecha = fechaMatch
     ? parseSpanishDate(fechaMatch[1])
     : new Date(email.date).toISOString()
 
+  // Extraer nombre: "Abril" → RappiCuenta, "tu Bolsillo Navidad" → "Bolsillo Navidad"
+  const titulo = montoMatch[1].trim().replace(/^tu\s+/i, '')
+  const esBolsillo = /bolsillo/i.test(titulo)
+  const comercio = esBolsillo ? titulo : 'RappiCuenta'
+  const descripcion = esBolsillo ? `Rendimiento ${titulo}` : 'Rendimiento mensual RappiCuenta'
+
   return {
     fecha: fecha ?? new Date(email.date).toISOString(),
     monto,
-    comercio: 'RappiCuenta',
-    descripcion: 'Rendimiento mensual RappiCuenta',
+    comercio,
+    descripcion,
     banco: 'RAPPIPAY',
     tipo: 'INGRESO',
     categoria: 'INGRESO',

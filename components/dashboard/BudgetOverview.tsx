@@ -3,10 +3,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Pencil, Info } from 'lucide-react'
 import {
-  CATEGORIA_LABELS,
   CATEGORIA_COLORS,
   PRESUPUESTO_CATS,
   formatCOPCompact,
+  catLabel,
   type Categoria,
   type BudgetEntry,
 } from '@/lib/types'
@@ -67,8 +67,8 @@ export default function BudgetOverview({ mes, gastosPorCategoria, ingresos, onBu
 
   useEffect(() => { loadBudgets() }, [loadBudgets])
 
-  // Categorías con presupuesto (o gasto) — solo de PRESUPUESTO_CATS
-  const withBudget = PRESUPUESTO_CATS.filter(cat => (budgets[cat] ?? 0) > 0)
+  // Categorías con presupuesto (predefinidas + custom)
+  const withBudget = Object.keys(budgets).filter(cat => (budgets[cat] ?? 0) > 0)
   const budgetOnly = PRESUPUESTO_CATS.filter(
     cat => !(budgets[cat] ?? 0) && (gastosPorCategoria[cat] ?? 0) > 0
   )
@@ -191,7 +191,7 @@ export default function BudgetOverview({ mes, gastosPorCategoria, ingresos, onBu
           const limite = budgets[cat] ?? 0
           const pct    = limite > 0 ? (gasto / limite) * 100 : 0
           const color  = barColor(pct)
-          const dot    = CATEGORIA_COLORS[cat]
+          const dot    = (CATEGORIA_COLORS as Record<string, string>)[cat] ?? '#94a3b8'
 
           return (
             <div
@@ -205,7 +205,7 @@ export default function BudgetOverview({ mes, gastosPorCategoria, ingresos, onBu
               <div className="flex items-center gap-2" style={{ marginBottom: 8 }}>
                 <span style={{ width: 9, height: 9, borderRadius: '50%', background: dot, flexShrink: 0 }} />
                 <span className="flex-1 truncate" style={{ fontSize: 'var(--text-sm)', color: 'var(--text)', fontWeight: 600 }}>
-                  {CATEGORIA_LABELS[cat]}
+                  {catLabel(cat)}
                 </span>
                 <span className="tabular-nums flex-shrink-0" style={{ fontSize: 'var(--text-xs)' }}>
                   <span style={{ color: 'var(--text-muted)' }}>{formatCOPCompact(gasto)}</span>
@@ -251,7 +251,7 @@ export default function BudgetOverview({ mes, gastosPorCategoria, ingresos, onBu
               <div className="flex items-center gap-2" style={{ marginBottom: 8 }}>
                 <span style={{ width: 9, height: 9, borderRadius: '50%', background: CATEGORIA_COLORS[cat], flexShrink: 0 }} />
                 <span className="flex-1 truncate" style={{ fontSize: 'var(--text-sm)', color: 'var(--text)', fontWeight: 600 }}>
-                  {CATEGORIA_LABELS[cat]}
+                  {catLabel(cat)}
                 </span>
                 <span className="tabular-nums flex-shrink-0" style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
                   {formatCOPCompact(gasto)}
@@ -288,7 +288,7 @@ export default function BudgetOverview({ mes, gastosPorCategoria, ingresos, onBu
               <div className="flex items-center gap-2" style={{ marginBottom: 8 }}>
                 <span style={{ width: 9, height: 9, borderRadius: '50%', background: CATEGORIA_COLORS[cat], flexShrink: 0 }} />
                 <span className="flex-1 truncate" style={{ fontSize: 'var(--text-sm)', color: 'var(--text)', fontWeight: 600 }}>
-                  {CATEGORIA_LABELS[cat]}
+                  {catLabel(cat)}
                 </span>
                 <span className="tabular-nums flex-shrink-0" style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
                   {formatCOPCompact(gasto)}

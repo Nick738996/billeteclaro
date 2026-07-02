@@ -40,13 +40,13 @@ export function buildAdvisorContext(
     .reduce<Record<string, number>>((acc, t) => {
       acc[t.categoria] = (acc[t.categoria] ?? 0) + t.monto
       return acc
-    }, {}) as Record<Categoria, number>
+    }, {})
 
   const ingresoEstimado = transactions
     .filter(t => isIngreso(t.tipo))
     .reduce((s, t) => s + t.monto, 0)
 
-  const presupuestoPorCategoria = { ...budgets } as Record<Categoria, number>
+  const presupuestoPorCategoria = { ...budgets }
 
   const totalGastado = Object.values(gastosPorCategoria).reduce((s, v) => s + v, 0)
   const totalPresupuestado = Object.values(presupuestoPorCategoria).reduce((s, v) => s + v, 0)

@@ -56,7 +56,7 @@ interface ChartEntry {
 }
 
 function buildChartData(transactions: Transaction[]): ChartEntry[] {
-  const totals: Partial<Record<Categoria, number>> = {}
+  const totals: Partial<Record<string, number>> = {}
   for (const t of transactions) {
     const include =
       isGasto(t.tipo, t.categoria) ||

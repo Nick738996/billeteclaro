@@ -284,6 +284,7 @@ export default function DashboardClient({
             onCategoryChange={() => loadMonth(month)}
             onTransactionDeleted={() => { loadMonth(month); bumpContext() }}
             onAdd={() => setManualOpen(v => !v)}
+            budgets={budgets}
           />
         </div>
       </main>
