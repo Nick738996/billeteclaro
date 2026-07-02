@@ -4,6 +4,8 @@ import { useMemo } from 'react'
 import {
   CATEGORIA_COLORS,
   CATEGORIA_LABELS,
+  getCategoryColor,
+  catLabel,
   formatCOPCompact,
   isGasto,
   isIngreso,
@@ -69,9 +71,9 @@ function buildChartData(transactions: Transaction[]): ChartEntry[] {
   const sorted = Object.entries(totals)
     .filter(([, v]) => (v ?? 0) > 0)
     .map(([cat, value]) => ({
-      name: CATEGORIA_LABELS[cat as Categoria] ?? cat,
+      name: catLabel(cat),
       value: value!,
-      fill: CATEGORIA_COLORS[cat as Categoria] ?? '#606060',
+      fill: getCategoryColor(cat),
       categoria: cat as Categoria,
     }))
     .sort((a, b) => b.value - a.value)
