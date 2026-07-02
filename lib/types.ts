@@ -159,7 +159,7 @@ export const CATEGORIA_COLORS: Record<Categoria, string> = {
   REEMBOLSABLE: '#38bdf8', // light-blue — reembolsable
   TRANSFERENCIA: '#a855f7', // purple  — transferencias
   INGRESO: '#22c55e',     // green    — ingresos
-  OTRO: '#94a3b8',        // slate    — sin categoría
+  OTRO: '#8b9cc4',        // slate-blue — sin categoría
 }
 
 const CUSTOM_PALETTE = [

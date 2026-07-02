@@ -1,0 +1,160 @@
+.container { margin-bottom: 8px; }
+
+/* ── Header ── */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 13px 16px 11px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.headerTitle {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.closeBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  display: flex;
+  padding: 4px;
+  margin: -4px;
+}
+
+/* ── Body ── */
+.body { padding: 14px 16px 16px; }
+
+/* ── Draft transaction row ── */
+.draftRow {
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+}
+
+.draftRowSeparated { border-bottom: 1px solid var(--border-soft); }
+
+.draftRowHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.rowLabel {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.removeBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-subtle);
+  display: flex;
+}
+
+/* ── Field rows ── */
+.fieldRow {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+/* All direct children of a fieldRow share equal width */
+.fieldRow > * { flex: 1; }
+
+.amountWrapper {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.currencySymbol {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+/* Applied on top of the `input-field` utility class to tighten padding */
+.inputOverride {
+  padding: 5px 8px;
+  width: 100%;
+}
+
+.comercioInput {
+  padding: 5px 8px;
+  width: 100%;
+  margin-bottom: 6px;
+}
+
+.selectsRow {
+  display: flex;
+  gap: 8px;
+}
+
+/* All selects share equal width */
+.selectsRow > * { flex: 1; }
+
+/* ── Add-row button ── */
+.addBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  padding: 0;
+  margin-bottom: 14px;
+}
+
+/* ── Inline error ── */
+.error {
+  font-size: var(--text-xs);
+  color: var(--red);
+  margin-bottom: 8px;
+}
+
+/* ── Save button — three states ── */
+.saveBtn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 0;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-subtle);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  cursor: default;
+  opacity: 0.4;
+}
+
+/* hasValid — ready to save */
+.saveBtnActive {
+  background: var(--surface-2);
+  border-color: var(--text-muted);
+  color: var(--text);
+  cursor: pointer;
+  opacity: 1;
+}
+
+/* savedOk — success feedback */
+.saveBtnSaved {
+  background: var(--green-soft);
+  border-color: var(--green);
+  color: var(--green);
+  cursor: pointer;
+  opacity: 1;
+}
+
+/* in-flight — override cursor while request is pending */
+.saveBtnSaving { cursor: default; }

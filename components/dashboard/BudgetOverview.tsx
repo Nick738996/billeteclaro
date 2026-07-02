@@ -12,6 +12,7 @@ import {
   type BudgetEntry,
 } from '@/lib/types'
 import BudgetManager from './BudgetManager'
+import styles from './BudgetOverview.module.css'
 
 type DraftMap = Record<string, BudgetEntry>
 
@@ -29,19 +30,10 @@ function urgencyRank(pct: number): number {
   return 2
 }
 
-function barColor(pct: number): string {
+function zoneColor(pct: number): string {
   if (pct >= 110) return 'var(--red)'
-  if (pct >= 100) return '#f97316'   // orange — en límite, esperado
-  if (pct >= 80)  return 'var(--yellow)'
-  return 'var(--green)'
-}
-
-function badgeColor(pct: number): string {
-  if (pct === 0)   return 'var(--text-subtle)'
-  if (pct >= 110)  return 'var(--red)'
-  if (pct >= 100)  return '#f97316'
-  if (pct >= 80)   return 'var(--yellow)'
-  return 'var(--green)'
+  if (pct >= 80 && pct < 100) return 'var(--yellow)'
+  return 'var(--green)'  // <80% saludable  ó  100-109% completado
 }
 
 export default function BudgetOverview({ mes, gastosPorCategoria, ingresos, onBudgetsChange, onSaved }: Props) {
@@ -93,12 +85,12 @@ export default function BudgetOverview({ mes, gastosPorCategoria, ingresos, onBu
   })
 
   if (!loaded) return (
-    <div className="card" style={{ padding: '16px 20px' }}>
-      <div className="skeleton" style={{ height: 11, width: 120, marginBottom: 16, borderRadius: 4 }} />
+    <div className={`card ${styles.skeletonWrap}`}>
+      <div className={`skeleton ${styles.skeletonTitle}`} />
       {[80, 60, 90].map((w, i) => (
-        <div key={i} style={{ marginBottom: 16 }}>
-          <div className="skeleton" style={{ height: 10, width: `${w}%`, marginBottom: 8, borderRadius: 4 }} />
-          <div className="skeleton" style={{ height: 4, borderRadius: 99 }} />
+        <div key={i} className={styles.skeletonItem}>
+          <div className={`skeleton ${styles.skeletonItemLabel}`} style={{ '--skel-w': `${w}%` } as React.CSSProperties} />
+          <div className={`skeleton ${styles.skeletonItemBar}`} />
         </div>
       ))}
     </div>
@@ -144,25 +136,12 @@ export default function BudgetOverview({ mes, gastosPorCategoria, ingresos, onBu
   return (
     <div>
       {/* Category bars card */}
-      <div className="card" style={{ overflow: 'hidden' }}>
+      <div className={`card ${styles.cardOverflow}`}>
 
         {/* Header */}
-        <div
-          className="flex items-center justify-between"
-          style={{ padding: '14px 16px 10px', borderBottom: hasContent ? '1px solid var(--border-soft)' : 'none' }}
-        >
-          <p style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text)' }}>
-            Presupuesto
-          </p>
-          <button
-            onClick={() => setEditing(true)}
-            className="flex items-center gap-1.5 transition-opacity hover:opacity-70"
-            style={{
-              background: 'none', border: 'none', cursor: 'pointer',
-              color: 'var(--text-muted)',
-              fontSize: 'var(--text-xs)', fontWeight: 500, padding: '2px 0',
-            }}
-          >
+        <div className={`${styles.header} ${hasContent ? styles.headerBordered : ''}`}>
+          <p className={styles.headerTitle}>Presupuesto</p>
+          <button onClick={() => setEditing(true)} className={styles.editBtn}>
             <Pencil size={11} />
             Editar
           </button>
@@ -170,19 +149,9 @@ export default function BudgetOverview({ mes, gastosPorCategoria, ingresos, onBu
 
         {/* Empty state */}
         {!hasContent && (
-          <div style={{ padding: '28px 16px', textAlign: 'center' }}>
-            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', marginBottom: 12 }}>
-              Sin transacciones este mes
-            </p>
-            <button
-              onClick={() => setEditing(true)}
-              style={{
-                fontSize: 'var(--text-xs)', fontWeight: 500,
-                color: 'var(--green)', background: 'var(--green-soft)',
-                border: 'none', borderRadius: 'var(--radius-sm)',
-                padding: '6px 14px', cursor: 'pointer',
-              }}
-            >
+          <div className={styles.empty}>
+            <p className={styles.emptyText}>Sin transacciones este mes</p>
+            <button onClick={() => setEditing(true)} className={styles.emptyBtn}>
               Configurar presupuesto
             </button>
           </div>
@@ -193,44 +162,37 @@ export default function BudgetOverview({ mes, gastosPorCategoria, ingresos, onBu
           const gasto  = gastosPorCategoria[cat] ?? 0
           const limite = budgets[cat] ?? 0
           const pct    = limite > 0 ? (gasto / limite) * 100 : 0
-          const color  = barColor(pct)
           const dot    = getCategoryColor(cat)
+          const color  = zoneColor(pct)
+          const badge  = zoneColor(pct)
 
           return (
             <div
               key={cat}
-              style={{
-                padding: '11px 16px',
-                borderBottom: i < sorted.length - 1 || noBudget.length > 0 ? '1px solid var(--border-soft)' : 'none',
-              }}
+              className={`${styles.row} ${i < sorted.length - 1 ? styles.rowBorder : ''}`}
             >
               {/* Name + amounts */}
-              <div className="flex items-center gap-2" style={{ marginBottom: 8 }}>
-                <span style={{ width: 9, height: 9, borderRadius: '50%', background: dot, flexShrink: 0 }} />
-                <span className="flex-1 truncate" style={{ fontSize: 'var(--text-sm)', color: 'var(--text)', fontWeight: 600 }}>
-                  {catLabel(cat)}
-                </span>
-                <span className="tabular-nums flex-shrink-0" style={{ fontSize: 'var(--text-xs)' }}>
-                  <span style={{ color: 'var(--text-muted)' }}>{formatCOPCompact(gasto)}</span>
-                  <span style={{ color: 'var(--text-subtle)' }}> / {formatCOPCompact(limite)}</span>
+              <div className={styles.rowMeta}>
+                <span className={styles.dot} style={{ '--dot-color': dot } as React.CSSProperties} />
+                <span className={styles.catName}>{catLabel(cat)}</span>
+                <span className={styles.amounts}>
+                  <span className={styles.spent}>{formatCOPCompact(gasto)}</span>
+                  <span className={styles.limit}> / {formatCOPCompact(limite)}</span>
                 </span>
                 <span
-                  className="tabular-nums flex-shrink-0"
-                  style={{ fontSize: 12, fontWeight: 700, color: badgeColor(pct), minWidth: 40, textAlign: 'right', display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}
+                  className={styles.pct}
+                  style={{ '--pct-color': badge } as React.CSSProperties}
                 >
                   {pct >= 110 ? `+${Math.round(pct - 100)}%` : pct >= 100 ? <Check size={13} strokeWidth={2.5} /> : `${Math.round(pct)}%`}
                 </span>
               </div>
 
               {/* Bar */}
-              <div style={{ height: 4, background: 'var(--border)', borderRadius: 99, overflow: 'hidden' }}>
-                <div style={{
-                  width: `${Math.min(pct, 100)}%`,
-                  height: '100%',
-                  background: color,
-                  borderRadius: 99,
-                  transition: 'width 0.3s ease',
-                }} />
+              <div className={styles.barTrack}>
+                <div
+                  className={styles.barFill}
+                  style={{ '--bar-w': `${Math.min(pct, 100)}%`, '--bar-color': color } as React.CSSProperties}
+                />
               </div>
             </div>
           )
@@ -238,31 +200,26 @@ export default function BudgetOverview({ mes, gastosPorCategoria, ingresos, onBu
 
         {/* Sin presupuesto — separador */}
         {noBudget.length > 0 && (
-          <div className="flex items-center gap-3" style={{ padding: '10px 16px 6px', borderTop: '1px solid var(--border-soft)' }}>
-            <div style={{ flex: 1, height: 1, background: 'var(--border-soft)' }} />
-            <p style={{ fontSize: 10, color: 'var(--text-subtle)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap' }}>
-              Sin presupuesto
-            </p>
-            <div style={{ flex: 1, height: 1, background: 'var(--border-soft)' }} />
+          <div className={styles.section}>
+            <p className={styles.sectionLabel}>Sin presupuesto</p>
           </div>
         )}
         {noBudget.map((cat, i) => {
           const gasto = gastosPorCategoria[cat] ?? 0
           const pct   = (gasto / maxGasto) * 100
           return (
-            <div key={cat} style={{ padding: '13px 16px 25px', borderBottom: i < noBudget.length - 1 ? '1px solid var(--border-soft)' : 'none' }}>
-              <div className="flex items-center gap-2" style={{ marginBottom: 8 }}>
-                <span style={{ width: 9, height: 9, borderRadius: '50%', background: getCategoryColor(cat), flexShrink: 0 }} />
-                <span className="flex-1 truncate" style={{ fontSize: 'var(--text-sm)', color: 'var(--text)', fontWeight: 600 }}>
-                  {catLabel(cat)}
-                </span>
-                <span className="tabular-nums flex-shrink-0" style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
-                  {formatCOPCompact(gasto)}
-                </span>
-                <span style={{ fontSize: 12, color: 'var(--text-subtle)', minWidth: 40, textAlign: 'right' }}>—</span>
+            <div key={cat} className={`${styles.row} ${i < noBudget.length - 1 ? styles.rowBorder : ''}`}>
+              <div className={styles.rowMeta}>
+                <span className={styles.dot} style={{ '--dot-color': getCategoryColor(cat) } as React.CSSProperties} />
+                <span className={styles.catName}>{catLabel(cat)}</span>
+                <span className={styles.amountOnly}>{formatCOPCompact(gasto)}</span>
+                <span className={styles.dash}>—</span>
               </div>
-              <div style={{ height: 4, background: 'var(--border)', borderRadius: 99, overflow: 'hidden' }}>
-                <div style={{ width: `${pct}%`, height: '100%', background: getCategoryColor(cat), opacity: 0.5, borderRadius: 99, transition: 'width 0.3s ease' }} />
+              <div className={styles.barTrack}>
+                <div
+                  className={styles.barFillGray}
+                  style={{ '--bar-w': `${pct}%` } as React.CSSProperties}
+                />
               </div>
             </div>
           )
@@ -270,35 +227,31 @@ export default function BudgetOverview({ mes, gastosPorCategoria, ingresos, onBu
 
         {/* Sin categoría — TRANSFERENCIA */}
         {sinCategoria.length > 0 && (
-          <div className="flex items-center gap-3" style={{ padding: '10px 16px 6px', borderTop: '1px solid var(--border-soft)' }}>
-            <div style={{ flex: 1, height: 1, background: 'var(--border-soft)' }} />
-            <div className="flex items-center gap-1">
-              <p style={{ fontSize: 10, color: 'var(--text-subtle)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap' }}>
-                Sin categoría
-              </p>
-              <span title="Transferencias — considera recategorizarlas en la lista de movimientos">
-                <Info size={10} style={{ color: 'var(--text-subtle)', cursor: 'help', flexShrink: 0 }} />
-              </span>
-            </div>
-            <div style={{ flex: 1, height: 1, background: 'var(--border-soft)' }} />
+          <div className={styles.sectionWithIcon}>
+            <p className={styles.sectionLabel}>Sin categoría</p>
+            <span
+              className={styles.infoIcon}
+              title="Transferencias — considera recategorizarlas en la lista de movimientos"
+            >
+              <Info size={10} />
+            </span>
           </div>
         )}
         {sinCategoria.map((cat, i) => {
           const gasto = gastosPorCategoria[cat] ?? 0
           const pct   = (gasto / maxGasto) * 100
           return (
-            <div key={cat} style={{ padding: '10px 16px', borderBottom: i < sinCategoria.length - 1 ? '1px solid var(--border-soft)' : 'none' }}>
-              <div className="flex items-center gap-2" style={{ marginBottom: 8 }}>
-                <span style={{ width: 9, height: 9, borderRadius: '50%', background: getCategoryColor(cat), flexShrink: 0 }} />
-                <span className="flex-1 truncate" style={{ fontSize: 'var(--text-sm)', color: 'var(--text)', fontWeight: 600 }}>
-                  {catLabel(cat)}
-                </span>
-                <span className="tabular-nums flex-shrink-0" style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
-                  {formatCOPCompact(gasto)}
-                </span>
+            <div key={cat} className={`${styles.row} ${i < sinCategoria.length - 1 ? styles.rowBorder : ''}`}>
+              <div className={styles.rowMeta}>
+                <span className={styles.dot} style={{ '--dot-color': getCategoryColor(cat) } as React.CSSProperties} />
+                <span className={styles.catName}>{catLabel(cat)}</span>
+                <span className={styles.amountOnly}>{formatCOPCompact(gasto)}</span>
               </div>
-              <div style={{ height: 4, background: 'var(--border)', borderRadius: 99, overflow: 'hidden' }}>
-                <div style={{ width: `${pct}%`, height: '100%', background: getCategoryColor(cat), borderRadius: 99, transition: 'width 0.3s ease' }} />
+              <div className={styles.barTrack}>
+                <div
+                  className={styles.barFillGray}
+                  style={{ '--bar-w': `${pct}%` } as React.CSSProperties}
+                />
               </div>
             </div>
           )

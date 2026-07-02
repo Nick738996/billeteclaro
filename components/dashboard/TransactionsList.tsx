@@ -18,6 +18,7 @@ import {
   isGasto,
 } from '@/lib/types'
 import { TEST_IDS } from '@/lib/testIds'
+import styles from './TransactionsList.module.css'
 
 // MEJORA ③: rows simplificados (divulgación progresiva)
 //   Antes: [CAT chip][BANCO chip] · hora  +  id_auditoria debajo del monto
@@ -102,6 +103,26 @@ function getDisplayName(t: Transaction): string {
   }
 }
 
+// Visual display: prefix arrow + clean name without verbose words
+function getDisplayParts(t: Transaction): { prefix: string; name: string } {
+  const comercio = t.comercio ? toTitleCase(t.comercio) : null
+  const desc = t.descripcion ? toTitleCase(t.descripcion) : null
+  switch (t.tipo) {
+    case 'INGRESO':
+      return { prefix: '↓', name: comercio ?? desc ?? 'Ingreso' }
+    case 'TRANSFERENCIA_ENVIADA':
+      return { prefix: '↑', name: comercio ?? desc ?? 'Transferencia' }
+    case 'TRANSFERENCIA_RECIBIDA':
+      return { prefix: '↓', name: comercio ?? desc ?? 'Transferencia' }
+    case 'ABONO_DEUDA':
+      return { prefix: '↑', name: comercio ? `Pago ${comercio}` : 'Pago tarjeta' }
+    case 'PAGO_SERVICIO':
+      return { prefix: '', name: comercio ?? desc ?? 'Pago servicio' }
+    default:
+      return { prefix: '', name: comercio ?? desc ?? 'Transacción' }
+  }
+}
+
 function efectivoBanco(t: Transaction): Banco {
   return t.tipo === 'ABONO_DEUDA' ? 'RAPPIPAY' : t.banco
 }
@@ -134,16 +155,8 @@ function CatFilterBtn({ cat, active, onChange }: { cat: string; active: FilterKe
     <button
       key={cat}
       onClick={() => onChange(cat as FilterKey)}
-      className="rounded-full"
-      style={{
-        padding: '7px 14px',
-        background: on ? theme.color : theme.bg,
-        color: on ? 'var(--bg)' : theme.color,
-        border: 'none',
-        fontSize: 'var(--text-xs)',
-        fontWeight: on ? 600 : 400,
-        cursor: 'pointer',
-      }}
+      className={`${styles.catBtn} ${on ? styles.catBtnOn : styles.catBtnOff}`}
+      style={{ '--cat-clr': theme.color, '--cat-bg': theme.bg } as React.CSSProperties}
     >
       {catLabel(cat)}
     </button>
@@ -167,8 +180,7 @@ function CategorySheet({
   return createPortal(
     <>
       <div
-        className="fixed inset-0 z-50"
-        style={{ background: 'var(--overlay)' }}
+        className={styles.sheetOverlay}
         onClick={onClose}
         aria-hidden="true"
       />
@@ -176,26 +188,20 @@ function CategorySheet({
         role="dialog"
         aria-modal="true"
         aria-label="Filtrar por categoría"
-        className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-lg z-50"
+        className={styles.sheet}
         onKeyDown={e => { if (e.key === 'Escape') onClose() }}
-        style={{
-          background: 'var(--surface-2)',
-          borderTop: '1px solid var(--border)',
-          borderRadius: 'var(--radius-xl) var(--radius-xl) 0 0',
-          padding: '12px 20px 40px',
-        }}
       >
-        <div className="w-9 h-1 rounded-full mx-auto mb-4" style={{ background: 'var(--border)' }} />
-        <p className="font-semibold mb-3" style={{ fontSize: 'var(--text-sm)', color: 'var(--text)' }}>
+        <div className={styles.sheetHandle} />
+        <p className={styles.sheetTitle}>
           Categorías
         </p>
 
         {budgetedCats.length > 0 && (
           <>
-            <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-subtle)', marginBottom: 8 }}>
+            <p className={styles.sectionLabel}>
               Presupuestadas
             </p>
-            <div className="flex flex-wrap gap-2 mb-4">
+            <div className={`${styles.chipGroup} ${styles.chipGroupMb}`}>
               {budgetedCats.map(cat => (
                 <CatFilterBtn key={cat} cat={cat} active={active} onChange={onChange} />
               ))}
@@ -206,11 +212,11 @@ function CategorySheet({
         {otherCats.length > 0 && (
           <>
             {budgetedCats.length > 0 && (
-              <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-subtle)', marginBottom: 8 }}>
+              <p className={styles.sectionLabel}>
                 Otras
               </p>
             )}
-            <div className="flex flex-wrap gap-2">
+            <div className={styles.chipGroup}>
               {otherCats.map(cat => (
                 <CatFilterBtn key={cat} cat={cat} active={active} onChange={onChange} />
               ))}
@@ -240,7 +246,6 @@ function FilterChips({
   const isCatActive    = active !== 'TODOS' && !active.startsWith('BANCO:')
   const activeCatLabel = isCatActive ? catLabel(active) : null
   const activeCatHex   = isCatActive ? getCategoryColor(active) : null
-  const activeCatTheme = isCatActive ? (CATEGORIA_THEME[active as Categoria] ?? (activeCatHex ? { color: activeCatHex, bg: activeCatHex + '22' } : null)) : null
 
   // Bancos que realmente tienen transacciones este mes, en orden de frecuencia
   const availableBancos = useMemo(() => {
@@ -269,33 +274,22 @@ function FilterChips({
     return result
   }, [transactions, budgetedCats])
 
-  const INACTIVE = { bg: 'transparent', border: '1px solid var(--border)', color: 'var(--text-muted)' }
-
   return (
     <>
-      <div className="flex items-center gap-1.5" style={{ minWidth: 0 }}>
-        {/* Chip "Todos" — fijo a la izquierda */}
+      <div className={styles.filterRow}>
+        {/* Todos */}
         <button
           key="TODOS"
           onClick={() => onChange('TODOS')}
           data-testid={TEST_IDS.DASHBOARD_FILTER_TODOS}
           aria-pressed={active === 'TODOS'}
-          className="flex-shrink-0 rounded-full"
-          style={{
-            padding: '5px 12px',
-            background: active === 'TODOS' ? 'var(--text)' : INACTIVE.bg,
-            color:      active === 'TODOS' ? 'var(--bg)'   : INACTIVE.color,
-            border:     active === 'TODOS' ? 'none'        : INACTIVE.border,
-            fontSize: 'var(--text-xs)',
-            fontWeight: active === 'TODOS' ? 600 : 400,
-            cursor: 'pointer',
-          }}
+          className={`${styles.filterBtn} ${active === 'TODOS' ? styles.filterBtnActive : styles.filterBtnInactive}`}
         >
           Todos
         </button>
 
         {/* Bancos + categoría activa — scroll horizontal */}
-        <div className="scroll-x-hide flex items-center gap-1.5" style={{ flex: 1, minWidth: 0 }}>
+        <div className={`scroll-x-hide ${styles.filterScrollArea}`}>
           {availableBancos.map(banco => {
             const filterKey: FilterKey = `BANCO:${banco}`
             const isOn  = active === filterKey
@@ -310,64 +304,36 @@ function FilterChips({
                 onClick={() => onChange(filterKey)}
                 data-testid={testId}
                 aria-pressed={isOn}
-                className="flex-shrink-0 rounded-full"
-                style={{
-                  padding: '5px 12px',
-                  background: isOn ? info.color : INACTIVE.bg,
-                  color:      isOn ? 'var(--bg)' : INACTIVE.color,
-                  border:     isOn ? 'none'      : INACTIVE.border,
-                  fontSize: 'var(--text-xs)',
-                  fontWeight: isOn ? 600 : 400,
-                  cursor: 'pointer',
-                }}
+                className={`${styles.filterBtn} ${isOn ? styles.filterBtnActive : styles.filterBtnInactive}`}
               >
                 {info.label}
               </button>
             )
           })}
 
-          {/* Badge de categoría activa (con × para limpiar) */}
-          {activeCatLabel && activeCatTheme && (
+          {/* Categoría activa — dot + nombre + × */}
+          {activeCatLabel && activeCatHex && (
             <button
               onClick={() => onChange('TODOS')}
-              className="flex-shrink-0 flex items-center gap-1.5 rounded-full"
-              style={{
-                padding: '5px 8px 5px 12px',
-                background: activeCatTheme.color,
-                color: 'var(--bg)',
-                border: 'none',
-                fontSize: 'var(--text-xs)',
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
+              className={styles.activeCatBtn}
             >
-              {activeCatLabel}
               <span
-                className="flex items-center justify-center rounded-full"
-                style={{ width: 14, height: 14, background: 'rgba(0,0,0,0.2)', fontSize: 10 }}
-              >
-                ×
-              </span>
+                className={styles.activeCatDot}
+                style={{ '--dot-clr': activeCatHex } as React.CSSProperties}
+              />
+              <span className={styles.activeCatLabel}>{activeCatLabel}</span>
+              <span className={styles.activeCatX}>×</span>
             </button>
           )}
         </div>
 
-        {/* Botón "Categoría" — fijo a la derecha */}
+        {/* Filtrar por categoría */}
         <button
           onClick={() => setSheetOpen(true)}
-          className="flex-shrink-0 flex items-center gap-1 rounded-full"
-          style={{
-            padding: '5px 12px',
-            background: 'transparent',
-            border: '1px solid var(--border)',
-            color: 'var(--text-muted)',
-            fontSize: 'var(--text-xs)',
-            fontWeight: 400,
-            cursor: 'pointer',
-          }}
+          className={styles.openSheetBtn}
         >
           Categoría
-          <span style={{ opacity: 0.5, fontSize: 9 }}>▾</span>
+          <span className={styles.openSheetArrow}>▾</span>
         </button>
       </div>
 
@@ -394,8 +360,8 @@ function CatPickerBtn({ cat, current, onSelect }: { cat: string; current: string
     <button
       key={cat}
       onClick={() => onSelect(cat as Categoria)}
-      className="rounded-full"
-      style={{ padding: '7px 14px', background: on ? theme.color : theme.bg, color: on ? 'var(--bg)' : theme.color, border: 'none', fontSize: 'var(--text-xs)', fontWeight: on ? 600 : 400, cursor: 'pointer' }}
+      className={`${styles.catBtn} ${on ? styles.catBtnOn : styles.catBtnOff}`}
+      style={{ '--cat-clr': theme.color, '--cat-bg': theme.bg } as React.CSSProperties}
     >
       {catLabel(cat)}
     </button>
@@ -415,45 +381,37 @@ function CategoryPicker({ current, onSelect, onClose, budgetedCats }: {
 
   return createPortal(
     <>
-      <div className="fixed inset-0" style={{ background: 'var(--overlay)', zIndex: 70 }} onClick={onClose} aria-hidden="true" />
+      <div className={styles.pickerOverlay} onClick={onClose} aria-hidden="true" />
       <div
         role="dialog"
         aria-modal="true"
         aria-label="Cambiar categoría"
-        className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-lg"
+        className={styles.pickerSheet}
         onKeyDown={e => { if (e.key === 'Escape') onClose() }}
-        style={{
-          zIndex: 80,
-          background: 'var(--surface-2)',
-          borderTop: '1px solid var(--border)',
-          borderRadius: 'var(--radius-xl) var(--radius-xl) 0 0',
-          padding: '16px 20px',
-          paddingBottom: 'max(32px, env(safe-area-inset-bottom))',
-        }}
       >
-        <div className="flex items-center justify-between mb-4">
-          <p className="font-semibold" style={{ fontSize: 'var(--text-sm)', color: 'var(--text)' }}>Cambiar categoría</p>
-          <button onClick={onClose} aria-label="Cerrar selector de categoría" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', padding: 4 }}>
+        <div className={styles.pickerHeader}>
+          <p className={styles.pickerTitle}>Cambiar categoría</p>
+          <button onClick={onClose} aria-label="Cerrar selector de categoría" className={styles.pickerCloseBtn}>
             <X size={16} />
           </button>
         </div>
 
         {budgetedCats.length > 0 && (
           <>
-            <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-subtle)', marginBottom: 8 }}>
+            <p className={styles.sectionLabel}>
               Presupuestadas
             </p>
-            <div className="flex flex-wrap gap-2 mb-4">
+            <div className={`${styles.chipGroup} ${styles.chipGroupMb}`}>
               {budgetedCats.map(cat => (
                 <CatPickerBtn key={cat} cat={cat} current={current} onSelect={onSelect} />
               ))}
             </div>
-            <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-subtle)', marginBottom: 8 }}>
+            <p className={styles.sectionLabel}>
               Otras
             </p>
           </>
         )}
-        <div className="flex flex-wrap gap-2">
+        <div className={styles.chipGroup}>
           {(budgetedCats.length > 0 ? otherCats : allCats).map(cat => (
             <CatPickerBtn key={cat} cat={cat} current={current} onSelect={onSelect} />
           ))}
@@ -503,46 +461,37 @@ function TransactionRow({ t, pendingCat, onCategoryClick, onDelete }: {
   }
 
   return (
-    <div
-      className="flex items-center gap-3"
-      style={{
-        padding: '10px 0',
-        borderBottom: '1px solid var(--border-soft)',
-      }}
-    >
-      <div className="flex-1 min-w-0">
-        <p className="font-medium truncate" style={{ fontSize: 'var(--text-sm)', color: 'var(--text)' }}>
-          {getDisplayName(t)}
+    <div className={`tx-row ${styles.row}`}>
+      <div className={styles.rowLeft}>
+        <p className={styles.rowName}>
+          {getDisplayParts(t).name}
         </p>
-        <div className="flex items-center gap-1" style={{ marginTop: 3 }}>
+        <div className={styles.rowMeta}>
           <button
             onClick={onCategoryClick}
             aria-label={`Cambiar categoría: ${catLabel(displayCat)}`}
-            style={{
-              background: isDirty ? 'var(--yellow-soft)' : 'transparent',
-              border: `1px solid ${isDirty ? 'var(--yellow)' : 'transparent'}`,
-              borderRadius: 'var(--radius-badge)',
-              padding: '1px 4px 1px 2px',
-              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4,
-            }}
+            className={styles.catChipBtn}
           >
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: isDirty ? 'var(--yellow)' : theme.color, flexShrink: 0 }} />
-            <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase', color: isDirty ? 'var(--yellow)' : theme.color }}>
+            <span
+              className={styles.catDot}
+              style={{ '--dot-clr': isDirty ? 'var(--yellow)' : theme.color } as React.CSSProperties}
+            />
+            <span className={`${styles.catChipLabel} ${isDirty ? styles.catChipLabelDirty : styles.catChipLabelNormal}`}>
               {catLabel(displayCat)}
             </span>
-            <span style={{ fontSize: 9, color: isDirty ? 'var(--yellow)' : theme.color, opacity: isDirty ? 0.7 : 0.45, lineHeight: 1 }}>✎</span>
+            <span className={`${styles.catChipArrow} ${isDirty ? styles.catChipArrowDirty : styles.catChipArrowNormal}`}>▾</span>
           </button>
-          <span style={{ fontSize: 10, color: 'var(--text-subtle)' }}>·</span>
-          <span style={{ fontSize: 10, color: chip.color }}>{chip.label}</span>
-          <span style={{ fontSize: 10, color: 'var(--text-subtle)' }}>·</span>
-          <span style={{ fontSize: 10, color: 'var(--text-subtle)' }}>{time}</span>
+          <span className={styles.metaDot}>·</span>
+          <span className={styles.metaBank}>{chip.label}</span>
+          <span className={styles.metaDot}>·</span>
+          <span className={styles.metaTime}>{time}</span>
         </div>
       </div>
 
       {/* Área derecha: monto + papelera en idle/deleting, controles de confirmación en confirming */}
-      <div className="flex-shrink-0 flex items-center gap-2">
+      <div className={styles.rowRight}>
         {deletePhase !== 'confirming' && (
-          <p className="font-semibold tabular-nums" style={{ fontSize: 'var(--text-sm)', color: income ? 'var(--green)' : 'var(--text)' }}>
+          <p className={`${styles.amount} ${income ? styles.amountIncome : styles.amountExpense}`}>
             {income ? '+' : '-'}{formatCOP(t.monto)}
           </p>
         )}
@@ -551,10 +500,9 @@ function TransactionRow({ t, pendingCat, onCategoryClick, onDelete }: {
           <button
             onClick={startConfirm}
             aria-label={`Eliminar transacción: ${getDisplayName(t)}`}
-            className="delete-btn"
-            style={{ background: 'none', border: 'none', padding: 4, cursor: 'pointer', color: 'var(--text-subtle)', display: 'flex', opacity: 0.3 }}
+            className={`delete-btn ${styles.trashBtn}`}
           >
-            <Trash2 size={12} />
+            <Trash2 size={13} />
           </button>
         )}
         {deletePhase === 'confirming' && (
@@ -562,31 +510,21 @@ function TransactionRow({ t, pendingCat, onCategoryClick, onDelete }: {
             <button
               onClick={cancelConfirm}
               aria-label="Cancelar eliminación"
-              style={{ background: 'none', border: 'none', padding: 4, cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' }}
+              className={styles.cancelBtn}
             >
               <X size={13} />
             </button>
             <button
               onClick={confirmDelete}
               aria-label={`Confirmar eliminación de: ${getDisplayName(t)}`}
-              style={{
-                background: 'var(--red-soft)',
-                border: '1px solid var(--red)',
-                borderRadius: 'var(--radius-badge)',
-                padding: '4px 10px',
-                cursor: 'pointer',
-                color: 'var(--red)',
-                fontSize: 'var(--text-xs)',
-                fontWeight: 600,
-                whiteSpace: 'nowrap',
-              }}
+              className={styles.confirmDeleteBtn}
             >
               Eliminar
             </button>
           </>
         )}
         {deletePhase === 'deleting' && (
-          <RefreshCw size={12} className="animate-spin" style={{ color: 'var(--text-muted)' }} />
+          <RefreshCw size={12} className={`animate-spin ${styles.spinIcon}`} />
         )}
       </div>
     </div>
@@ -693,40 +631,25 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
     <>
     <div className="card">
       {/* Header dentro del card */}
-      <div
-        className="flex items-center justify-between"
-        style={{ padding: '14px 16px 0' }}
-      >
-        <p style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text)' }}>
+      <div className={styles.cardHeader}>
+        <p className={styles.cardTitle}>
           Transacciones
         </p>
         {onAdd && (
           <button
             onClick={onAdd}
-            className="flex items-center gap-1.5 transition-opacity hover:opacity-70"
-            style={{
-              background: 'none', border: 'none', cursor: 'pointer',
-              color: 'var(--text-muted)',
-              fontSize: 'var(--text-xs)', fontWeight: 500, padding: '2px 0',
-            }}
+            aria-label="Agregar transacción"
+            className={styles.addBtn}
           >
-            <Plus size={11} />
-            Agregar
+            +
           </button>
         )}
       </div>
 
       {/* Buscador */}
-      <div className="px-4 pt-3 pb-3">
-        <div
-          className="flex items-center gap-2 rounded-[var(--radius-md)]"
-          style={{
-            background: 'var(--surface-2)',
-            border: '1px solid var(--border)',
-            padding: '9px 13px',
-          }}
-        >
-          <Search size={14} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+      <div className={styles.searchWrap}>
+        <div className={styles.searchBox}>
+          <Search size={14} className={styles.searchIcon} />
           <input
             type="search"
             value={search}
@@ -734,37 +657,31 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
             placeholder="Buscar..."
             aria-label="Buscar transacciones"
             data-testid={TEST_IDS.DASHBOARD_SEARCH_INPUT}
-            className="flex-1 bg-transparent outline-none"
-            style={{ fontSize: 'var(--text-sm)', color: 'var(--text)' }}
+            className={styles.searchInput}
           />
         </div>
       </div>
 
       {/* Chips */}
-      <div className="px-4 pb-3" style={{ borderBottom: '1px solid var(--border-soft)' }}>
+      <div className={styles.chipsWrap}>
         <FilterChips active={activeFilterKey} onChange={key => onFilterChange(key)} transactions={transactions} budgetedCats={budgetedCats} />
       </div>
 
 
       {/* Lista agrupada por fecha */}
-      <div className="px-4" data-testid={TEST_IDS.DASHBOARD_TRANSACTIONS_LIST} role="list" aria-label="Lista de transacciones">
+      <div className={styles.listWrap} data-testid={TEST_IDS.DASHBOARD_TRANSACTIONS_LIST} role="list" aria-label="Lista de transacciones">
         {filtered.length === 0 ? (
-          <p className="text-center py-8" style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>
+          <p className={styles.emptyMsg}>
             {search ? 'Sin resultados para tu búsqueda' : 'Sin transacciones este mes'}
           </p>
         ) : (
           groups.map(({ dateLabel, items }) => (
             <div key={dateLabel}>
-              <div
-                className="flex items-center gap-2 py-2"
-              >
-                <p
-                  className="font-medium uppercase tracking-wider"
-                  style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', letterSpacing: '0.06em' }}
-                >
+              <div className={styles.dateHeader}>
+                <p className={styles.dateLabel}>
                   {dateLabel}
                 </p>
-                <span style={{ fontSize: 10, color: 'var(--text-subtle)', fontWeight: 400 }}>
+                <span className={styles.dateCount}>
                   {items.length}
                 </span>
               </div>
@@ -784,21 +701,18 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
       </div>
 
       {filtered.length > 0 && (
-        <div
-          className="flex items-center justify-between"
-          style={{ padding: '10px 20px 12px', borderTop: '1px solid var(--border-soft)' }}
-        >
-          <span style={{ fontSize: 10, color: 'var(--text-subtle)' }}>
+        <div className={styles.listFooter}>
+          <span className={styles.footerCount}>
             {filtered.length} movimiento{filtered.length !== 1 ? 's' : ''}
           </span>
-          <div className="flex items-center gap-3">
+          <div className={styles.footerTotals}>
             {totalIngresos > 0 && (
-              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--green)', fontWeight: 500 }}>
+              <span className={styles.footerIncome}>
                 +{formatCOPCompact(totalIngresos)}
               </span>
             )}
             {totalGastos > 0 && (
-              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', fontWeight: 500 }}>
+              <span className={styles.footerExpense}>
                 -{formatCOPCompact(totalGastos)}
               </span>
             )}
@@ -809,49 +723,22 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
 
     {/* Barra flotante de cambios pendientes */}
     {pendingCount > 0 && typeof document !== 'undefined' && createPortal(
-      <div
-        style={{
-          position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
-          zIndex: 60, width: 'calc(100% - 32px)', maxWidth: 480,
-        }}
-      >
-        <div
-          style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            background: 'var(--surface-2)',
-            border: '1px solid var(--border)',
-            borderRadius: 'var(--radius-pill)',
-            padding: '10px 10px 10px 18px',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
-          }}
-        >
-          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', fontWeight: 500 }}>
+      <div className={styles.pendingBarWrap}>
+        <div className={styles.pendingBar}>
+          <span className={styles.pendingLabel}>
             {pendingCount} cambio{pendingCount !== 1 ? 's' : ''} sin guardar
           </span>
-          <div className="flex items-center gap-2">
+          <div className={styles.pendingActions}>
             <button
               onClick={() => setPendingCats({})}
-              style={{
-                background: 'none', border: 'none', cursor: 'pointer',
-                fontSize: 'var(--text-xs)', color: 'var(--text-muted)',
-                fontWeight: 500, padding: '6px 10px',
-              }}
+              className={styles.discardBtn}
             >
               Descartar
             </button>
             <button
               onClick={saveCategories}
               disabled={isSaving}
-              className="flex items-center gap-1.5"
-              style={{
-                background: savedOk ? 'var(--green)' : 'var(--text)',
-                border: 'none',
-                borderRadius: 'var(--radius-pill)',
-                padding: '7px 16px',
-                color: 'var(--bg)',
-                fontSize: 'var(--text-xs)', fontWeight: 600,
-                cursor: isSaving ? 'default' : 'pointer',
-              }}
+              className={`${styles.saveBtn} ${isSaving ? styles.saveBtnSaving : savedOk ? styles.saveBtnSaved : styles.saveBtnNormal}`}
             >
               {isSaving
                 ? <><RefreshCw size={11} className="animate-spin" /> Guardando…</>

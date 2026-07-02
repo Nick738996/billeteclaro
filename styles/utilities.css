@@ -27,6 +27,17 @@
   color:         var(--text);
   outline:       none;
   font-size:     var(--text-xs);
+  padding:       6px 10px;
+}
+
+/* ── Ghost button base ───────────────────────────────────────────────────────
+   Base para botones de icono o texto sin fondo visible.
+   Uso: <button className="btn-ghost"> ─────────────────────────────────────── */
+.btn-ghost {
+  background: none;
+  border:     none;
+  cursor:     pointer;
+  padding:    0;
 }
 
 .input-field::placeholder {
@@ -66,4 +77,15 @@
 }
 .scroll-x-hide::-webkit-scrollbar {
   display: none;
+}
+
+/* ── Transaction row hover interactions ─────────────────────────────────────
+   On touch devices the delete button stays at low opacity (always reachable).
+   On pointer devices it fades in only on row hover, keeping rows clean. ─── */
+.tx-row .delete-btn {
+  opacity: 0.35;
+  transition: opacity 0.15s;
+}
+@media (hover: hover) {
+  .tx-row:hover .delete-btn { opacity: 0.75; }
 }

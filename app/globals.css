@@ -15,8 +15,13 @@
 
   body {
     background-color: var(--bg);
+    background-image: radial-gradient(ellipse 140% 45% at 50% -5%, rgba(74, 222, 128, 0.06) 0%, transparent 65%);
     color: var(--text);
     transition: background-color 0.2s, color 0.2s;
+  }
+
+  [data-theme="light"] body {
+    background-image: none;
   }
 }
 
