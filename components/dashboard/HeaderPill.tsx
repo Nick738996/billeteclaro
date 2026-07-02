@@ -8,6 +8,7 @@ import { useState, useEffect } from 'react'
 import { useTheme } from 'next-themes'
 import { RefreshCw, Check, AlertCircle, Trash2, Sun, Moon, LogOut } from 'lucide-react'
 import { TEST_IDS } from '@/lib/testIds'
+import styles from './HeaderPill.module.css'
 
 interface Props {
   onSyncComplete: () => void
@@ -94,11 +95,6 @@ export default function HeaderPill({ onSyncComplete, onSignOut, onHelp }: Props)
   const resetTitle = resetState === 'confirm' ? '¿Confirmar? Toca de nuevo para borrar todos los datos'
                    : 'Borrar todos los datos'
 
-  /* ── Divider ────────────────────────────────────── */
-  const Divider = () => (
-    <div style={{ width: 1, height: 16, background: 'var(--border)', flexShrink: 0 }}/>
-  )
-
   /* ── Single pill button ─────────────────────────── */
   const PillBtn = ({
     onClick, icon, color, disabled = false, title, ariaLabel, 'data-testid': testId,
@@ -117,40 +113,15 @@ export default function HeaderPill({ onSyncComplete, onSignOut, onHelp }: Props)
       title={title}
       aria-label={ariaLabel ?? title}
       data-testid={testId}
-      style={{
-        background: 'none',
-        border: 'none',
-        cursor: disabled ? 'default' : 'pointer',
-        width: 34,
-        height: 30,
-        borderRadius: 'var(--radius-badge)',
-        flexShrink: 0,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        color,
-        opacity: disabled ? 0.3 : 1,
-        transition: 'opacity 0.15s, color 0.15s',
-      }}
+      className={disabled ? `${styles.btn} ${styles.btnDisabled}` : styles.btn}
+      style={{ '--clr': color } as React.CSSProperties}
     >
       {icon}
     </button>
   )
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        background: 'var(--pill-bg)',
-        border: '1px solid var(--border)',
-        borderRadius: 'var(--radius-pill)',
-        padding: '0 3px',
-        gap: 1,
-        height: 36,
-        flexShrink: 0,
-      }}
-    >
+    <div className={styles.pill}>
       <PillBtn
         onClick={handleSync}
         icon={syncIcon}
@@ -160,7 +131,6 @@ export default function HeaderPill({ onSyncComplete, onSignOut, onHelp }: Props)
         ariaLabel="Sincronizar correos"
         data-testid={TEST_IDS.DASHBOARD_SYNC_BUTTON}
       />
-      <Divider/>
       <PillBtn
         onClick={handleReset}
         icon={resetIcon}
@@ -170,16 +140,14 @@ export default function HeaderPill({ onSyncComplete, onSignOut, onHelp }: Props)
         ariaLabel="Borrar todos los datos"
         data-testid={TEST_IDS.DASHBOARD_RESET_BUTTON}
       />
-      <Divider/>
       <PillBtn
         onClick={onHelp}
-        icon={<span style={{ fontSize: 13, fontWeight: 600, lineHeight: 1 }}>?</span>}
+        icon={<span className={styles.helpIcon}>?</span>}
         color="var(--text-muted)"
         title="Ayuda y tour del dashboard"
         ariaLabel="Ayuda y tour del dashboard"
         data-testid={TEST_IDS.DASHBOARD_HELP_BUTTON}
       />
-      <Divider/>
       <PillBtn
         onClick={() => setTheme(isDark ? 'light' : 'dark')}
         icon={isDark ? <Sun size={13}/> : <Moon size={13}/>}
@@ -187,7 +155,6 @@ export default function HeaderPill({ onSyncComplete, onSignOut, onHelp }: Props)
         title={isDark ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
         ariaLabel={isDark ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
       />
-      <Divider/>
       <PillBtn
         onClick={onSignOut}
         icon={<LogOut size={13}/>}

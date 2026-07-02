@@ -1,0 +1,145 @@
+/* Loading state */
+.loadingWrap {
+  padding: 16px 20px;
+}
+
+.skeletonTitle {
+  height: 11px;
+  width: 100px;
+  margin-bottom: 16px;
+  border-radius: 4px;
+}
+
+.skeletonRow {
+  margin-bottom: 10px;
+}
+
+.skeletonLine {
+  height: 10px;
+  width: var(--w);
+  border-radius: 4px;
+}
+
+/* Main card */
+.root {
+  overflow: hidden;
+}
+
+/* Header */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 10px;
+}
+
+.headerBorder {
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.headerTitle {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.editBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  padding: 2px 0;
+  transition: opacity 0.15s;
+}
+
+.editBtn:hover {
+  opacity: 0.7;
+}
+
+/* Empty state */
+.emptyState {
+  padding: 28px 16px;
+  text-align: center;
+}
+
+.emptyMsg {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+
+.addBtn {
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--green);
+  background: var(--green-soft);
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 6px 14px;
+  cursor: pointer;
+}
+
+/* Total section */
+.total {
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.totalLabel {
+  font-size: var(--text-xs);
+  font-weight: 400;
+  color: var(--text-subtle);
+  margin-bottom: 4px;
+}
+
+.totalAmount {
+  font-size: var(--text-3xl);
+  font-weight: 700;
+  color: var(--green);
+  letter-spacing: -0.03em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Account rows */
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 16px;
+}
+
+.rowBorder {
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--clr);
+  flex-shrink: 0;
+}
+
+.accountName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-sm);
+  color: var(--text);
+}
+
+.accountAmount {
+  flex-shrink: 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}

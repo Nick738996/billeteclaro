@@ -1,0 +1,111 @@
+/* ── Root ─────────────────────────────────────────────── */
+.root {
+  min-height: 100vh;
+  background: var(--bg);
+}
+
+/* ── Header ───────────────────────────────────────────── */
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+}
+
+.headerInner {
+  max-width: 32rem;
+  margin: 0 auto;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.logoGroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.logoSvg {
+  color: var(--text);
+}
+
+.logoText {
+  font-size: var(--text-lg);
+  letter-spacing: -0.02em;
+}
+
+.logoWordLight {
+  font-weight: 400;
+  color: var(--text);
+}
+
+.logoWordBold {
+  font-weight: 700;
+  color: var(--green);
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ── Main ─────────────────────────────────────────────── */
+.main {
+  max-width: 32rem;
+  margin: 0 auto;
+  padding: 24px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  transition: opacity 0.2s;
+}
+
+.mainLoading {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* ── Month navigation ─────────────────────────────────── */
+.greeting {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.monthNavRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 4px;
+}
+
+.navBtn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.navBtn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.monthTitle {
+  text-transform: capitalize;
+  font-size: var(--text-xl);
+  font-weight: 500;
+  color: var(--text);
+}

@@ -102,6 +102,26 @@ function getDisplayName(t: Transaction): string {
   }
 }
 
+// Visual display: prefix arrow + clean name without verbose words
+function getDisplayParts(t: Transaction): { prefix: string; name: string } {
+  const comercio = t.comercio ? toTitleCase(t.comercio) : null
+  const desc = t.descripcion ? toTitleCase(t.descripcion) : null
+  switch (t.tipo) {
+    case 'INGRESO':
+      return { prefix: '↓', name: comercio ?? desc ?? 'Ingreso' }
+    case 'TRANSFERENCIA_ENVIADA':
+      return { prefix: '↑', name: comercio ?? desc ?? 'Transferencia' }
+    case 'TRANSFERENCIA_RECIBIDA':
+      return { prefix: '↓', name: comercio ?? desc ?? 'Transferencia' }
+    case 'ABONO_DEUDA':
+      return { prefix: '↑', name: comercio ? `Pago ${comercio}` : 'Pago tarjeta' }
+    case 'PAGO_SERVICIO':
+      return { prefix: '', name: comercio ?? desc ?? 'Pago servicio' }
+    default:
+      return { prefix: '', name: comercio ?? desc ?? 'Transacción' }
+  }
+}
+
 function efectivoBanco(t: Transaction): Banco {
   return t.tipo === 'ABONO_DEUDA' ? 'RAPPIPAY' : t.banco
 }
@@ -269,24 +289,20 @@ function FilterChips({
     return result
   }, [transactions, budgetedCats])
 
-  const INACTIVE = { bg: 'transparent', border: '1px solid var(--border)', color: 'var(--text-muted)' }
-
   return (
     <>
-      <div className="flex items-center gap-1.5" style={{ minWidth: 0 }}>
-        {/* Chip "Todos" — fijo a la izquierda */}
+      <div className="flex items-center gap-4" style={{ minWidth: 0 }}>
+        {/* Todos */}
         <button
           key="TODOS"
           onClick={() => onChange('TODOS')}
           data-testid={TEST_IDS.DASHBOARD_FILTER_TODOS}
           aria-pressed={active === 'TODOS'}
-          className="flex-shrink-0 rounded-full"
+          className="flex-shrink-0"
           style={{
-            padding: '5px 12px',
-            background: active === 'TODOS' ? 'var(--text)' : INACTIVE.bg,
-            color:      active === 'TODOS' ? 'var(--bg)'   : INACTIVE.color,
-            border:     active === 'TODOS' ? 'none'        : INACTIVE.border,
-            fontSize: 'var(--text-xs)',
+            background: 'none', border: 'none', padding: '4px 0',
+            fontSize: 'var(--text-sm)',
+            color: active === 'TODOS' ? 'var(--text)' : 'var(--text-muted)',
             fontWeight: active === 'TODOS' ? 600 : 400,
             cursor: 'pointer',
           }}
@@ -295,7 +311,7 @@ function FilterChips({
         </button>
 
         {/* Bancos + categoría activa — scroll horizontal */}
-        <div className="scroll-x-hide flex items-center gap-1.5" style={{ flex: 1, minWidth: 0 }}>
+        <div className="scroll-x-hide flex items-center gap-4" style={{ flex: 1, minWidth: 0 }}>
           {availableBancos.map(banco => {
             const filterKey: FilterKey = `BANCO:${banco}`
             const isOn  = active === filterKey
@@ -310,13 +326,11 @@ function FilterChips({
                 onClick={() => onChange(filterKey)}
                 data-testid={testId}
                 aria-pressed={isOn}
-                className="flex-shrink-0 rounded-full"
+                className="flex-shrink-0"
                 style={{
-                  padding: '5px 12px',
-                  background: isOn ? info.color : INACTIVE.bg,
-                  color:      isOn ? 'var(--bg)' : INACTIVE.color,
-                  border:     isOn ? 'none'      : INACTIVE.border,
-                  fontSize: 'var(--text-xs)',
+                  background: 'none', border: 'none', padding: '4px 0',
+                  fontSize: 'var(--text-sm)',
+                  color: isOn ? 'var(--text)' : 'var(--text-muted)',
                   fontWeight: isOn ? 600 : 400,
                   cursor: 'pointer',
                 }}
@@ -326,48 +340,33 @@ function FilterChips({
             )
           })}
 
-          {/* Badge de categoría activa (con × para limpiar) */}
-          {activeCatLabel && activeCatTheme && (
+          {/* Categoría activa — dot + nombre + × */}
+          {activeCatLabel && activeCatHex && (
             <button
               onClick={() => onChange('TODOS')}
-              className="flex-shrink-0 flex items-center gap-1.5 rounded-full"
-              style={{
-                padding: '5px 8px 5px 12px',
-                background: activeCatTheme.color,
-                color: 'var(--bg)',
-                border: 'none',
-                fontSize: 'var(--text-xs)',
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
+              className="flex-shrink-0 flex items-center gap-1.5"
+              style={{ background: 'none', border: 'none', padding: '4px 0', cursor: 'pointer' }}
             >
-              {activeCatLabel}
-              <span
-                className="flex items-center justify-center rounded-full"
-                style={{ width: 14, height: 14, background: 'rgba(0,0,0,0.2)', fontSize: 10 }}
-              >
-                ×
-              </span>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: activeCatHex, flexShrink: 0 }} />
+              <span style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text)' }}>{activeCatLabel}</span>
+              <span style={{ fontSize: 12, color: 'var(--text-subtle)', marginLeft: 1 }}>×</span>
             </button>
           )}
         </div>
 
-        {/* Botón "Categoría" — fijo a la derecha */}
+        {/* Filtrar por categoría */}
         <button
           onClick={() => setSheetOpen(true)}
-          className="flex-shrink-0 flex items-center gap-1 rounded-full"
+          className="flex-shrink-0 flex items-center gap-0.5"
           style={{
-            padding: '5px 12px',
-            background: 'transparent',
-            border: '1px solid var(--border)',
+            background: 'none', border: 'none', padding: '4px 0',
             color: 'var(--text-muted)',
-            fontSize: 'var(--text-xs)',
-            fontWeight: 400,
+            fontSize: 'var(--text-sm)',
             cursor: 'pointer',
           }}
         >
           Categoría
-          <span style={{ opacity: 0.5, fontSize: 9 }}>▾</span>
+          <span style={{ fontSize: 15, color: 'var(--text-muted)' }}>▾</span>
         </button>
       </div>
 
@@ -504,45 +503,39 @@ function TransactionRow({ t, pendingCat, onCategoryClick, onDelete }: {
 
   return (
     <div
-      className="flex items-center gap-3"
+      className="tx-row flex items-center gap-3"
       style={{
-        padding: '10px 0',
+        padding: '13px 0',
         borderBottom: '1px solid var(--border-soft)',
       }}
     >
       <div className="flex-1 min-w-0">
-        <p className="font-medium truncate" style={{ fontSize: 'var(--text-sm)', color: 'var(--text)' }}>
-          {getDisplayName(t)}
+        <p className="truncate" style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>
+          {getDisplayParts(t).name}
         </p>
-        <div className="flex items-center gap-1" style={{ marginTop: 3 }}>
+        <div className="flex items-center gap-1.5" style={{ marginTop: 4 }}>
           <button
             onClick={onCategoryClick}
             aria-label={`Cambiar categoría: ${catLabel(displayCat)}`}
-            style={{
-              background: isDirty ? 'var(--yellow-soft)' : 'transparent',
-              border: `1px solid ${isDirty ? 'var(--yellow)' : 'transparent'}`,
-              borderRadius: 'var(--radius-badge)',
-              padding: '1px 4px 1px 2px',
-              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4,
-            }}
+            style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
           >
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: isDirty ? 'var(--yellow)' : theme.color, flexShrink: 0 }} />
-            <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase', color: isDirty ? 'var(--yellow)' : theme.color }}>
+            <span style={{ width: 5, height: 5, borderRadius: '50%', background: isDirty ? 'var(--yellow)' : theme.color, flexShrink: 0 }} />
+            <span style={{ fontSize: 11, color: isDirty ? 'var(--yellow)' : 'var(--text)', fontWeight: isDirty ? 600 : 500, opacity: isDirty ? 1 : 0.65 }}>
               {catLabel(displayCat)}
             </span>
-            <span style={{ fontSize: 9, color: isDirty ? 'var(--yellow)' : theme.color, opacity: isDirty ? 0.7 : 0.45, lineHeight: 1 }}>✎</span>
+            <span style={{ fontSize: 13, color: isDirty ? 'var(--yellow)' : 'var(--text-muted)', lineHeight: 1 }}>▾</span>
           </button>
-          <span style={{ fontSize: 10, color: 'var(--text-subtle)' }}>·</span>
-          <span style={{ fontSize: 10, color: chip.color }}>{chip.label}</span>
-          <span style={{ fontSize: 10, color: 'var(--text-subtle)' }}>·</span>
-          <span style={{ fontSize: 10, color: 'var(--text-subtle)' }}>{time}</span>
+          <span style={{ fontSize: 11, color: 'var(--text-muted)', opacity: 0.4 }}>·</span>
+          <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 500 }}>{chip.label}</span>
+          <span style={{ fontSize: 11, color: 'var(--text-muted)', opacity: 0.4 }}>·</span>
+          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{time}</span>
         </div>
       </div>
 
       {/* Área derecha: monto + papelera en idle/deleting, controles de confirmación en confirming */}
       <div className="flex-shrink-0 flex items-center gap-2">
         {deletePhase !== 'confirming' && (
-          <p className="font-semibold tabular-nums" style={{ fontSize: 'var(--text-sm)', color: income ? 'var(--green)' : 'var(--text)' }}>
+          <p className="tabular-nums" style={{ fontSize: 15, fontWeight: 600, color: income ? 'var(--green)' : 'var(--text)', letterSpacing: '-0.02em' }}>
             {income ? '+' : '-'}{formatCOP(t.monto)}
           </p>
         )}
@@ -552,9 +545,9 @@ function TransactionRow({ t, pendingCat, onCategoryClick, onDelete }: {
             onClick={startConfirm}
             aria-label={`Eliminar transacción: ${getDisplayName(t)}`}
             className="delete-btn"
-            style={{ background: 'none', border: 'none', padding: 4, cursor: 'pointer', color: 'var(--text-subtle)', display: 'flex', opacity: 0.3 }}
+            style={{ background: 'none', border: 'none', padding: 4, cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' }}
           >
-            <Trash2 size={12} />
+            <Trash2 size={13} />
           </button>
         )}
         {deletePhase === 'confirming' && (
@@ -703,15 +696,16 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
         {onAdd && (
           <button
             onClick={onAdd}
-            className="flex items-center gap-1.5 transition-opacity hover:opacity-70"
+            aria-label="Agregar transacción"
+            className="transition-opacity hover:opacity-60"
             style={{
               background: 'none', border: 'none', cursor: 'pointer',
-              color: 'var(--text-muted)',
-              fontSize: 'var(--text-xs)', fontWeight: 500, padding: '2px 0',
+              color: 'var(--text)',
+              fontSize: 22, fontWeight: 300, lineHeight: 1,
+              padding: '0 2px',
             }}
           >
-            <Plus size={11} />
-            Agregar
+            +
           </button>
         )}
       </div>
@@ -822,7 +816,7 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
             border: '1px solid var(--border)',
             borderRadius: 'var(--radius-pill)',
             padding: '10px 10px 10px 18px',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+            borderColor: 'var(--text-subtle)',
           }}
         >
           <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', fontWeight: 500 }}>

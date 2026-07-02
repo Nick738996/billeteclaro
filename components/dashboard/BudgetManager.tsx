@@ -8,14 +8,12 @@ import { TEST_IDS } from '@/lib/testIds'
 
 function pctColor(pct: number) {
   if (pct >= 110) return 'var(--red)'
-  if (pct >= 100) return '#f97316'   // orange — usó el presupuesto, normal
-  if (pct >= 80)  return 'var(--yellow)'
-  return 'var(--green)'
+  if (pct >= 80 && pct < 100) return 'var(--yellow)'
+  return 'var(--green)'  // <80% saludable  ó  100-109% completado
 }
 function pctBg(pct: number) {
   if (pct >= 110) return 'var(--red-soft)'
-  if (pct >= 100) return '#f9731620'
-  if (pct >= 80)  return 'var(--yellow-soft)'
+  if (pct >= 80 && pct < 100) return 'var(--yellow-soft)'
   return 'var(--green-soft)'
 }
 
@@ -313,7 +311,7 @@ export default function BudgetManager({ mes, gastosPorCategoria, ingresos = 0, i
             {/* Chips de categorías predefinidas disponibles */}
             {availablePredefined.length > 0 && (
               <>
-                <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-subtle)', marginBottom: 8 }}>
+                <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-subtle)', marginBottom: 8 }}>
                   O elige una existente
                 </p>
                 <div className="flex flex-wrap gap-2">
@@ -353,7 +351,7 @@ export default function BudgetManager({ mes, gastosPorCategoria, ingresos = 0, i
 
       {/* Footer — resumen de asignación */}
       {(totalPresupuestado > 0 || ingresos > 0) && (
-        <div style={{ borderTop: '1px solid var(--border)', padding: '12px 16px', background: 'var(--surface-2)' }}>
+        <div style={{ borderTop: '1px solid var(--border)', padding: '12px 16px' }}>
           <div className="flex items-center justify-between" style={{ marginBottom: 6 }}>
             <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>Total presupuestado</span>
             <span className="tabular-nums" style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--text)' }}>
@@ -390,7 +388,7 @@ export default function BudgetManager({ mes, gastosPorCategoria, ingresos = 0, i
           border: '1px solid var(--border)',
           borderRadius: 'var(--radius-pill)',
           padding: '10px 10px 10px 18px',
-          boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+          borderColor: 'var(--text-subtle)',
         }}>
           <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', fontWeight: 500 }}>
             Cambios sin guardar
@@ -446,6 +444,7 @@ function CategoryRow({ cat, entry, savedEntry, gasto, isExpanded, onToggle, onCh
   const hasSubs  = entry.subcategorias.length > 0
   const pct      = limite > 0 ? (gasto / limite) * 100 : 0
   const over     = limite > 0 && gasto > limite
+  const barFill  = limite > 0 ? pctColor(pct) : 'var(--border)'
   const color    = limite > 0 ? pctColor(pct) : 'var(--text-muted)'
   const bgColor  = limite > 0 ? pctBg(pct) : 'transparent'
   const isDirty  = JSON.stringify(entry) !== JSON.stringify(savedEntry)
@@ -484,7 +483,7 @@ function CategoryRow({ cat, entry, savedEntry, gasto, isExpanded, onToggle, onCh
         className="flex items-center gap-2"
         aria-expanded={isExpanded}
         aria-label={`${catLabel(cat)}: ${limite > 0 ? `límite ${formatCOP(limite)}` : 'sin límite'}${isExpanded ? ', expandido' : ''}`}
-        style={{ padding: '12px 16px', cursor: 'pointer' }}
+        style={{ padding: '9px 16px', cursor: 'pointer' }}
         onClick={onToggle}
         onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle() } }}
       >
@@ -542,13 +541,13 @@ function CategoryRow({ cat, entry, savedEntry, gasto, isExpanded, onToggle, onCh
       {/* Barra de progreso */}
       {limite > 0 && (
         <div style={{ margin: '-4px 16px 10px', height: 3, background: 'var(--border)', borderRadius: 99 }}>
-          <div style={{ width: `${Math.min(pct, 100)}%`, height: '100%', background: color, borderRadius: 99, transition: 'width 0.3s' }} />
+          <div style={{ width: `${Math.min(pct, 100)}%`, height: '100%', background: barFill, borderRadius: 99, transition: 'width 0.3s' }} />
         </div>
       )}
 
       {/* Panel expandido */}
       {isExpanded && (
-        <div style={{ background: 'var(--surface-2)', borderTop: '1px solid var(--border-soft)', padding: '12px 16px 14px' }}>
+        <div style={{ borderTop: '1px solid var(--border-soft)', padding: '12px 16px 14px' }}>
 
           {/* Borrar presupuesto — solo si hay algo configurado */}
           {(limite > 0 || hasSubs) && (

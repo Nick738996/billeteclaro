@@ -21,6 +21,10 @@ import TourTooltip from '@/components/tour/TourTooltip'
 import HelpModal from '@/components/tour/HelpModal'
 import { useTour } from '@/hooks/useTour'
 import { TOUR_STEPS } from '@/lib/tour/tourSteps'
+import styles from './DashboardClient.module.css'
+
+// Deshabilitado temporalmente — el asesor necesita más trabajo antes de estar listo
+const FEATURE_AI_ADVISOR = false
 
 interface Props {
   user: { name: string }
@@ -148,25 +152,17 @@ export default function DashboardClient({
   const firstName = user.name !== 'Usuario' ? user.name.split(' ')[0] : ''
 
   return (
-    <div className="min-h-screen" style={{ background: 'var(--bg)' }}>
+    <div className={styles.root}>
       {/* Header */}
-      <header
-        className="sticky top-0 z-10"
-        style={{
-          background: 'var(--surface)',
-          borderBottom: '1px solid var(--border)',
-          backdropFilter: 'var(--glass-blur)',
-          WebkitBackdropFilter: 'var(--glass-blur)',
-        }}
-      >
-        <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
+      <header className={styles.header}>
+        <div className={styles.headerInner}>
           {/* Logo lockup — Variante A (La B)
                stroke="currentColor" + color:var(--text) = adapta auto en light/dark */}
-          <div className="flex items-center gap-2">
+          <div className={styles.logoGroup}>
             <svg
               viewBox="0 0 100 100" width="45" height="45"
               aria-hidden="true"
-              style={{ color: 'var(--text)' }}
+              className={styles.logoSvg}
             >
               <line x1="30" y1="18" x2="30" y2="82"
                 stroke="currentColor" strokeWidth="6" strokeLinecap="round"/>
@@ -175,42 +171,38 @@ export default function DashboardClient({
               <path d="M30,50 Q78,50 78,66 Q78,82 30,82"
                 stroke="var(--green)" strokeWidth="6" fill="none" strokeLinecap="round"/>
             </svg>
-            <span className="tracking-tight" style={{ fontSize: 'var(--text-lg)', letterSpacing: '-0.02em' }}>
-              <span style={{ fontWeight: 400, color: 'var(--text)' }}>Billete</span>
-              <span style={{ fontWeight: 700, color: 'var(--green)' }}>Claro</span>
+            <span className={styles.logoText}>
+              <span className={styles.logoWordLight}>Billete</span>
+              <span className={styles.logoWordBold}>Claro</span>
             </span>
           </div>
-          <div className="flex items-center gap-2">
-          <HeaderPill onSyncComplete={handleSyncComplete} onSignOut={handleSignOut} onHelp={handleHelp}/>
+          <div className={styles.headerActions}>
+            <HeaderPill onSyncComplete={handleSyncComplete} onSignOut={handleSignOut} onHelp={handleHelp}/>
           </div>
         </div>
       </header>
 
       {/* Main */}
-      <main
-        className={`max-w-lg mx-auto px-4 py-6 space-y-6 transition-opacity duration-200 ${loading ? 'opacity-40 pointer-events-none' : ''}`}
-      >
+      <main className={`${styles.main} ${loading ? styles.mainLoading : ''}`}>
         {/* Saludo + navegación de mes */}
         <div>
-          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>
+          <p className={styles.greeting}>
             {firstName ? `Hola, ${firstName}` : 'Hola'}
           </p>
-          <div className="flex items-center justify-between mt-1">
+          <div className={styles.monthNavRow}>
             {/* MEJORA ⑤: w-8 h-8 → w-11 h-11 para touch target de 44px */}
             <button
               onClick={() => navigate(prevMonth)}
               data-testid={TEST_IDS.DASHBOARD_MONTH_PREV}
               aria-label="Mes anterior"
-              className="w-11 h-11 rounded-full flex items-center justify-center transition-colors"
-              style={{ color: 'var(--text-muted)' }}
+              className={styles.navBtn}
             >
               <ChevronLeft size={18} />
             </button>
 
             <h1
-              className="font-semibold capitalize"
+              className={styles.monthTitle}
               aria-live="polite"
-              style={{ fontSize: 'var(--text-xl)', color: 'var(--text)' }}
             >
               {label}
             </h1>
@@ -221,8 +213,7 @@ export default function DashboardClient({
               data-testid={TEST_IDS.DASHBOARD_MONTH_NEXT}
               aria-label="Mes siguiente"
               aria-disabled={!canGoNext}
-              className="w-11 h-11 rounded-full flex items-center justify-center transition-colors disabled:opacity-30"
-              style={{ color: 'var(--text-muted)' }}
+              className={styles.navBtn}
             >
               <ChevronRight size={18} />
             </button>
@@ -260,14 +251,16 @@ export default function DashboardClient({
           />
         </div>
 
-        <div data-testid="tour-advisor">
-          <AIAdvisorPanel
-            mes={month}
-            budgetCount={Object.values(budgets).filter(v => v > 0).length}
-            txCount={txs.length}
-            contextVersion={contextVersion}
-          />
-        </div>
+        {FEATURE_AI_ADVISOR && (
+          <div data-testid="tour-advisor">
+            <AIAdvisorPanel
+              mes={month}
+              budgetCount={Object.values(budgets).filter(v => v > 0).length}
+              txCount={txs.length}
+              contextVersion={contextVersion}
+            />
+          </div>
+        )}
 
         <div data-testid="tour-transactions">
           {manualOpen && (

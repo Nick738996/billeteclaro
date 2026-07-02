@@ -1,5 +1,6 @@
 import { formatCOPCompact, type MonthlyStats } from '@/lib/types'
 import { TEST_IDS } from '@/lib/testIds'
+import styles from './StatsCards.module.css'
 
 interface Props {
   stats: MonthlyStats
@@ -15,55 +16,24 @@ export default function StatsCards({ stats }: Props) {
   const bColor  = surplus ? 'var(--green)' : 'var(--red)'
   const bSoft   = surplus ? 'var(--green-soft)' : 'var(--red-soft)'
 
-  const glow = (isIncome: boolean) => ({
-    background:           isIncome ? 'var(--green-glow-bg)' : 'var(--red-glow-bg)',
-    border:               isIncome ? '1px solid var(--green-glow-border)' : '1px solid var(--red-glow-border)',
-    backdropFilter:       'var(--glass-blur)',
-    WebkitBackdropFilter: 'var(--glass-blur)',
-    borderRadius:         'var(--radius-lg)',
-  })
-
   return (
-    <div className="flex flex-col gap-2">
+    <div className={styles.wrapper}>
 
       {/* Balance hero */}
-      <div
-        style={{
-          ...glow(surplus),
-          padding: '20px 20px 18px',
-        }}
-      >
-        <p
-          style={{
-            fontSize: 'var(--text-xs)',
-            fontWeight: 500,
-            letterSpacing: '0.08em',
-            color: 'var(--text-muted)',
-            textTransform: 'uppercase',
-            marginBottom: 10,
-          }}
-        >
-          Balance neto
-        </p>
-        <div className="flex items-end justify-between">
+      <div className={`${styles.heroCard} ${surplus ? styles.heroCardPositive : styles.heroCardNegative}`}>
+        <p className={styles.heroLabel}>Balance neto</p>
+        <div className={styles.heroRow}>
           <span
-            className="tabular-nums"
+            className={styles.heroAmount}
             data-testid={TEST_IDS.DASHBOARD_BALANCE_AMOUNT}
             aria-label={`Balance neto: ${surplus ? 'positivo' : 'negativo'} ${formatCOPCompact(Math.abs(balance))}`}
-            style={{ fontSize: 'var(--text-4xl)', fontWeight: 700, color: bColor, letterSpacing: '-0.03em', lineHeight: 1 }}
+            style={{ '--clr': bColor } as React.CSSProperties}
           >
             {formatCOPCompact(Math.abs(balance))}
           </span>
           <span
-            style={{
-              fontSize: 'var(--text-xs)',
-              fontWeight: 600,
-              color: bColor,
-              background: bSoft,
-              padding: '4px 10px',
-              borderRadius: 'var(--radius-sm)',
-              marginBottom: 3,
-            }}
+            className={styles.heroBadge}
+            style={{ '--clr': bColor, '--bg-soft': bSoft } as React.CSSProperties}
           >
             {surplus ? 'positivo' : 'negativo'}
           </span>
@@ -71,37 +41,25 @@ export default function StatsCards({ stats }: Props) {
       </div>
 
       {/* Gastos + Ingresos secundarios */}
-      <div className={`grid gap-2 ${ahorros > 0 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+      <div className={styles.secondaryGrid}>
         {[
           { label: 'Gastos',   arrow: '↓', value: formatCOPCompact(gastos),   color: 'var(--red)',    sub: `${transacciones} mov.`, isIncome: false, testId: TEST_IDS.DASHBOARD_GASTOS_AMOUNT },
           { label: 'Ingresos', arrow: '↑', value: formatCOPCompact(ingresos), color: 'var(--green)',  sub: 'este mes',              isIncome: true,  testId: TEST_IDS.DASHBOARD_INGRESOS_AMOUNT },
-          ...(ahorros > 0 ? [{ label: 'Ahorrado', arrow: '→', value: formatCOPCompact(ahorros), color: 'var(--blue)', sub: 'este mes', isIncome: false, testId: '' }] : []),
+          { label: 'Ahorrado', arrow: '→', value: ahorros > 0 ? formatCOPCompact(ahorros) : '—', color: ahorros > 0 ? 'var(--blue)' : 'var(--text-subtle)', sub: 'este mes', isIncome: false, testId: '' },
         ].map(({ label, arrow, value, color, sub, isIncome, testId }) => (
           <div
             key={label}
-            style={{
-              ...glow(isIncome),
-              padding: '14px 16px',
-              backdropFilter: 'var(--glass-blur)',
-              WebkitBackdropFilter: 'var(--glass-blur)',
-            }}
+            className={`${styles.secondaryCard} ${isIncome ? styles.secondaryCardIncome : styles.secondaryCardExpense}`}
           >
+            <p className={styles.secondaryLabel}>{arrow} {label}</p>
             <p
-              style={{
-                fontSize: 'var(--text-xs)',
-                fontWeight: 500,
-                letterSpacing: '0.08em',
-                color: 'var(--text-muted)',
-                textTransform: 'uppercase',
-                marginBottom: 6,
-              }}
+              className={styles.secondaryValue}
+              data-testid={testId}
+              style={{ '--val-clr': color } as React.CSSProperties}
             >
-              {arrow} {label}
-            </p>
-            <p className="tabular-nums" data-testid={testId} style={{ fontSize: 'var(--text-2xl)', fontWeight: 600, color, letterSpacing: '-0.02em' }}>
               {value}
             </p>
-            <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginTop: 3 }}>{sub}</p>
+            <p className={styles.secondarySub}>{sub}</p>
           </div>
         ))}
       </div>

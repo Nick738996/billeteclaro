@@ -1,13 +1,13 @@
 :root {
   /* MODO OSCURO — default (glass + fluido) */
-  --bg:           #0A0A0A;
-  --surface:      rgba(28, 28, 28, 0.72);
-  --surface-2:    rgba(36, 36, 36, 0.72);
-  --border:       rgba(255, 255, 255, 0.10);
-  --border-soft:  rgba(255, 255, 255, 0.06);
-  --text:         #FFFFFF;
-  --text-muted:   #888888;
-  --text-subtle:  #444444;
+  --bg:           #080A0C;
+  --surface:      rgba(18, 24, 30, 0.82);
+  --surface-2:    rgba(24, 30, 38, 0.82);
+  --border:       rgba(255, 255, 255, 0.12);
+  --border-soft:  rgba(255, 255, 255, 0.07);
+  --text:         #F0F4F8;
+  --text-muted:   #B8C4D0;
+  --text-subtle:  #7A8A9C;
 
   --green:        #4ADE80;
   --green-soft:   #153D24;
@@ -46,7 +46,7 @@
   --text-4xl: 40px;
 
   /* Glass blur — usado como backdrop-filter en las cards */
-  --glass-blur: blur(24px) saturate(160%);
+  --glass-blur: blur(32px) saturate(180%);
 
   /* Surfaces adicionales */
   --pill-bg:  rgba(255,255,255,0.05);  /* fondo del HeaderPill en dark */
@@ -59,9 +59,9 @@
   --surface-2:    rgba(240, 240, 240, 0.80);
   --border:       rgba(0, 0, 0, 0.09);
   --border-soft:  rgba(0, 0, 0, 0.05);
-  --text:         #0A0A0A;
-  --text-muted:   #6B6B6B;
-  --text-subtle:  #C8C8C8;
+  --text:         #0F1117;
+  --text-muted:   #6B7280;
+  --text-subtle:  #9CA3AF;
 
   --green:        #16A34A;
   --green-soft:   #DCFCE7;

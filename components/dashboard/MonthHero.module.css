@@ -1,0 +1,97 @@
+.hero {
+  padding: 8px 0 4px;
+}
+
+.amountRow {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+.label {
+  font-size: var(--text-xs);
+  font-weight: 400;
+  color: var(--text-subtle);
+  margin-bottom: 5px;
+}
+
+.amount {
+  font-size: var(--text-4xl);
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+
+.incomeSuffix {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+/* Badge — solo texto coloreado, sin fondo */
+.badge {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+
+.barTrack {
+  height: 5px;
+  background: var(--border);
+  border-radius: 99px;
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+
+.barFill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.4s ease;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.disponibleOk {
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--green);
+}
+
+.disponibleOver {
+  font-size: var(--text-xs);
+  font-weight: 400;
+  color: var(--red);
+}
+
+.meta {
+  font-size: var(--text-xs);
+  color: var(--text-subtle);
+}
+
+.chartBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  border-radius: var(--radius-badge);
+  color: var(--text-subtle);
+  cursor: pointer;
+  padding: 3px 6px;
+  margin-left: auto;
+  transition: opacity 0.15s;
+}
+
+.chartBtn:hover {
+  opacity: 0.7;
+}
+
+.chartBtnActive {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+}

@@ -5,6 +5,7 @@ import { Pencil } from 'lucide-react'
 import { formatCOPCompact } from '@/lib/types'
 import SavingsManager from './SavingsManager'
 import type { SavingsAccount } from '@/lib/services/savingsService'
+import styles from './SavingsOverview.module.css'
 
 export default function SavingsOverview() {
   const [accounts, setAccounts] = useState<SavingsAccount[]>([])
@@ -23,11 +24,11 @@ export default function SavingsOverview() {
   const total = accounts.reduce((s, a) => s + a.saldo, 0)
 
   if (!loaded) return (
-    <div className="card" style={{ padding: '16px 20px' }}>
-      <div className="skeleton" style={{ height: 11, width: 100, marginBottom: 16, borderRadius: 4 }} />
+    <div className={`card ${styles.loadingWrap}`}>
+      <div className={`skeleton ${styles.skeletonTitle}`} />
       {[75, 55].map((w, i) => (
-        <div key={i} style={{ marginBottom: 10 }}>
-          <div className="skeleton" style={{ height: 10, width: `${w}%`, borderRadius: 4 }} />
+        <div key={i} className={styles.skeletonRow}>
+          <div className={`skeleton ${styles.skeletonLine}`} style={{ '--w': `${w}%` } as React.CSSProperties} />
         </div>
       ))}
     </div>
@@ -44,19 +45,15 @@ export default function SavingsOverview() {
   }
 
   return (
-    <div className="card" style={{ overflow: 'hidden' }}>
+    <div className={`card ${styles.root}`}>
       {/* Header */}
-      <div
-        className="flex items-center justify-between"
-        style={{ padding: '14px 16px 10px', borderBottom: (accounts.length > 0) ? '1px solid var(--border-soft)' : 'none' }}
-      >
-        <p style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text)' }}>
+      <div className={`${styles.header} ${accounts.length > 0 ? styles.headerBorder : ''}`}>
+        <p className={styles.headerTitle}>
           Mis Ahorros
         </p>
         <button
           onClick={() => setEditing(true)}
-          className="flex items-center gap-1.5 transition-opacity hover:opacity-70"
-          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 'var(--text-xs)', fontWeight: 500, padding: '2px 0' }}
+          className={styles.editBtn}
         >
           <Pencil size={11} />
           Editar
@@ -65,13 +62,13 @@ export default function SavingsOverview() {
 
       {/* Empty state */}
       {accounts.length === 0 && (
-        <div style={{ padding: '28px 16px', textAlign: 'center' }}>
-          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', marginBottom: 12 }}>
+        <div className={styles.emptyState}>
+          <p className={styles.emptyMsg}>
             Sin cuentas de ahorro registradas
           </p>
           <button
             onClick={() => setEditing(true)}
-            style={{ fontSize: 'var(--text-xs)', fontWeight: 500, color: 'var(--green)', background: 'var(--green-soft)', border: 'none', borderRadius: 'var(--radius-sm)', padding: '6px 14px', cursor: 'pointer' }}
+            className={styles.addBtn}
           >
             Agregar cuenta
           </button>
@@ -80,14 +77,11 @@ export default function SavingsOverview() {
 
       {/* Total */}
       {accounts.length > 0 && (
-        <div style={{ padding: '14px 16px 12px', borderBottom: '1px solid var(--border-soft)' }}>
-          <p style={{ fontSize: 'var(--text-xs)', fontWeight: 500, color: 'var(--text-muted)', letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 4 }}>
+        <div className={styles.total}>
+          <p className={styles.totalLabel}>
             Total ahorrado
           </p>
-          <span
-            className="tabular-nums"
-            style={{ fontSize: 'var(--text-3xl)', fontWeight: 700, color: 'var(--green)', letterSpacing: '-0.03em', lineHeight: 1 }}
-          >
+          <span className={styles.totalAmount}>
             {formatCOPCompact(total)}
           </span>
         </div>
@@ -97,14 +91,16 @@ export default function SavingsOverview() {
       {accounts.map((account, i) => (
         <div
           key={account.id}
-          className="flex items-center gap-3"
-          style={{ padding: '11px 16px', borderBottom: i < accounts.length - 1 ? '1px solid var(--border-soft)' : 'none' }}
+          className={`${styles.row} ${i < accounts.length - 1 ? styles.rowBorder : ''}`}
         >
-          <span style={{ width: 9, height: 9, borderRadius: '50%', background: account.color, flexShrink: 0 }} />
-          <span className="flex-1 truncate" style={{ fontSize: 'var(--text-sm)', color: 'var(--text)' }}>
+          <span
+            className={styles.dot}
+            style={{ '--clr': account.color } as React.CSSProperties}
+          />
+          <span className={styles.accountName}>
             {account.nombre}
           </span>
-          <span className="tabular-nums flex-shrink-0" style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text)' }}>
+          <span className={styles.accountAmount}>
             {formatCOPCompact(account.saldo)}
           </span>
         </div>

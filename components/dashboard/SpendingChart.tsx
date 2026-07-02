@@ -13,6 +13,7 @@ import {
   type Transaction,
 } from '@/lib/types'
 import { TEST_IDS } from '@/lib/testIds'
+import styles from './SpendingChart.module.css'
 
 // MEJORA ②: donut interactivo (toca un slice → filtra la lista)
 //           + barras proporcionales con % en la leyenda
@@ -102,14 +103,11 @@ export default function SpendingChart({ transactions, activeFilter, onFilterChan
 
   if (data.length === 0) {
     return (
-      <div
-        className="rounded-[var(--radius-lg)] p-6"
-        style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
-      >
-        <h2 className="font-medium mb-4" style={{ fontSize: 'var(--text-sm)', color: 'var(--text)' }}>
+      <div className={styles.containerEmpty}>
+        <h2 className={styles.heading}>
           Gastos por categoría
         </h2>
-        <p className="text-center py-6" style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>
+        <p className={styles.emptyText}>
           Sin datos este mes. Sincroniza para ver tus gastos.
         </p>
       </div>
@@ -117,25 +115,16 @@ export default function SpendingChart({ transactions, activeFilter, onFilterChan
   }
 
   return (
-    <div
-      className="rounded-[var(--radius-lg)] p-4"
-      style={{
-        background: 'var(--surface)',
-        border: '1px solid var(--border)',
-        backdropFilter: 'var(--glass-blur)',
-        WebkitBackdropFilter: 'var(--glass-blur)',
-      }}
-    >
-      <h2 className="font-medium mb-4" style={{ fontSize: 'var(--text-sm)', color: 'var(--text)' }}>
+    <div className={styles.container}>
+      <h2 className={styles.heading}>
         Gastos por categoría
       </h2>
 
-      <div className="flex gap-4 items-center">
+      <div className={styles.body}>
 
         {/* Donut interactivo */}
         <div
-          className="flex-shrink-0 relative"
-          style={{ width: S, height: S }}
+          className={styles.donutWrap}
           data-testid={TEST_IDS.DASHBOARD_DONUT_CHART}
           role="img"
           aria-label="Gráfico de gastos por categoría"
@@ -153,7 +142,7 @@ export default function SpendingChart({ transactions, activeFilter, onFilterChan
                   stroke="var(--bg)"
                   strokeWidth="2.5"
                   opacity={isDimmed ? 0.28 : 1}
-                  className="cursor-pointer transition-opacity duration-150"
+                  className={styles.slice}
                   role="button"
                   tabIndex={0}
                   data-testid={TEST_IDS.DASHBOARD_DONUT_SLICE}
@@ -173,39 +162,33 @@ export default function SpendingChart({ transactions, activeFilter, onFilterChan
 
           {/* Centro: total o categoría seleccionada. Toca para limpiar filtro. */}
           <div
-            className="absolute inset-0 flex flex-col items-center justify-center"
-            style={{ gap: 2, cursor: catActive ? 'pointer' : 'default' }}
+            className={catActive ? `${styles.center} ${styles.centerActive}` : styles.center}
             onClick={() => catActive && onFilterChange('TODOS')}
             role={catActive ? 'button' : undefined}
             aria-label={catActive ? 'Limpiar filtro de categoría' : undefined}
             tabIndex={catActive ? 0 : undefined}
             onKeyDown={catActive ? e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onFilterChange('TODOS') } } : undefined}
           >
-            <span style={{ fontSize: 9, color: 'var(--text-muted)', letterSpacing: '0.07em', textTransform: 'uppercase' }}>
+            <span className={styles.centerLabel}>
               {selEntry ? selEntry.name : 'total'}
             </span>
             <span
-              className="tabular-nums font-bold"
-              style={{ fontSize: 16, color: selEntry ? selEntry.fill : 'var(--text)' }}
+              className={styles.centerValue}
+              style={{ '--clr': selEntry ? selEntry.fill : 'var(--text)' } as React.CSSProperties}
             >
               {selEntry ? formatCOPCompact(selEntry.value) : formatCOPCompact(total)}
             </span>
-            {catActive && (
-              <span style={{ fontSize: 9, color: 'var(--text-subtle)', marginTop: 2 }}>
-                toca para limpiar
-              </span>
-            )}
           </div>
         </div>
 
         {/* Leyenda con barras proporcionales */}
-        <div className="flex-1 flex flex-col gap-2.5 overflow-hidden">
+        <div className={styles.legend}>
           {data.map((entry, i) => (
             <div
               key={i}
               role="button"
               tabIndex={0}
-              className="cursor-pointer"
+              className={styles.legendRow}
               aria-pressed={entry.categoria === activeFilter}
               aria-label={`${entry.name}: ${Math.round(entry.pct * 100)}%`}
               onClick={() => onFilterChange(
@@ -218,28 +201,25 @@ export default function SpendingChart({ transactions, activeFilter, onFilterChan
                 }
               }}
             >
-              <div className="flex items-center justify-between mb-1">
-                <div className="flex items-center gap-1.5 min-w-0">
+              <div className={styles.legendHeader}>
+                <div className={styles.legendNameGroup}>
                   <div
-                    className="w-2 h-2 rounded-full flex-shrink-0"
-                    style={{ backgroundColor: entry.fill }}
+                    className={styles.legendDot}
+                    style={{ '--clr': entry.fill } as React.CSSProperties}
                   />
-                  <span className="truncate" style={{ fontSize: 'var(--text-xs)', color: 'var(--text)' }}>
+                  <span className={styles.legendName}>
                     {entry.name}
                   </span>
                 </div>
-                <span
-                  className="tabular-nums flex-shrink-0 ml-2"
-                  style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}
-                >
+                <span className={styles.legendPct}>
                   {Math.round(entry.pct * 100)}%
                 </span>
               </div>
               {/* Barra proporcional */}
-              <div className="rounded-full" style={{ height: 3, background: 'var(--border)' }}>
+              <div className={styles.barTrack}>
                 <div
-                  className="h-full rounded-full"
-                  style={{ width: `${entry.pct * 100}%`, background: entry.fill }}
+                  className={styles.barFill}
+                  style={{ '--w': `${entry.pct * 100}%`, '--clr': entry.fill } as React.CSSProperties}
                 />
               </div>
             </div>
