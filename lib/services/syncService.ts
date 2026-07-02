@@ -67,6 +67,7 @@ export async function runSync(userId: string, admin: Admin): Promise<SyncResult>
       providers.map(p => p.listBankMessageIds(SYNC_FROM))
     )
     const allMessageIds = allIdsByProvider.flat()
+    console.log(`[sync] emails encontrados total: ${allMessageIds.length} (Gmail/Outlook sin filtrar)`)
     const providerByMessageId = new Map<string, EmailProvider>()
     allIdsByProvider.forEach((ids, i) => ids.forEach(id => providerByMessageId.set(id, providers[i])))
 
@@ -75,6 +76,7 @@ export async function runSync(userId: string, admin: Admin): Promise<SyncResult>
     const errores: string[] = []
     let parserCount = 0, omitidosCount = 0
     const allTransactions: Array<{ id: string; extracted: ExtractedTransaction }> = []
+    const bancoCount: Record<string, number> = {}
 
     // 6. FASE 1 — parsers específicos (sin fallback IA)
     for (let i = 0; i < newIds.length; i += BATCH_SIZE) {
@@ -90,6 +92,10 @@ export async function runSync(userId: string, admin: Admin): Promise<SyncResult>
         if (result.status === 'rejected') { errores.push(`Fetch error: ${result.reason}`); continue }
         const email = result.value
         const banco = detectBank(email.from)
+        bancoCount[banco] = (bancoCount[banco] ?? 0) + 1
+        if (banco === 'RAPPIPAY' || banco === 'RAPPICARD') {
+          console.log(`[scan] ${banco} — "${email.subject}" | body[0:120]=${JSON.stringify(email.body.slice(0, 120))}`)
+        }
         const parsed = trySpecificParser(banco, {
           id: email.id,
           from: email.from,
@@ -99,10 +105,17 @@ export async function runSync(userId: string, admin: Admin): Promise<SyncResult>
         })
         if (parsed) {
           parserCount++
+          const isIncome = parsed.tipo === 'INGRESO' || parsed.tipo === 'TRANSFERENCIA_RECIBIDA'
+          if (banco === 'RAPPIPAY' || isIncome) {
+            console.log(`[sync] parsed ${banco} tipo=${parsed.tipo} monto=${parsed.monto} fecha=${parsed.fecha?.slice(0, 10)} — "${email.subject}"`)
+          }
           allTransactions.push({ id: email.id, extracted: { ...parsed, banco } })
         } else {
           omitidosCount++
           console.log(`[sync] omitido ${banco} (${email.provider}) — "${email.subject}"`)
+          if (banco === 'RAPPIPAY') {
+            console.log(`[sync] RAPPIPAY body[0:200]=${JSON.stringify(email.body.slice(0, 200))}`)
+          }
         }
       }
     }
@@ -133,8 +146,13 @@ export async function runSync(userId: string, admin: Admin): Promise<SyncResult>
         .upsert(rows, { onConflict: 'user_id,gmail_message_id', ignoreDuplicates: true })
         .select('id')
 
-      if (insertError) errores.push(`Insert error: ${insertError.message}`)
-      else transaccionesNuevas += inserted?.length ?? 0
+      if (insertError) {
+        console.error(`[sync] Insert error (${rows.length} rows intentados):`, insertError.message)
+        errores.push(`Insert error: ${insertError.message}`)
+      } else {
+        console.log(`[sync] Insertados: ${inserted?.length ?? 0} de ${rows.length} rows`)
+        transaccionesNuevas += inserted?.length ?? 0
+      }
     }
 
     // 9. FASE 4 — asignar mes_contable
@@ -147,6 +165,7 @@ export async function runSync(userId: string, admin: Admin): Promise<SyncResult>
 
     const providerNames = providers.map(p => p.name).join('+')
     console.log(`[sync] ${providerNames} — ${newIds.length} emails — ${parserCount} parser | ${omitidosCount} omitidos | ${preauthIds.length} Uber preauth | ${errores.length} errores`)
+    console.log(`[sync] por banco:`, bancoCount)
 
     await admin.from('sync_log').update({
       finished_at: new Date().toISOString(),

@@ -6,6 +6,9 @@ export function parseRappiPay(email: EmailInput): ParseResult {
   const body = email.body
   const subject = email.subject
 
+  // Ignorar notificaciones sin transacción real
+  if (/fall[oó]|no se proces[oó]/i.test(subject) || /extracto de rappi/i.test(subject)) return null
+
   // Order matters: more specific patterns first
 
   // Rentabilidad mensual / bolsillos
@@ -23,13 +26,16 @@ export function parseRappiPay(email: EmailInput): ParseResult {
     return parsePSECompra(email)
   }
 
-  // Depósito bancario (salary, employer transfers) — detected by subject
+  // Transferencia bancaria — puede ser ENTRANTE (sueldo) o SALIENTE (envío a otro banco)
   if (/resumen transferencia bancaria|transferencia bancaria/i.test(subject + body)) {
-    return parseIngresoBancario(email)
+    return /monto transferido/i.test(body)
+      ? parseTransferenciaEnviada(email)
+      : parseIngresoBancario(email)
   }
 
-  // Transferencia recibida (llave) — "Monto recibido" + "tu RappiCuenta"
-  if (/monto recibido/i.test(body) && /rappiCuenta|tus llaves|ya est[aá] disponible/i.test(body)) {
+  // Transferencia recibida — cualquier email con "Monto recibido" no bancario
+  // Cubre: llave, P2P, contacto, cualquier variante futura
+  if (/monto recibido/i.test(body)) {
     return parseTransferenciaRecibida(email)
   }
 
@@ -54,15 +60,20 @@ function extractFechaHora(body: string, emailDate: string): string {
 function parseTransferenciaRecibida(email: EmailInput): ParseResult {
   const body = email.body
 
-  const montoMatch = body.match(/Monto recibido\s+\$([\d.,]+)/i)
+  const montoMatch = body.match(/Monto recibido\s+\$\s*([\d.,]+)/i)
   if (!montoMatch) return null
 
   const monto = parseCOPAmount(montoMatch[1])
   if (!monto || monto <= 0) return null
 
-  // Banco origen: "Banco\nBancolombia\nNro." → stops before next field
+  // Banco origen (transferencia bancaria): "Banco\nBancolombia\nNro."
   const bancoMatch = body.match(/\bBanco\s+([^\n$]{1,80}?)(?=\s+(?:Nro|No\.|Fecha|¿|$))/i)
-  const origen = bancoMatch ? toTitleCase(bancoMatch[1].trim()) : null
+  // Contacto P2P: "Nombre de tu contacto\nRAUL GOMEZ\nNo. de transacción"
+  // Lookahead para no capturar el número de transacción que sigue (en HTML todo queda en una línea)
+  const contactoMatch = body.match(/Nombre de tu contacto\s+([^\n]{1,80}?)(?=\s+(?:No\.|Nro\.|Fecha|Hora|¿|$))/i)
+  const origen = bancoMatch
+    ? toTitleCase(bancoMatch[1].trim())
+    : contactoMatch ? toTitleCase(contactoMatch[1].trim()) : null
 
   return {
     fecha: extractFechaHora(body, email.date),
@@ -82,15 +93,18 @@ function parseTransferenciaRecibida(email: EmailInput): ParseResult {
 function parseTransferenciaEnviada(email: EmailInput): ParseResult {
   const body = email.body
 
-  const montoMatch = body.match(/Monto transferido\s+\$([\d.,]+)/i)
+  const montoMatch = body.match(/Monto transferido\s+\$\s*([\d.,]+)/i)
   if (!montoMatch) return null
 
   const monto = parseCOPAmount(montoMatch[1])
   if (!monto || monto <= 0) return null
 
-  // Destinatario: llave tipo @handle
+  // Destinatario: llave (@handle) o banco destino (transferencia interbancaria)
   const llaveMatch = body.match(/Llave destino\s+(@?\S+)/i)
-  const destinatario = llaveMatch ? llaveMatch[1].trim() : null
+  const bancoDestinoMatch = body.match(/\bBanco\s+([^\n$]{1,80}?)(?=\s+(?:No\.|Nro|Fecha|Costo|¿|$))/i)
+  const destinatario = llaveMatch
+    ? llaveMatch[1].trim()
+    : bancoDestinoMatch ? toTitleCase(bancoDestinoMatch[1].trim()) : null
 
   return {
     fecha: extractFechaHora(body, email.date),
@@ -110,7 +124,7 @@ function parseTransferenciaEnviada(email: EmailInput): ParseResult {
 function parseIngresoBancario(email: EmailInput): ParseResult {
   const body = email.body
 
-  const montoMatch = body.match(/Monto recibido\s+\$([\d.,]+)/i)
+  const montoMatch = body.match(/Monto recibido\s+\$\s*([\d.,]+)/i)
   if (!montoMatch) return null
 
   const monto = parseCOPAmount(montoMatch[1])
@@ -139,7 +153,7 @@ function parsePagoServicio(email: EmailInput): ParseResult {
   const body = email.body
 
   // Preferir "Pago total" sobre "Monto de recibo" (ambos deberían ser iguales)
-  const montoMatch = body.match(/(?:Pago total|Monto de recibo)\s+\$([\d.,]+)/i)
+  const montoMatch = body.match(/(?:Pago total|Monto de recibo)\s+\$\s*([\d.,]+)/i)
   if (!montoMatch) return null
 
   const monto = parseCOPAmount(montoMatch[1])
@@ -175,7 +189,7 @@ function parsePagoServicio(email: EmailInput): ParseResult {
 function parsePSECompra(email: EmailInput): ParseResult {
   const body = email.body
 
-  const montoMatch = body.match(/Monto\s+\$([\d.,]+)/i)
+  const montoMatch = body.match(/Monto\s+\$\s*([\d.,]+)/i)
   if (!montoMatch) return null
 
   const monto = parseCOPAmount(montoMatch[1])
@@ -206,7 +220,7 @@ function parseRentabilidad(email: EmailInput): ParseResult {
   // "Rentabilidad de Abril\n$203.770,46" (tests → newlines)
   // "Rentabilidad de tu Bolsillo Navidad $50.000" (bolsillos, multi-palabra)
   // Grupo 1 = label (ej. "Abril", "tu Bolsillo Navidad"), Grupo 2 = monto
-  const montoMatch = body.match(/Rentabilidad\s+de\s+([\s\S]*?)\s*\$([\d.,]+)/i)
+  const montoMatch = body.match(/Rentabilidad\s+de\s+([\s\S]*?)\s*\$\s*([\d.,]+)/i)
   if (!montoMatch) return null
 
   const monto = parseCOPAmount(montoMatch[2])

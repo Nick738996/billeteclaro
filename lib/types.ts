@@ -162,6 +162,19 @@ export const CATEGORIA_COLORS: Record<Categoria, string> = {
   OTRO: '#94a3b8',        // slate    — sin categoría
 }
 
+const CUSTOM_PALETTE = [
+  '#fb923c', '#a3e635', '#2dd4bf', '#818cf8', '#fb7185',
+  '#34d399', '#60a5fa', '#c084fc', '#facc15', '#f87171',
+  '#38bdf8', '#4ade80',
+]
+
+export function getCategoryColor(cat: string): string {
+  if (cat in CATEGORIA_COLORS) return CATEGORIA_COLORS[cat as Categoria]
+  let h = 0
+  for (let i = 0; i < cat.length; i++) h = (h * 31 + cat.charCodeAt(i)) >>> 0
+  return CUSTOM_PALETTE[h % CUSTOM_PALETTE.length]
+}
+
 export const BANCO_LABELS: Record<Banco, string> = {
   RAPPICARD:            'RappiCard',
   RAPPIPAY:             'RappiPay',

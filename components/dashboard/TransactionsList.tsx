@@ -11,6 +11,7 @@ import {
   type Banco,
   CATEGORIA_LABELS,
   catLabel,
+  getCategoryColor,
   formatCOP,
   formatCOPCompact,
   isIngreso,
@@ -72,9 +73,11 @@ const LOWERCASE_ES = new Set(['y','e','o','de','del','la','el','los','las','en',
 function toTitleCase(str: string): string {
   if (!str) return str
   if (str.startsWith('@') || str.includes('@')) return str
-  if (str !== str.toUpperCase() && str !== str.toLowerCase()) return str
-  return str
-    .toLowerCase()
+  // Solo saltar si ya está en formato mixto (no TODO mayúsculas ni todo minúsculas)
+  const up = str.toUpperCase()
+  const lo = str.toLowerCase()
+  if (str !== up && str !== lo) return str
+  return lo
     .split(' ')
     .map((word, i) => i > 0 && LOWERCASE_ES.has(word) ? word : word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ')
@@ -82,12 +85,20 @@ function toTitleCase(str: string): string {
 
 function getDisplayName(t: Transaction): string {
   const comercio = t.comercio ? toTitleCase(t.comercio) : null
+  const desc = t.descripcion ? toTitleCase(t.descripcion) : null
   switch (t.tipo) {
-    case 'TRANSFERENCIA_ENVIADA':  return comercio ? `Transferencia a ${comercio}` : 'Transferencia enviada'
-    case 'TRANSFERENCIA_RECIBIDA': return comercio ? `Transferencia de ${comercio}` : 'Transferencia recibida'
-    case 'ABONO_DEUDA':            return comercio ? `Pago a ${comercio}` : 'Pago tarjeta'
-    case 'PAGO_SERVICIO':          return comercio ? `Pago ${comercio}` : 'Pago servicio'
-    default:                       return comercio ?? t.descripcion ?? 'Transacción'
+    case 'INGRESO':
+      return desc ?? (comercio ? `Ingreso de ${comercio}` : 'Ingreso')
+    case 'TRANSFERENCIA_ENVIADA':
+      return comercio ? `Transferencia a ${comercio}` : (desc ?? 'Transferencia enviada')
+    case 'TRANSFERENCIA_RECIBIDA':
+      return comercio ? `Transferencia de ${comercio}` : (desc ?? 'Transferencia recibida')
+    case 'ABONO_DEUDA':
+      return comercio ? `Pago a ${comercio}` : 'Pago tarjeta'
+    case 'PAGO_SERVICIO':
+      return comercio ? `Pago ${comercio}` : (desc ?? 'Pago servicio')
+    default:
+      return comercio ?? desc ?? 'Transacción'
   }
 }
 
@@ -117,7 +128,8 @@ function groupByDate(txs: Transaction[]): Array<{ dateLabel: string; items: Tran
 
 function CatFilterBtn({ cat, active, onChange }: { cat: string; active: FilterKey; onChange: (k: FilterKey) => void }) {
   const on    = active === cat
-  const theme = CATEGORIA_THEME[cat as Categoria] ?? CATEGORIA_THEME['OTRO']
+  const hex   = getCategoryColor(cat)
+  const theme = CATEGORIA_THEME[cat as Categoria] ?? { color: hex, bg: hex + '22' }
   return (
     <button
       key={cat}
@@ -227,7 +239,8 @@ function FilterChips({
   const [sheetOpen, setSheetOpen] = useState(false)
   const isCatActive    = active !== 'TODOS' && !active.startsWith('BANCO:')
   const activeCatLabel = isCatActive ? catLabel(active) : null
-  const activeCatTheme = isCatActive ? (CATEGORIA_THEME[active as Categoria] ?? CATEGORIA_THEME['OTRO']) : null
+  const activeCatHex   = isCatActive ? getCategoryColor(active) : null
+  const activeCatTheme = isCatActive ? (CATEGORIA_THEME[active as Categoria] ?? (activeCatHex ? { color: activeCatHex, bg: activeCatHex + '22' } : null)) : null
 
   // Bancos que realmente tienen transacciones este mes, en orden de frecuencia
   const availableBancos = useMemo(() => {
@@ -375,7 +388,8 @@ function FilterChips({
 
 function CatPickerBtn({ cat, current, onSelect }: { cat: string; current: string; onSelect: (c: Categoria) => void }) {
   const on    = cat === current
-  const theme = CATEGORIA_THEME[cat as Categoria] ?? CATEGORIA_THEME['OTRO']
+  const hex   = getCategoryColor(cat)
+  const theme = CATEGORIA_THEME[cat as Categoria] ?? { color: hex, bg: hex + '22' }
   return (
     <button
       key={cat}
@@ -401,14 +415,15 @@ function CategoryPicker({ current, onSelect, onClose, budgetedCats }: {
 
   return createPortal(
     <>
-      <div className="fixed inset-0 z-50" style={{ background: 'var(--overlay)' }} onClick={onClose} aria-hidden="true" />
+      <div className="fixed inset-0" style={{ background: 'var(--overlay)', zIndex: 70 }} onClick={onClose} aria-hidden="true" />
       <div
         role="dialog"
         aria-modal="true"
         aria-label="Cambiar categoría"
-        className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-lg z-50"
+        className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-lg"
         onKeyDown={e => { if (e.key === 'Escape') onClose() }}
         style={{
+          zIndex: 80,
           background: 'var(--surface-2)',
           borderTop: '1px solid var(--border)',
           borderRadius: 'var(--radius-xl) var(--radius-xl) 0 0',
@@ -464,7 +479,8 @@ function TransactionRow({ t, pendingCat, onCategoryClick, onDelete }: {
 
   const income     = isIngreso(t.tipo)
   const displayCat = pendingCat ?? t.categoria
-  const theme      = CATEGORIA_THEME[displayCat as Categoria] ?? CATEGORIA_THEME['OTRO']
+  const catHex     = getCategoryColor(displayCat)
+  const theme      = CATEGORIA_THEME[displayCat as Categoria] ?? { color: catHex, bg: catHex + '22' }
   const banco      = efectivoBanco(t)
   const chip       = BANCO_LABEL[banco]
   const time       = format(new Date(t.fecha), 'HH:mm', { locale: es })

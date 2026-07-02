@@ -30,6 +30,11 @@ export async function reassignCalendarMonths(
 
     const conMes = asignarMesContable(txsMes)
 
+    const ingresos = conMes.filter(t => t.tipo === 'INGRESO' || t.tipo === 'TRANSFERENCIA_RECIBIDA')
+    if (ingresos.length) {
+      console.log(`[mesContable] mes=${mes} ingresos → ${ingresos.map(t => `${t.tipo}($${t.monto})→${t.mes_contable}`).join(', ')}`)
+    }
+
     await Promise.all(conMes.map(t =>
       admin.from('transactions').update({
         mes_contable: t.mes_contable,

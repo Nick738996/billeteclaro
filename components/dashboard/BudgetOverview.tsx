@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Pencil, Info } from 'lucide-react'
+import { Pencil, Info, Check } from 'lucide-react'
 import {
   CATEGORIA_COLORS,
+  getCategoryColor,
   PRESUPUESTO_CATS,
   formatCOPCompact,
   catLabel,
@@ -29,14 +30,16 @@ function urgencyRank(pct: number): number {
 }
 
 function barColor(pct: number): string {
-  if (pct >= 100) return 'var(--red)'
+  if (pct >= 110) return 'var(--red)'
+  if (pct >= 100) return '#f97316'   // orange — en límite, esperado
   if (pct >= 80)  return 'var(--yellow)'
   return 'var(--green)'
 }
 
 function badgeColor(pct: number): string {
   if (pct === 0)   return 'var(--text-subtle)'
-  if (pct >= 100)  return 'var(--red)'
+  if (pct >= 110)  return 'var(--red)'
+  if (pct >= 100)  return '#f97316'
   if (pct >= 80)   return 'var(--yellow)'
   return 'var(--green)'
 }
@@ -191,7 +194,7 @@ export default function BudgetOverview({ mes, gastosPorCategoria, ingresos, onBu
           const limite = budgets[cat] ?? 0
           const pct    = limite > 0 ? (gasto / limite) * 100 : 0
           const color  = barColor(pct)
-          const dot    = (CATEGORIA_COLORS as Record<string, string>)[cat] ?? '#94a3b8'
+          const dot    = getCategoryColor(cat)
 
           return (
             <div
@@ -213,9 +216,9 @@ export default function BudgetOverview({ mes, gastosPorCategoria, ingresos, onBu
                 </span>
                 <span
                   className="tabular-nums flex-shrink-0"
-                  style={{ fontSize: 12, fontWeight: 700, color: badgeColor(pct), minWidth: 40, textAlign: 'right' }}
+                  style={{ fontSize: 12, fontWeight: 700, color: badgeColor(pct), minWidth: 40, textAlign: 'right', display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}
                 >
-                  {pct > 100 ? `+${Math.round(pct - 100)}%` : `${Math.round(pct)}%`}
+                  {pct >= 110 ? `+${Math.round(pct - 100)}%` : pct >= 100 ? <Check size={13} strokeWidth={2.5} /> : `${Math.round(pct)}%`}
                 </span>
               </div>
 
@@ -249,7 +252,7 @@ export default function BudgetOverview({ mes, gastosPorCategoria, ingresos, onBu
           return (
             <div key={cat} style={{ padding: '13px 16px 25px', borderBottom: i < noBudget.length - 1 ? '1px solid var(--border-soft)' : 'none' }}>
               <div className="flex items-center gap-2" style={{ marginBottom: 8 }}>
-                <span style={{ width: 9, height: 9, borderRadius: '50%', background: CATEGORIA_COLORS[cat], flexShrink: 0 }} />
+                <span style={{ width: 9, height: 9, borderRadius: '50%', background: getCategoryColor(cat), flexShrink: 0 }} />
                 <span className="flex-1 truncate" style={{ fontSize: 'var(--text-sm)', color: 'var(--text)', fontWeight: 600 }}>
                   {catLabel(cat)}
                 </span>
@@ -259,7 +262,7 @@ export default function BudgetOverview({ mes, gastosPorCategoria, ingresos, onBu
                 <span style={{ fontSize: 12, color: 'var(--text-subtle)', minWidth: 40, textAlign: 'right' }}>—</span>
               </div>
               <div style={{ height: 4, background: 'var(--border)', borderRadius: 99, overflow: 'hidden' }}>
-                <div style={{ width: `${pct}%`, height: '100%', background: CATEGORIA_COLORS[cat], opacity: 0.5, borderRadius: 99, transition: 'width 0.3s ease' }} />
+                <div style={{ width: `${pct}%`, height: '100%', background: getCategoryColor(cat), opacity: 0.5, borderRadius: 99, transition: 'width 0.3s ease' }} />
               </div>
             </div>
           )
@@ -286,7 +289,7 @@ export default function BudgetOverview({ mes, gastosPorCategoria, ingresos, onBu
           return (
             <div key={cat} style={{ padding: '10px 16px', borderBottom: i < sinCategoria.length - 1 ? '1px solid var(--border-soft)' : 'none' }}>
               <div className="flex items-center gap-2" style={{ marginBottom: 8 }}>
-                <span style={{ width: 9, height: 9, borderRadius: '50%', background: CATEGORIA_COLORS[cat], flexShrink: 0 }} />
+                <span style={{ width: 9, height: 9, borderRadius: '50%', background: getCategoryColor(cat), flexShrink: 0 }} />
                 <span className="flex-1 truncate" style={{ fontSize: 'var(--text-sm)', color: 'var(--text)', fontWeight: 600 }}>
                   {catLabel(cat)}
                 </span>
@@ -295,7 +298,7 @@ export default function BudgetOverview({ mes, gastosPorCategoria, ingresos, onBu
                 </span>
               </div>
               <div style={{ height: 4, background: 'var(--border)', borderRadius: 99, overflow: 'hidden' }}>
-                <div style={{ width: `${pct}%`, height: '100%', background: 'var(--yellow)', borderRadius: 99, transition: 'width 0.3s ease' }} />
+                <div style={{ width: `${pct}%`, height: '100%', background: getCategoryColor(cat), borderRadius: 99, transition: 'width 0.3s ease' }} />
               </div>
             </div>
           )
