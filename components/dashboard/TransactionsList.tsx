@@ -2,8 +2,15 @@
 
 import { useState, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { format } from 'date-fns'
+import type { Locale } from 'date-fns'
+import { formatInTimeZone } from 'date-fns-tz'
 import { es } from 'date-fns/locale'
+
+// BilleteClaro es Colombia-only — la hora se muestra siempre en zona Bogotá
+// (UTC-5, sin horario de verano) sin importar la zona horaria del dispositivo.
+const BOGOTA_TZ = 'America/Bogota'
+const format = (date: Date | number, fmt: string, opts?: { locale?: Locale }) =>
+  formatInTimeZone(date, BOGOTA_TZ, fmt, opts)
 import { Search, RefreshCw, X, Trash2, Plus, Check } from 'lucide-react'
 import {
   type Transaction,

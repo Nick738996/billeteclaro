@@ -1,3 +1,14 @@
+// Los bancos reportan la hora en el reloj de Bogotá sin indicar zona horaria.
+// Colombia no tiene horario de verano — siempre UTC-5. Hay que fijar ese offset
+// explícitamente en vez de depender de la zona horaria del proceso que corre el
+// parser (naive `new Date(...)` da resultados distintos en local vs. Vercel/UTC).
+export function bogotaDateToUTC(
+  year: number, month0: number, day: number,
+  hour = 0, minute = 0, second = 0
+): string {
+  return new Date(Date.UTC(year, month0, day, hour + 5, minute, second)).toISOString()
+}
+
 const MESES: Record<string, number> = {
   enero: 0, febrero: 1, marzo: 2, abril: 3, mayo: 4, junio: 5,
   julio: 6, agosto: 7, septiembre: 8, octubre: 9, noviembre: 10, diciembre: 11,
@@ -46,8 +57,7 @@ export function parseSpanishDate(dateStr: string, timeStr?: string): string | nu
     }
   }
 
-  const d = new Date(year, month, day, hours, minutes)
-  return isNaN(d.getTime()) ? null : d.toISOString()
+  return bogotaDateToUTC(year, month, day, hours, minutes)
 }
 
 // Converts "BANCO CITIBANK COLOMBIA" → "Banco Citibank Colombia"
@@ -67,14 +77,13 @@ export function toTitleCase(str: string): string {
     .join(' ')
 }
 
-// Parses "2026-06-07 12:25:21" or "2026-06-07"
+// Parses "2026-06-07 12:25:21" or "2026-06-07" — hora de Bogotá, sin zona
 export function parseISOLikeDate(s: string): string | null {
-  const m = s.match(/(\d{4}-\d{2}-\d{2}(?:[\sT]\d{2}:\d{2}(?::\d{2})?)?)/)
+  const m = s.match(/(\d{4})-(\d{2})-(\d{2})(?:[\sT](\d{2}):(\d{2})(?::(\d{2}))?)?/)
   if (!m) return null
-  try {
-    const d = new Date(m[1].trim())
-    return isNaN(d.getTime()) ? null : d.toISOString()
-  } catch {
-    return null
-  }
+  const [, y, mo, d, h, mi, se] = m
+  return bogotaDateToUTC(
+    parseInt(y), parseInt(mo) - 1, parseInt(d),
+    h ? parseInt(h) : 0, mi ? parseInt(mi) : 0, se ? parseInt(se) : 0
+  )
 }

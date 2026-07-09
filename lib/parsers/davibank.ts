@@ -1,5 +1,5 @@
 import type { EmailInput, ParseResult } from './types'
-import { parseCOPAmount, toTitleCase } from './utils'
+import { parseCOPAmount, toTitleCase, bogotaDateToUTC } from './utils'
 import { guessCategoria } from './commerceCategories'
 
 // Formato de email DAVIbank (Scotiabank Colombia):
@@ -37,7 +37,8 @@ export function parseDavibank(email: EmailInput): ParseResult {
   if (fechaMatch) {
     // Zero-pad single-digit hours: '9:09' → '09:09'
     const time = horaMatch ? horaMatch[1].padStart(5, '0') : '00:00'
-    fecha = `${fechaMatch[1]}-${fechaMatch[2]}-${fechaMatch[3]}T${time}:00`
+    const [h, mi] = time.split(':').map(Number)
+    fecha = bogotaDateToUTC(parseInt(fechaMatch[1]), parseInt(fechaMatch[2]) - 1, parseInt(fechaMatch[3]), h, mi)
   } else {
     fecha = new Date(email.date).toISOString()
   }

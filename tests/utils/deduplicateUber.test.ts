@@ -44,34 +44,27 @@ describe('deduplicateUber', () => {
     expect(preauthIds).toHaveLength(0)
   })
 
-  it('deduplicates pre-auth (same monto, within 2h) — removes the earlier one', () => {
+  it('deduplicates pre-auth (same monto, within 15min) — removes the earlier one', () => {
     const preauth  = uberTx('preauth', '2026-06-07T10:00:00Z', 15000)
-    const cobro    = uberTx('cobro',   '2026-06-07T10:30:00Z', 15000)
+    const cobro    = uberTx('cobro',   '2026-06-07T10:05:00Z', 15000)
     const { transactions, preauthIds } = deduplicateUber([preauth, cobro])
     expect(transactions).toHaveLength(1)
     expect(transactions[0].id).toBe('cobro')
     expect(preauthIds).toContain('preauth')
   })
 
-  it('deduplicates pre-auth with slight monto difference (≤20%)', () => {
-    const preauth  = uberTx('preauth', '2026-06-07T09:00:00Z', 10000)
-    const cobro    = uberTx('cobro',   '2026-06-07T09:45:00Z', 11500)  // 15% diff
+  it('deduplicates pre-auth even with a large monto difference (estimado vs. real)', () => {
+    const preauth  = uberTx('preauth', '2026-06-07T09:00:00Z', 17667)
+    const cobro    = uberTx('cobro',   '2026-06-07T09:00:29Z', 8725)  // 50% diff, 29s apart
     const { transactions, preauthIds } = deduplicateUber([preauth, cobro])
     expect(transactions).toHaveLength(1)
-    expect(preauthIds).toHaveLength(1)
+    expect(transactions[0].id).toBe('cobro')
+    expect(preauthIds).toContain('preauth')
   })
 
-  it('does NOT deduplicate trips more than 2h apart', () => {
+  it('does NOT deduplicate trips more than 15min apart', () => {
     const trip1 = uberTx('trip1', '2026-06-07T08:00:00Z', 12000)
-    const trip2 = uberTx('trip2', '2026-06-07T12:00:00Z', 12000)  // 4h apart
-    const { transactions, preauthIds } = deduplicateUber([trip1, trip2])
-    expect(transactions).toHaveLength(2)
-    expect(preauthIds).toHaveLength(0)
-  })
-
-  it('does NOT deduplicate trips with monto difference >20%', () => {
-    const trip1 = uberTx('trip1', '2026-06-07T10:00:00Z', 10000)
-    const trip2 = uberTx('trip2', '2026-06-07T10:30:00Z', 15000)  // 50% diff
+    const trip2 = uberTx('trip2', '2026-06-07T08:30:00Z', 12000)  // 30min apart
     const { transactions, preauthIds } = deduplicateUber([trip1, trip2])
     expect(transactions).toHaveLength(2)
     expect(preauthIds).toHaveLength(0)

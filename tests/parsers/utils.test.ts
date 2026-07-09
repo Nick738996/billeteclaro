@@ -37,37 +37,37 @@ describe('parseSpanishDate', () => {
     expect(result!.startsWith('2026-06-04')).toBe(true)
   })
 
-  it('handles abbreviated month with dot (Abr.)', () => {
+  it('handles abbreviated month with dot (Abr.) — hora Bogotá (UTC-5)', () => {
     const result = parseSpanishDate('27 Abr. 2026', '19:36')
     expect(result).not.toBeNull()
     const d = new Date(result!)
-    expect(d.getFullYear()).toBe(2026)
-    expect(d.getMonth()).toBe(3)  // April = 3
-    expect(d.getDate()).toBe(27)
-    expect(d.getHours()).toBe(19)
-    expect(d.getMinutes()).toBe(36)
+    expect(d.getUTCFullYear()).toBe(2026)
+    expect(d.getUTCMonth()).toBe(3)  // April = 3
+    expect(d.getUTCDate()).toBe(28)  // 19:36-05 → 00:36 UTC, ya es el día siguiente
+    expect(d.getUTCHours()).toBe(0)
+    expect(d.getUTCMinutes()).toBe(36)
   })
 
-  it('converts 12h pm time correctly', () => {
+  it('converts 12h pm time correctly — hora Bogotá (UTC-5)', () => {
     const result = parseSpanishDate('28 de mayo de 2026', '03:18 pm')
     expect(result).not.toBeNull()
     const d = new Date(result!)
-    expect(d.getFullYear()).toBe(2026)
-    expect(d.getMonth()).toBe(4)   // May = 4
-    expect(d.getDate()).toBe(28)
-    expect(d.getHours()).toBe(15)  // 3pm = 15h
-    expect(d.getMinutes()).toBe(18)
+    expect(d.getUTCFullYear()).toBe(2026)
+    expect(d.getUTCMonth()).toBe(4)   // May = 4
+    expect(d.getUTCDate()).toBe(28)
+    expect(d.getUTCHours()).toBe(20)  // 3pm Bogotá = 20h UTC
+    expect(d.getUTCMinutes()).toBe(18)
   })
 
-  it('converts 12h am midnight correctly', () => {
+  it('converts 12h am midnight correctly — hora Bogotá (UTC-5)', () => {
     const result = parseSpanishDate('01 de enero de 2026', '12:00 am')
     expect(result).not.toBeNull()
     const d = new Date(result!)
-    expect(d.getFullYear()).toBe(2026)
-    expect(d.getMonth()).toBe(0)   // January = 0
-    expect(d.getDate()).toBe(1)
-    expect(d.getHours()).toBe(0)   // 12am = midnight = 0h
-    expect(d.getMinutes()).toBe(0)
+    expect(d.getUTCFullYear()).toBe(2026)
+    expect(d.getUTCMonth()).toBe(0)   // January = 0
+    expect(d.getUTCDate()).toBe(1)
+    expect(d.getUTCHours()).toBe(5)   // medianoche Bogotá = 05h UTC
+    expect(d.getUTCMinutes()).toBe(0)
   })
 
   it('returns null for invalid input', () => {

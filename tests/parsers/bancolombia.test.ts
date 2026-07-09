@@ -44,8 +44,8 @@ describe('parseBancolombia — compra con tarjeta débito', () => {
     expect(parseBancolombia(email)?.monto).toBe(6790)
   })
 
-  it('extrae fecha con hora', () => {
-    expect(parseBancolombia(email)?.fecha).toBe('2025-04-18T14:05:00')
+  it('extrae fecha con hora (14:05 Bogotá → 19:05 UTC)', () => {
+    expect(parseBancolombia(email)?.fecha).toBe('2025-04-18T19:05:00.000Z')
   })
 
   it('limpia asterisco del comercio y aplica toTitleCase', () => {
@@ -75,8 +75,8 @@ describe('parseBancolombia — transferencia enviada', () => {
     expect(parseBancolombia(email)?.monto).toBe(120000)
   })
 
-  it('extrae fecha con hora', () => {
-    expect(parseBancolombia(email)?.fecha).toBe('2026-06-07T08:07:00')
+  it('extrae fecha con hora (08:07 Bogotá → 13:07 UTC)', () => {
+    expect(parseBancolombia(email)?.fecha).toBe('2026-06-07T13:07:00.000Z')
   })
 
   it('tipo = TRANSFERENCIA_ENVIADA', () => {
@@ -129,8 +129,8 @@ describe('parseBancolombia — pago código QR', () => {
     expect(parseBancolombia(email)?.monto).toBe(6000)
   })
 
-  it('extrae fecha', () => {
-    expect(parseBancolombia(email)?.fecha).toBe('2026-05-25T16:16:00')
+  it('extrae fecha (16:16 Bogotá → 21:16 UTC)', () => {
+    expect(parseBancolombia(email)?.fecha).toBe('2026-05-25T21:16:00.000Z')
   })
 
   it('tipo = PAGO_SERVICIO', () => {

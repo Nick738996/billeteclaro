@@ -24,8 +24,8 @@ describe('parseDavibank', () => {
     expect(r!.tipo).toBe('COMPRA')
     expect(r!.monto).toBe(236500)
     expect(r!.comercio).toBe('Bw Buffalo Wings Ilarc')
-    expect(r!.fecha).toContain('2026-06-23')
-    expect(r!.fecha).toContain('20:46')
+    // 20:46 hora Bogotá (UTC-5) → 2026-06-24T01:46 UTC
+    expect(r!.fecha).toBe('2026-06-24T01:46:00.000Z')
   })
 
   it('ejemplo 2 — SIBAR S.A.S $97.250', () => {
@@ -79,7 +79,8 @@ describe('parseDavibank', () => {
       subject: 'DAVIbank en Linea',
       body: davi('EXITO', '120,000', '2026/06/20', '09:15:33'),
     })
-    expect(r!.fecha).toContain('09:15')
+    // 09:15 hora Bogotá (UTC-5) → 14:15 UTC
+    expect(r!.fecha).toContain('14:15')
   })
 
   it('extrae hora con un solo dígito — "9:09:25"', () => {
@@ -89,8 +90,9 @@ describe('parseDavibank', () => {
       body: davi('FRUVER EL GRAN JARDIN', '33,809', '2026/06/23', '9:09:25'),
     })
     expect(r).not.toBeNull()
+    // 9:09 hora Bogotá (UTC-5) → 14:09 UTC, mismo día
     expect(r!.fecha).toContain('2026-06-23')
-    expect(r!.fecha).toContain('T09:09')
+    expect(r!.fecha).toContain('T14:09')
     expect(r!.monto).toBe(33809)
   })
 

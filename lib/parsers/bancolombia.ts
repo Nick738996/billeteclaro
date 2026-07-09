@@ -1,5 +1,5 @@
 import type { EmailInput, ParseResult } from './types'
-import { toTitleCase } from './utils'
+import { toTitleCase, bogotaDateToUTC } from './utils'
 import { guessCategoria } from './commerceCategories'
 
 // ── Monto ──────────────────────────────────────────────────────────────────────
@@ -45,9 +45,9 @@ export function parseMontoBancolombia(raw: string): number {
 }
 
 function parseFecha(dd: string, mm: string, yyyy: string, hhmm?: string): string {
-  const h = hhmm ? hhmm.slice(0, 2) : '00'
-  const m = hhmm ? hhmm.slice(3, 5) : '00'
-  return `${yyyy}-${mm}-${dd}T${h}:${m}:00`
+  const h = hhmm ? parseInt(hhmm.slice(0, 2)) : 0
+  const m = hhmm ? parseInt(hhmm.slice(3, 5)) : 0
+  return bogotaDateToUTC(parseInt(yyyy), parseInt(mm) - 1, parseInt(dd), h, m)
 }
 
 // ── Parser principal ───────────────────────────────────────────────────────────
