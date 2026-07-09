@@ -28,12 +28,17 @@ export default function HeaderPill({ onSyncComplete, onSignOut, onHelp }: Props)
   const [syncState,   setSyncState]  = useState<SyncState>('idle')
   const [resetState,  setResetState] = useState<ResetState>('idle')
   const [syncResult,  setSyncResult] = useState<{ transacciones_nuevas: number } | null>(null)
+  const [syncError,   setSyncError]  = useState<string | null>(null)
 
   /* ── Sync ──────────────────────────────────────── */
+  const needsReconnect = syncError?.toLowerCase().includes('token') ?? false
+
   const handleSync = async () => {
     if (syncState === 'syncing') return
+    if (needsReconnect) { window.location.href = '/' ; return }
     setSyncState('syncing')
     setSyncResult(null)
+    setSyncError(null)
     try {
       const res  = await fetch('/api/sync', { method: 'POST' })
       const data = await res.json()
@@ -42,9 +47,9 @@ export default function HeaderPill({ onSyncComplete, onSignOut, onHelp }: Props)
       setSyncState('done')
       onSyncComplete()
       setTimeout(() => setSyncState('idle'), 5000)
-    } catch {
+    } catch (e) {
+      setSyncError(e instanceof Error ? e.message : 'Error')
       setSyncState('error')
-      setTimeout(() => setSyncState('idle'), 5000)
     }
   }
 
@@ -81,7 +86,8 @@ export default function HeaderPill({ onSyncComplete, onSignOut, onHelp }: Props)
 
   const syncTitle = syncState === 'done' && syncResult
     ? `+${syncResult.transacciones_nuevas} transacción${syncResult.transacciones_nuevas !== 1 ? 'es' : ''} nueva${syncResult.transacciones_nuevas !== 1 ? 's' : ''}`
-    : syncState === 'error' ? 'Error — toca para reintentar' : 'Sincronizar'
+    : syncState === 'error' ? (needsReconnect ? `${syncError} — toca para volver a entrar` : `${syncError ?? 'Error'} — toca para reintentar`)
+    : 'Sincronizar'
 
   const resetIcon = resetState === 'resetting' ? <RefreshCw size={14} className="animate-spin"/>
                   : resetState === 'done'       ? <Check size={14}/>

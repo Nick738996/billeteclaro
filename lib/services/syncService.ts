@@ -186,11 +186,21 @@ export async function runSync(userId: string, admin: Admin): Promise<SyncResult>
     }
 
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
     console.error('[syncService] error:', { userId }, err)
+
+    // Google OAuth responde con status 400 + message "invalid_grant" cuando el
+    // refresh_token de Gmail fue revocado o expiró (apps sin verificar: 7 días).
+    // Sin este chequeo el error crudo de Google se filtra tal cual al cliente.
+    let message = err instanceof Error ? err.message : String(err)
+    if (err instanceof Error && message === 'invalid_grant' && tokenRow.gmail_refresh_token) {
+      await admin.from('user_tokens').update({ gmail_refresh_token: null }).eq('user_id', userId)
+      message = 'El token de acceso a Gmail expiró. Vuelve a iniciar sesión para reconectar tu correo.'
+    }
+
     await admin.from('sync_log').update({
       finished_at: new Date().toISOString(), errores: [message], status: 'ERROR',
     }).eq('id', syncId)
-    throw err
+
+    throw Object.assign(new Error(message), { status: 400 })
   }
 }
