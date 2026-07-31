@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Pencil } from 'lucide-react'
+import { Pencil, ChevronDown } from 'lucide-react'
 import { formatCOPCompact } from '@/lib/types'
 import SavingsManager from './SavingsManager'
 import type { SavingsAccount } from '@/lib/services/savingsService'
@@ -11,6 +11,7 @@ export default function SavingsOverview() {
   const [accounts, setAccounts] = useState<SavingsAccount[]>([])
   const [loaded,   setLoaded]   = useState(false)
   const [editing,  setEditing]  = useState(false)
+  const [expanded, setExpanded] = useState(false)
 
   const load = useCallback(() => {
     fetch('/api/savings')
@@ -87,8 +88,19 @@ export default function SavingsOverview() {
         </div>
       )}
 
-      {/* Account rows */}
-      {accounts.map((account, i) => (
+      {/* Desglose por cuenta — oculto por default */}
+      {accounts.length > 0 && (
+        <button
+          onClick={() => setExpanded(v => !v)}
+          aria-expanded={expanded}
+          className={`${styles.toggleBtn} ${expanded ? styles.toggleBtnExpanded : ''}`}
+        >
+          <ChevronDown size={12} className={expanded ? styles.chevronOpen : styles.chevron} />
+          {expanded ? 'Ocultar desglose' : `Ver desglose (${accounts.length})`}
+        </button>
+      )}
+
+      {expanded && accounts.map((account, i) => (
         <div
           key={account.id}
           className={`${styles.row} ${i < accounts.length - 1 ? styles.rowBorder : ''}`}

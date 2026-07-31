@@ -87,7 +87,36 @@
 /* Total section */
 .total {
   padding: 14px 16px 12px;
+}
+
+.toggleBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  padding: 0 16px 12px;
+  transition: opacity 0.15s;
+}
+
+.toggleBtn:hover {
+  opacity: 0.7;
+}
+
+.toggleBtnExpanded {
   border-bottom: 1px solid var(--border-soft);
+}
+
+.chevron {
+  transition: transform 0.15s;
+}
+
+.chevronOpen {
+  transform: rotate(180deg);
 }
 
 .totalLabel {

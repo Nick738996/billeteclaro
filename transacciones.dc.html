@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; background: #eceef1; font-family: 'Inter', system-ui, sans-serif; }
+  a { color: #2a6bd6; }
+  a:hover { color: #1d4fa3; }
+  .dv-turn { padding: 40px 44px 32px; border-bottom: 1px solid rgba(0,0,0,.08); scroll-margin-top: 16px; }
+  .dv-thd { display: flex; align-items: baseline; gap: 10px; margin: 0 0 20px; }
+  .dv-tid { font: 600 10px ui-monospace, Menlo, monospace; padding: 3px 7px; background: #1a1a1a; color: #fff; border-radius: 4px; text-decoration: none; }
+  .dv-tname { font: 600 13px/1.2 system-ui, sans-serif; color: #1a1a1a; }
+  .dv-opts { display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-start; }
+  .dv-opt { flex: none; display: flex; flex-direction: column; gap: 9px; scroll-margin-top: 16px; }
+  .dv-oid { font: 600 10.5px ui-monospace, Menlo, monospace; padding: 3px 7px; background: rgba(0,0,0,.08); color: #1a1a1a; border-radius: 5px; text-decoration: none; }
+  .dv-olabel { display: flex; flex-direction: column; gap: 2px; font: 400 11px/1.4 system-ui, sans-serif; color: rgba(0,0,0,.6); max-width: 390px; }
+  .dv-olabel b { color: #1a1a1a; font-weight: 600; }
+  .dv-card { width: 390px; background: #080A0C; border: 1px solid rgba(0,0,0,.18); border-radius: 14px; overflow: hidden; }
+  .dv-next { margin: 22px 0 0; font: 12px/1.5 system-ui, sans-serif; color: rgba(0,0,0,.5); }
+</style>
+</helmet>
+
+<div style="max-width:1400px;margin:0 auto">
+
+  <section style="padding:44px 44px 8px">
+    <p style="font:600 10px ui-monospace,Menlo,monospace;color:#7a5230;background:#f3e4d0;display:inline-block;padding:3px 8px;border-radius:4px;margin:0 0 12px">MÓDULO 3 / 4 — TRANSACCIONES</p>
+    <h1 style="font:700 22px/1.3 system-ui,sans-serif;color:#1a1a1a;margin:0 0 18px">Transacciones — diagnóstico y propuesta</h1>
+
+    <div style="display:flex;gap:32px;flex-wrap:wrap">
+      <div style="flex:1;min-width:320px">
+        <p style="font:600 12px system-ui,sans-serif;color:#1a1a1a;margin:0 0 8px">Diagnóstico (código real: TransactionsList.tsx)</p>
+        <ul style="font:400 12.5px/1.6 system-ui,sans-serif;color:#333;margin:0;padding-left:18px">
+          <li>El ícono de borrar ya pide confirmación (toca papelera → aparece "Eliminar" con 2s para cancelar) — no hay riesgo real de borrado de un solo toque. El problema es otro: la papelera vive permanente en cada fila (atenuada, pero siempre ahí), compitiendo por atención en una acción rara.</li>
+          <li>Categoría hoy es solo un punto de color de 5px + texto — confirmado, no hay ícono de apoyo en ningún lado del componente.</li>
+          <li>La barra de filtros mezcla "Todos" + chips de banco (scroll horizontal) + chip de categoría activa + botón "Categoría ▾" en una sola fila de texto plano, todos con el mismo peso visual — sin agrupar qué es fuente vs. categoría.</li>
+        </ul>
+      </div>
+      <div style="flex:1;min-width:320px">
+        <p style="font:600 12px system-ui,sans-serif;color:#1a1a1a;margin:0 0 8px">Qué cambia a nivel de componente</p>
+        <ul style="font:400 12.5px/1.6 system-ui,sans-serif;color:#333;margin:0 0 14px;padding-left:18px">
+          <li><b>TransactionRow</b>: <code>catDot</code> (5px) se reemplaza por un ícono en placa de color — mismo mapa <code>CATEGORIA_THEME</code> de hoy, sin inventar colores nuevos.</li>
+          <li><b>TransactionRow</b>: el botón de borrar deja de ser permanente en las 3 direcciones — cada una prueba un mecanismo distinto (abajo).</li>
+          <li><b>FilterChips</b>: se reagrupa para separar fuente (banco) de categoría en vez de una sola fila mixta.</li>
+        </ul>
+        <p style="font:600 12px system-ui,sans-serif;color:#1a1a1a;margin:0 0 6px">3 direcciones para fila + filtros</p>
+        <p style="font:400 12.5px/1.6 system-ui,sans-serif;color:#333;margin:0">No toco el bottom sheet de categorías (ya funciona) ni el modelo de <code>pendingCats</code>/guardado en lote. Estados de carga, vacío y de búsqueda sin resultados al final.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="dv-turn" id="t1">
+    <div class="dv-thd"><a class="dv-tid" href="#t1">1</a><span class="dv-tname">Fila + filtros — 3 direcciones</span></div>
+    <div class="dv-opts">
+
+      <div class="dv-opt" id="3a">
+        <div class="dv-olabel"><a class="dv-oid" href="#3a">3a</a><b>Swipe para borrar</b>Sin papelera en reposo: deslizar la fila revela "Eliminar" detrás. Filtros: una sola fila con "Todos" + un botón "Filtros" que abre el sheet combinado. Riesgo: el gesto es menos descubrible que un botón — toca la fila para simular el swipe.</div>
+        <div class="dv-card">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px 0">
+            <p style="font-size:13px;font-weight:600;color:#F0F4F8;margin:0">Transacciones</p>
+            <button style="background:none;border:none;cursor:pointer;color:#F0F4F8;font-size:20px;font-weight:300;padding:0 2px">+</button>
+          </div>
+          <div style="padding:12px 16px">
+            <div style="display:flex;align-items:center;gap:8px;border-radius:18px;background:rgba(24,30,38,0.82);border:1px solid rgba(255,255,255,0.12);padding:9px 13px">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#B8C4D0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="m21 21-4.3-4.3"></path></svg>
+              <span style="font-size:13px;color:#7A8A9C">Buscar...</span>
+            </div>
+          </div>
+          <div style="padding:0 16px 12px;border-bottom:1px solid rgba(255,255,255,0.07);display:flex;align-items:center;gap:14px">
+            <span style="font-size:13px;font-weight:600;color:#F0F4F8">Todos</span>
+            <button style="display:flex;align-items:center;gap:4px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);border-radius:99px;color:#B8C4D0;font-size:11px;font-weight:600;padding:5px 11px;cursor:pointer;margin-left:auto">
+              Filtros
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg>
+            </button>
+          </div>
+
+          <div style="padding:0 16px">
+            <p style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.06em;color:#B8C4D0;padding:8px 0">Hoy</p>
+
+            <sc-if value="{{ aClosed }}" hint-placeholder-val="{{ true }}">
+              <div onClick="{{ toggleASwipe }}" style="position:relative;overflow:hidden;border-bottom:1px solid rgba(255,255,255,0.07);cursor:pointer">
+                <div style="display:flex;align-items:center;gap:10px;padding:13px 0;background:#080A0C;transform:translateX(0);transition:transform 0.2s">
+                  <span style="width:26px;height:26px;border-radius:8px;background:#0F2A3D;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#60A5FA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17h14"></path><path d="M5 17a2 2 0 1 0 4 0"></path><path d="M15 17a2 2 0 1 0 4 0"></path><path d="M5 17V11l2-5h10l2 5v6"></path></svg>
+                  </span>
+                  <div style="flex:1;min-width:0">
+                    <p style="font-size:14px;font-weight:600;color:#F0F4F8;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Rappi Turbo</p>
+                    <p style="font-size:11px;color:#7A8A9C;margin:2px 0 0">Transporte · RappiPay · 14:32</p>
+                  </div>
+                  <p style="font-size:15px;font-weight:600;color:#F0F4F8;margin:0;font-variant-numeric:tabular-nums">-$18.500</p>
+                </div>
+              </div>
+            </sc-if>
+            <sc-if value="{{ aSwiped }}" hint-placeholder-val="{{ false }}">
+              <div onClick="{{ toggleASwipe }}" style="position:relative;overflow:hidden;border-bottom:1px solid rgba(255,255,255,0.07);cursor:pointer">
+                <div style="position:absolute;inset:0;background:#3D1515;display:flex;align-items:center;justify-content:flex-end;padding-right:16px">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FF6B6B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                </div>
+                <div style="position:relative;display:flex;align-items:center;gap:10px;padding:13px 0;background:#080A0C;transform:translateX(-72px);transition:transform 0.2s">
+                  <span style="width:26px;height:26px;border-radius:8px;background:#0F2A3D;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#60A5FA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17h14"></path><path d="M5 17a2 2 0 1 0 4 0"></path><path d="M15 17a2 2 0 1 0 4 0"></path><path d="M5 17V11l2-5h10l2 5v6"></path></svg>
+                  </span>
+                  <div style="flex:1;min-width:0">
+                    <p style="font-size:14px;font-weight:600;color:#F0F4F8;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Rappi Turbo</p>
+                    <p style="font-size:11px;color:#7A8A9C;margin:2px 0 0">Transporte · RappiPay · 14:32</p>
+                  </div>
+                  <p style="font-size:15px;font-weight:600;color:#F0F4F8;margin:0;font-variant-numeric:tabular-nums">-$18.500</p>
+                </div>
+              </div>
+            </sc-if>
+
+            <div style="display:flex;align-items:center;gap:10px;padding:13px 0;border-bottom:1px solid rgba(255,255,255,0.07)">
+              <span style="width:26px;height:26px;border-radius:8px;background:#153D24;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#4ADE80" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7"></path><path d="M9 22V12h6v10"></path></svg>
+              </span>
+              <div style="flex:1;min-width:0"><p style="font-size:14px;font-weight:600;color:#F0F4F8;margin:0">Éxito</p><p style="font-size:11px;color:#7A8A9C;margin:2px 0 0">Hogar · Bancolombia · 11:05</p></div>
+              <p style="font-size:15px;font-weight:600;color:#F0F4F8;margin:0;font-variant-numeric:tabular-nums">-$142.300</p>
+            </div>
+
+            <p style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.06em;color:#B8C4D0;padding:12px 0 8px">Ayer</p>
+            <div style="display:flex;align-items:center;gap:10px;padding:13px 0;border-bottom:1px solid rgba(255,255,255,0.07)">
+              <span style="width:26px;height:26px;border-radius:8px;background:#3D1515;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#FF6B6B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h2a2 2 0 0 0 2-2V2"></path><path d="M7 2v20"></path><path d="M21 15V2a5 5 0 0 0-5 5v13"></path></svg>
+              </span>
+              <div style="flex:1;min-width:0"><p style="font-size:14px;font-weight:600;color:#F0F4F8;margin:0">Crepes &amp; Waffles</p><p style="font-size:11px;color:#7A8A9C;margin:2px 0 0">Salidas · RappiCard · 20:14</p></div>
+              <p style="font-size:15px;font-weight:600;color:#F0F4F8;margin:0;font-variant-numeric:tabular-nums">-$67.000</p>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;padding:13px 0">
+              <span style="width:26px;height:26px;border-radius:8px;background:#153D24;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#4ADE80" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v8"></path><path d="m8 12 4 4 4-4"></path></svg>
+              </span>
+              <div style="flex:1;min-width:0"><p style="font-size:14px;font-weight:600;color:#F0F4F8;margin:0">Nómina Empresa</p><p style="font-size:11px;color:#7A8A9C;margin:2px 0 0">Ingreso · Bancolombia · 00:03</p></div>
+              <p style="font-size:15px;font-weight:600;color:#4ADE80;margin:0;font-variant-numeric:tabular-nums">+$3.200.000</p>
+            </div>
+          </div>
+
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 20px 12px;border-top:1px solid rgba(255,255,255,0.07)">
+            <span style="font-size:10px;color:#7A8A9C">6 movimientos</span>
+            <div style="display:flex;align-items:center;gap:12px">
+              <span style="font-size:11px;color:#4ADE80;font-weight:500">+$3.2M</span>
+              <span style="font-size:11px;color:#B8C4D0;font-weight:500">-$228K</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="dv-opt" id="3b">
+        <div class="dv-olabel"><a class="dv-oid" href="#3b">3b</a><b>Menú "⋯" por fila</b>Sin gesto: un botón discreto "⋯" reemplaza la papelera fija y abre Cambiar categoría / Eliminar. Filtros: dos filas etiquetadas — "Fuente" (bancos) y "Categoría" (un solo chip) — en vez de una mezcla. Toca "⋯" para ver el menú.</div>
+        <div class="dv-card">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px 0">
+            <p style="font-size:13px;font-weight:600;color:#F0F4F8;margin:0">Transacciones</p>
+            <button style="background:none;border:none;cursor:pointer;color:#F0F4F8;font-size:20px;font-weight:300;padding:0 2px">+</button>
+          </div>
+          <div style="padding:12px 16px">
+            <div style="display:flex;align-items:center;gap:8px;border-radius:18px;background:rgba(24,30,38,0.82);border:1px solid rgba(255,255,255,0.12);padding:9px 13px">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#B8C4D0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="m21 21-4.3-4.3"></path></svg>
+              <span style="font-size:13px;color:#7A8A9C">Buscar...</span>
+            </div>
+          </div>
+          <div style="padding:0 16px 12px;border-bottom:1px solid rgba(255,255,255,0.07)">
+            <p style="font-size:9.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:#7A8A9C;margin:0 0 6px">Fuente</p>
+            <div style="display:flex;align-items:center;gap:14px;margin-bottom:12px">
+              <span style="font-size:13px;font-weight:600;color:#F0F4F8">Todos</span>
+              <span style="font-size:13px;color:#B8C4D0">RappiCard</span>
+              <span style="font-size:13px;color:#B8C4D0">Bancolombia</span>
+              <span style="font-size:13px;color:#B8C4D0">RappiPay</span>
+            </div>
+            <p style="font-size:9.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:#7A8A9C;margin:0 0 6px">Categoría</p>
+            <button style="display:flex;align-items:center;gap:4px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);border-radius:99px;color:#B8C4D0;font-size:11px;font-weight:600;padding:5px 11px;cursor:pointer">
+              Todas
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg>
+            </button>
+          </div>
+
+          <div style="padding:0 16px">
+            <p style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.06em;color:#B8C4D0;padding:8px 0">Hoy</p>
+
+            <div style="position:relative;display:flex;align-items:center;gap:10px;padding:13px 0;border-bottom:1px solid rgba(255,255,255,0.07)">
+              <span style="width:26px;height:26px;border-radius:8px;background:#0F2A3D;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#60A5FA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17h14"></path><path d="M5 17a2 2 0 1 0 4 0"></path><path d="M15 17a2 2 0 1 0 4 0"></path><path d="M5 17V11l2-5h10l2 5v6"></path></svg>
+              </span>
+              <div style="flex:1;min-width:0"><p style="font-size:14px;font-weight:600;color:#F0F4F8;margin:0">Rappi Turbo</p><p style="font-size:11px;color:#7A8A9C;margin:2px 0 0">Transporte · RappiPay · 14:32</p></div>
+              <p style="font-size:15px;font-weight:600;color:#F0F4F8;margin:0;font-variant-numeric:tabular-nums">-$18.500</p>
+              <button onClick="{{ toggleBMenu }}" aria-label="Más acciones" style="background:none;border:none;cursor:pointer;color:#7A8A9C;padding:4px;flex-shrink:0">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg>
+              </button>
+              <sc-if value="{{ bMenuOpen }}" hint-placeholder-val="{{ false }}">
+                <div style="position:absolute;top:38px;right:0;z-index:5;background:#182029;border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:4px;min-width:150px">
+                  <button style="width:100%;text-align:left;background:none;border:none;cursor:pointer;color:#F0F4F8;font-size:12px;padding:8px 10px;border-radius:6px">Cambiar categoría</button>
+                  <button onClick="{{ toggleBMenu }}" style="width:100%;text-align:left;background:none;border:none;cursor:pointer;color:#FF6B6B;font-size:12px;padding:8px 10px;border-radius:6px">Eliminar</button>
+                </div>
+              </sc-if>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:10px;padding:13px 0;border-bottom:1px solid rgba(255,255,255,0.07)">
+              <span style="width:26px;height:26px;border-radius:8px;background:#153D24;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#4ADE80" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7"></path><path d="M9 22V12h6v10"></path></svg>
+              </span>
+              <div style="flex:1;min-width:0"><p style="font-size:14px;font-weight:600;color:#F0F4F8;margin:0">Éxito</p><p style="font-size:11px;color:#7A8A9C;margin:2px 0 0">Hogar · Bancolombia · 11:05</p></div>
+              <p style="font-size:15px;font-weight:600;color:#F0F4F8;margin:0;font-variant-numeric:tabular-nums">-$142.300</p>
+              <button aria-label="Más acciones" style="background:none;border:none;cursor:pointer;color:#7A8A9C;padding:4px;flex-shrink:0">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg>
+              </button>
+            </div>
+
+            <p style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.06em;color:#B8C4D0;padding:12px 0 8px">Ayer</p>
+            <div style="display:flex;align-items:center;gap:10px;padding:13px 0;border-bottom:1px solid rgba(255,255,255,0.07)">
+              <span style="width:26px;height:26px;border-radius:8px;background:#3D1515;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#FF6B6B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h2a2 2 0 0 0 2-2V2"></path><path d="M7 2v20"></path><path d="M21 15V2a5 5 0 0 0-5 5v13"></path></svg>
+              </span>
+              <div style="flex:1;min-width:0"><p style="font-size:14px;font-weight:600;color:#F0F4F8;margin:0">Crepes &amp; Waffles</p><p style="font-size:11px;color:#7A8A9C;margin:2px 0 0">Salidas · RappiCard · 20:14</p></div>
+              <p style="font-size:15px;font-weight:600;color:#F0F4F8;margin:0;font-variant-numeric:tabular-nums">-$67.000</p>
+              <button aria-label="Más acciones" style="background:none;border:none;cursor:pointer;color:#7A8A9C;padding:4px;flex-shrink:0">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg>
+              </button>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;padding:13px 0">
+              <span style="width:26px;height:26px;border-radius:8px;background:#153D24;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#4ADE80" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v8"></path><path d="m8 12 4 4 4-4"></path></svg>
+              </span>
+              <div style="flex:1;min-width:0"><p style="font-size:14px;font-weight:600;color:#F0F4F8;margin:0">Nómina Empresa</p><p style="font-size:11px;color:#7A8A9C;margin:2px 0 0">Ingreso · Bancolombia · 00:03</p></div>
+              <p style="font-size:15px;font-weight:600;color:#4ADE80;margin:0;font-variant-numeric:tabular-nums">+$3.200.000</p>
+              <button aria-label="Más acciones" style="background:none;border:none;cursor:pointer;color:#7A8A9C;padding:4px;flex-shrink:0">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg>
+              </button>
+            </div>
+          </div>
+
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 20px 12px;border-top:1px solid rgba(255,255,255,0.07)">
+            <span style="font-size:10px;color:#7A8A9C">6 movimientos</span>
+            <div style="display:flex;align-items:center;gap:12px">
+              <span style="font-size:11px;color:#4ADE80;font-weight:500">+$3.2M</span>
+              <span style="font-size:11px;color:#B8C4D0;font-weight:500">-$228K</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="dv-opt" id="3c">
+        <div class="dv-olabel"><a class="dv-oid" href="#3c">3c</a><b>Todo entra por el sheet</b>Sin nada permanente en la fila (ni papelera ni menú): tocar la fila abre un sheet con "Cambiar categoría" y "Eliminar" — reusa el patrón de sheet que ya existe para categorías. Filtros colapsan en un solo resumen tocable. Toca la fila "Crepes &amp; Waffles" para ver el sheet.</div>
+        <div class="dv-card" style="position:relative">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px 0">
+            <p style="font-size:13px;font-weight:600;color:#F0F4F8;margin:0">Transacciones</p>
+            <button style="background:none;border:none;cursor:pointer;color:#F0F4F8;font-size:20px;font-weight:300;padding:0 2px">+</button>
+          </div>
+          <div style="padding:12px 16px">
+            <div style="display:flex;align-items:center;gap:8px;border-radius:18px;background:rgba(24,30,38,0.82);border:1px solid rgba(255,255,255,0.12);padding:9px 13px">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#B8C4D0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="m21 21-4.3-4.3"></path></svg>
+              <span style="font-size:13px;color:#7A8A9C">Buscar...</span>
+            </div>
+          </div>
+          <div style="padding:0 16px 12px;border-bottom:1px solid rgba(255,255,255,0.07)">
+            <button style="display:flex;align-items:center;gap:6px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);border-radius:99px;color:#F0F4F8;font-size:12px;font-weight:600;padding:7px 13px;cursor:pointer;width:100%;justify-content:space-between">
+              <span>6 movimientos · Todos</span>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#7A8A9C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg>
+            </button>
+          </div>
+
+          <div style="padding:0 16px">
+            <p style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.06em;color:#B8C4D0;padding:8px 0">Hoy</p>
+            <div style="display:flex;align-items:center;gap:10px;padding:13px 0;border-bottom:1px solid rgba(255,255,255,0.07)">
+              <span style="width:26px;height:26px;border-radius:8px;background:#0F2A3D;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#60A5FA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17h14"></path><path d="M5 17a2 2 0 1 0 4 0"></path><path d="M15 17a2 2 0 1 0 4 0"></path><path d="M5 17V11l2-5h10l2 5v6"></path></svg>
+              </span>
+              <div style="flex:1;min-width:0"><p style="font-size:14px;font-weight:600;color:#F0F4F8;margin:0">Rappi Turbo</p><p style="font-size:11px;color:#7A8A9C;margin:2px 0 0">Transporte · RappiPay · 14:32</p></div>
+              <p style="font-size:15px;font-weight:600;color:#F0F4F8;margin:0;font-variant-numeric:tabular-nums">-$18.500</p>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;padding:13px 0;border-bottom:1px solid rgba(255,255,255,0.07)">
+              <span style="width:26px;height:26px;border-radius:8px;background:#153D24;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#4ADE80" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7"></path><path d="M9 22V12h6v10"></path></svg>
+              </span>
+              <div style="flex:1;min-width:0"><p style="font-size:14px;font-weight:600;color:#F0F4F8;margin:0">Éxito</p><p style="font-size:11px;color:#7A8A9C;margin:2px 0 0">Hogar · Bancolombia · 11:05</p></div>
+              <p style="font-size:15px;font-weight:600;color:#F0F4F8;margin:0;font-variant-numeric:tabular-nums">-$142.300</p>
+            </div>
+
+            <p style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.06em;color:#B8C4D0;padding:12px 0 8px">Ayer</p>
+            <div onClick="{{ toggleCSheet }}" style="display:flex;align-items:center;gap:10px;padding:13px 0;border-bottom:1px solid rgba(255,255,255,0.07);cursor:pointer">
+              <span style="width:26px;height:26px;border-radius:8px;background:#3D1515;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#FF6B6B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h2a2 2 0 0 0 2-2V2"></path><path d="M7 2v20"></path><path d="M21 15V2a5 5 0 0 0-5 5v13"></path></svg>
+              </span>
+              <div style="flex:1;min-width:0"><p style="font-size:14px;font-weight:600;color:#F0F4F8;margin:0">Crepes &amp; Waffles</p><p style="font-size:11px;color:#7A8A9C;margin:2px 0 0">Salidas · RappiCard · 20:14</p></div>
+              <p style="font-size:15px;font-weight:600;color:#F0F4F8;margin:0;font-variant-numeric:tabular-nums">-$67.000</p>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;padding:13px 0;border-bottom:1px solid rgba(255,255,255,0.07)">
+              <span style="width:26px;height:26px;border-radius:8px;background:#26153D;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#A78BFA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"></rect><path d="m17 2-5 5-5-5"></path></svg>
+              </span>
+              <div style="flex:1;min-width:0"><p style="font-size:14px;font-weight:600;color:#F0F4F8;margin:0">Netflix</p><p style="font-size:11px;color:#7A8A9C;margin:2px 0 0">Suscripciones · RappiCard · 09:00</p></div>
+              <p style="font-size:15px;font-weight:600;color:#F0F4F8;margin:0;font-variant-numeric:tabular-nums">-$38.900</p>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;padding:13px 0">
+              <span style="width:26px;height:26px;border-radius:8px;background:#153D24;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#4ADE80" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v8"></path><path d="m8 12 4 4 4-4"></path></svg>
+              </span>
+              <div style="flex:1;min-width:0"><p style="font-size:14px;font-weight:600;color:#F0F4F8;margin:0">Nómina Empresa</p><p style="font-size:11px;color:#7A8A9C;margin:2px 0 0">Ingreso · Bancolombia · 00:03</p></div>
+              <p style="font-size:15px;font-weight:600;color:#4ADE80;margin:0;font-variant-numeric:tabular-nums">+$3.200.000</p>
+            </div>
+          </div>
+
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 20px 12px;border-top:1px solid rgba(255,255,255,0.07)">
+            <span style="font-size:10px;color:#7A8A9C">7 movimientos</span>
+            <div style="display:flex;align-items:center;gap:12px">
+              <span style="font-size:11px;color:#4ADE80;font-weight:500">+$3.2M</span>
+              <span style="font-size:11px;color:#B8C4D0;font-weight:500">-$267K</span>
+            </div>
+          </div>
+
+          <sc-if value="{{ cSheetOpen }}" hint-placeholder-val="{{ false }}">
+            <div onClick="{{ toggleCSheet }}" style="position:absolute;inset:0;background:rgba(0,0,0,0.55);z-index:9"></div>
+          </sc-if>
+          <sc-if value="{{ cSheetOpen }}" hint-placeholder-val="{{ false }}">
+            <div style="position:absolute;left:0;right:0;bottom:0;z-index:10;background:#182029;border-top:1px solid rgba(255,255,255,0.12);border-radius:20px 20px 0 0;padding:10px 18px 20px">
+              <div style="width:36px;height:4px;border-radius:99px;background:rgba(255,255,255,0.12);margin:0 auto 14px"></div>
+              <p style="font-size:13px;font-weight:600;color:#F0F4F8;margin:0 0 2px">Crepes &amp; Waffles</p>
+              <p style="font-size:11px;color:#7A8A9C;margin:0 0 14px">-$67.000 · 20 de julio</p>
+              <button style="width:100%;text-align:left;background:rgba(255,255,255,0.05);border:none;border-radius:10px;color:#F0F4F8;font-size:13px;font-weight:500;padding:12px 14px;cursor:pointer;margin-bottom:8px">Cambiar categoría</button>
+              <button onClick="{{ toggleCSheet }}" style="width:100%;text-align:left;background:rgba(61,21,21,0.5);border:none;border-radius:10px;color:#FF6B6B;font-size:13px;font-weight:500;padding:12px 14px;cursor:pointer">Eliminar transacción</button>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+
+    </div>
+    <p class="dv-next">Prueba: "quédate con <a href="#3b">3b</a>" · "usa los íconos de <a href="#3a">3a</a> con el sheet de <a href="#3c">3c</a>" · "sigue con la pasada de consistencia final"</p>
+  </section>
+
+  <section style="padding:8px 44px 56px">
+    <p style="font:600 12px system-ui,sans-serif;color:#1a1a1a;margin:0 0 4px">Estados considerados (aplican a las 3 direcciones)</p>
+    <p style="font:400 11.5px system-ui,sans-serif;color:#666;margin:0 0 16px">Sin transacciones este mes · sin resultados de búsqueda.</p>
+    <div style="display:flex;gap:20px;flex-wrap:wrap">
+      <div style="width:280px;background:#080A0C;border:1px solid rgba(0,0,0,.18);border-radius:14px;overflow:hidden">
+        <div style="padding:14px 16px 0"><p style="font-size:13px;font-weight:600;color:#F0F4F8;margin:0">Transacciones</p></div>
+        <div style="padding:40px 20px;text-align:center"><p style="font-size:12.5px;color:#7A8A9C;margin:0">Sin transacciones este mes</p></div>
+      </div>
+      <div style="width:280px;background:#080A0C;border:1px solid rgba(0,0,0,.18);border-radius:14px;overflow:hidden">
+        <div style="padding:12px 16px 0">
+          <div style="display:flex;align-items:center;gap:8px;border-radius:18px;background:rgba(24,30,38,0.82);border:1px solid rgba(255,255,255,0.12);padding:9px 13px">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#B8C4D0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="m21 21-4.3-4.3"></path></svg>
+            <span style="font-size:13px;color:#F0F4F8">rappy</span>
+          </div>
+        </div>
+        <div style="padding:40px 20px;text-align:center"><p style="font-size:12.5px;color:#7A8A9C;margin:0">Sin resultados para tu búsqueda</p></div>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { aSwiped: false, bMenuOpen: false, cSheetOpen: false };
+  renderVals() {
+    return {
+      aSwiped: this.state.aSwiped,
+      aClosed: !this.state.aSwiped,
+      bMenuOpen: this.state.bMenuOpen,
+      cSheetOpen: this.state.cSheetOpen,
+      toggleASwipe: () => this.setState(s => ({ aSwiped: !s.aSwiped })),
+      toggleBMenu: () => this.setState(s => ({ bMenuOpen: !s.bMenuOpen })),
+      toggleCSheet: () => this.setState(s => ({ cSheetOpen: !s.cSheetOpen })),
+    };
+  }
+}
+</script>
+</body>
+</html>

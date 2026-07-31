@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; background: #eceef1; font-family: 'Inter', system-ui, sans-serif; }
+  a { color: #2a6bd6; }
+  a:hover { color: #1d4fa3; }
+  @keyframes pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 0.9; } }
+  .dv-turn { padding: 40px 44px 32px; border-bottom: 1px solid rgba(0,0,0,.08); scroll-margin-top: 16px; }
+  .dv-thd { display: flex; align-items: baseline; gap: 10px; margin: 0 0 20px; }
+  .dv-tid { font: 600 10px ui-monospace, Menlo, monospace; padding: 3px 7px; background: #1a1a1a; color: #fff; border-radius: 4px; text-decoration: none; }
+  .dv-tname { font: 600 13px/1.2 system-ui, sans-serif; color: #1a1a1a; }
+  .dv-opts { display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-start; }
+  .dv-opt { flex: none; display: flex; flex-direction: column; gap: 9px; scroll-margin-top: 16px; }
+  .dv-oid { font: 600 10.5px ui-monospace, Menlo, monospace; padding: 3px 7px; background: rgba(0,0,0,.08); color: #1a1a1a; border-radius: 5px; text-decoration: none; }
+  .dv-olabel { display: flex; flex-direction: column; gap: 2px; font: 400 11px/1.4 system-ui, sans-serif; color: rgba(0,0,0,.6); max-width: 390px; }
+  .dv-olabel b { color: #1a1a1a; font-weight: 600; }
+  .dv-card { width: 390px; background: #080A0C; border: 1px solid rgba(0,0,0,.18); border-radius: 14px; overflow: hidden; }
+  .dv-next { margin: 22px 0 0; font: 12px/1.5 system-ui, sans-serif; color: rgba(0,0,0,.5); }
+</style>
+</helmet>
+
+<div style="max-width:1400px;margin:0 auto">
+
+  <section style="padding:44px 44px 8px">
+    <p style="font:600 10px ui-monospace,Menlo,monospace;color:#7a5230;background:#f3e4d0;display:inline-block;padding:3px 8px;border-radius:4px;margin:0 0 12px">MÓDULO 2 / 4 — PRESUPUESTO</p>
+    <h1 style="font:700 22px/1.3 system-ui,sans-serif;color:#1a1a1a;margin:0 0 18px">Presupuesto — diagnóstico y propuesta</h1>
+
+    <div style="display:flex;gap:32px;flex-wrap:wrap">
+      <div style="flex:1;min-width:320px">
+        <p style="font:600 12px system-ui,sans-serif;color:#1a1a1a;margin:0 0 8px">Diagnóstico (código real: BudgetManager.tsx)</p>
+        <ul style="font:400 12.5px/1.6 system-ui,sans-serif;color:#333;margin:0;padding-left:18px">
+          <li>Definir un límite plano ya es razonable: tocar la fila la expande y hay un input directo. La fricción real está en dos lugares — (1) categorías sin gasto ni presupuesto muestran solo el texto inerte "sin límite", sin ninguna acción a la vista, y (2) desglosar en subcategorías obliga a tocar "Agregar ítem" y llenar nombre y monto en dos campos separados por cada línea, para lo que suele ser 2-3 ítems.</li>
+          <li>No hay affordance para "ya sé más o menos cuánto gasto aquí, solo confírmame un número" — el usuario siempre parte de un campo vacío, incluso cuando <code>gastosPorCategoria</code> ya tiene el dato.</li>
+          <li>Bug real encontrado leyendo el código: <code>handleSave()</code> no tiene manejo de error — si el <code>fetch</code> falla, el <code>catch</code> no existe y el fallo queda silencioso. Lo corrijo en las 3 propuestas.</li>
+          <li>Estado vacío real (mes sin transacciones ni presupuesto) hoy es casi en blanco: solo aparece el botón chico "+ Agregar categoría". "Copiar mes anterior" queda como texto secundario arriba, lejos de donde miraría alguien sin nada configurado.</li>
+        </ul>
+      </div>
+      <div style="flex:1;min-width:320px">
+        <p style="font:600 12px system-ui,sans-serif;color:#1a1a1a;margin:0 0 8px">Qué cambia a nivel de componente</p>
+        <ul style="font:400 12.5px/1.6 system-ui,sans-serif;color:#333;margin:0 0 14px;padding-left:18px">
+          <li><b>CategoryRow</b>: la fila "sin límite" gana una acción real (según dirección, abajo) en vez de texto muerto.</li>
+          <li><b>handleSave</b>: agrega <code>catch</code> visible — la barra flotante pasa a estado de error con "Reintentar" en vez de fallar en silencio.</li>
+          <li>Loading state: el skeleton de una sola línea pasa a simular filas reales; el estado vacío sube "Copiar mes anterior" a acción primaria junto a "Agregar categoría".</li>
+        </ul>
+        <p style="font:600 12px system-ui,sans-serif;color:#1a1a1a;margin:0 0 6px">3 direcciones para el patrón de edición inline</p>
+        <p style="font:400 12.5px/1.6 system-ui,sans-serif;color:#333;margin:0">No toco el modelo de subcategorías ni el flujo de "Agregar categoría" (chips + texto libre) — ya funciona bien. Estados de carga, vacío y error al final.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="dv-turn" id="t1">
+    <div class="dv-thd"><a class="dv-tid" href="#t1">1</a><span class="dv-tname">Definir un límite — 3 direcciones</span></div>
+    <div class="dv-opts">
+
+      <div class="dv-opt" id="2a">
+        <div class="dv-olabel"><a class="dv-oid" href="#2a">2a</a><b>Quick-set inline</b>La fila sin presupuesto gana un botón "+ Definir" que revela un campo numérico ahí mismo — sin abrir el acordeón completo. Las filas ya presupuestadas siguen igual (tocar para expandir).</div>
+        <div class="dv-card">
+          <div style="padding:14px 16px 12px;border-bottom:1px solid rgba(255,255,255,0.07)">
+            <div style="display:flex;align-items:center;gap:8px">
+              <button aria-label="Volver" style="background:none;border:none;cursor:pointer;color:#B8C4D0;display:flex;padding:2px 4px 2px 0">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg>
+              </button>
+              <p style="font-size:13px;font-weight:600;color:#F0F4F8;margin:0">Presupuesto mensual</p>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;margin-top:4px;padding-left:23px">
+              <p style="font-size:11px;color:#B8C4D0;margin:0">Toca ▸ para desglosar</p>
+              <button style="display:flex;align-items:center;gap:4px;font-size:10px;color:#7A8A9C;background:none;border:none;cursor:pointer;padding:0">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                Copiar mes anterior
+              </button>
+            </div>
+          </div>
+
+          <div style="border-top:1px solid rgba(255,255,255,0.07)">
+            <div style="display:flex;align-items:center;gap:8px;padding:9px 16px">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#7A8A9C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></svg>
+              <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:0"><span style="width:8px;height:8px;border-radius:50%;flex-shrink:0;background:#f43f5e"></span><span style="font-size:13px;color:#F0F4F8">Salidas</span></div>
+              <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+                <span style="font-size:11px;color:#B8C4D0;font-variant-numeric:tabular-nums">$420.000</span>
+                <span style="font-size:11px;font-weight:600;padding:2px 7px;border-radius:4px;color:#FF6B6B;background:#3D1515">+20%</span>
+              </div>
+            </div>
+            <div style="margin:-4px 16px 10px;height:3px;background:rgba(255,255,255,0.12);border-radius:99px"><div style="height:100%;width:100%;background:#FF6B6B;border-radius:99px"></div></div>
+          </div>
+          <div style="border-top:1px solid rgba(255,255,255,0.07)">
+            <div style="display:flex;align-items:center;gap:8px;padding:9px 16px">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#7A8A9C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></svg>
+              <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:0"><span style="width:8px;height:8px;border-radius:50%;flex-shrink:0;background:#6366f1"></span><span style="font-size:13px;color:#F0F4F8">Hogar</span></div>
+              <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+                <span style="font-size:11px;color:#B8C4D0;font-variant-numeric:tabular-nums">$680.000</span>
+                <span style="font-size:11px;font-weight:600;padding:2px 7px;border-radius:4px;color:#FCD34D;background:#3D2E0F">91%</span>
+              </div>
+            </div>
+            <div style="margin:-4px 16px 10px;height:3px;background:rgba(255,255,255,0.12);border-radius:99px"><div style="height:100%;width:91%;background:#FCD34D;border-radius:99px"></div></div>
+          </div>
+
+          <div style="border-top:1px solid rgba(255,255,255,0.07)">
+            <div style="display:flex;align-items:center;gap:8px;padding:9px 16px">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#7A8A9C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></svg>
+              <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:0"><span style="width:8px;height:8px;border-radius:50%;flex-shrink:0;background:#0ea5e9"></span><span style="font-size:13px;color:#F0F4F8">Compras Online</span></div>
+              <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+                <span style="font-size:11px;color:#B8C4D0;font-variant-numeric:tabular-nums">$150.000</span>
+                <div style="display:flex;align-items:center;gap:4px;background:rgba(255,255,255,0.05);border:1px solid #4ADE80;border-radius:8px;padding:3px 5px 3px 8px">
+                  <span style="font-size:11px;color:#7A8A9C">$</span>
+                  <span style="font-size:11px;color:#F0F4F8;width:46px;display:inline-block">180.000</span>
+                  <span style="width:1px;height:12px;background:rgba(255,255,255,0.25)"></span>
+                  <button aria-label="Confirmar" style="background:none;border:none;cursor:pointer;color:#4ADE80;display:flex;padding:1px">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style="border-top:1px solid rgba(255,255,255,0.07)">
+            <div style="display:flex;align-items:center;gap:8px;padding:9px 16px">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#7A8A9C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></svg>
+              <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:0"><span style="width:8px;height:8px;border-radius:50%;flex-shrink:0;background:#10b981"></span><span style="font-size:13px;color:#F0F4F8">Salud</span></div>
+              <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+                <span style="font-size:11px;color:#B8C4D0;font-variant-numeric:tabular-nums">$45.000</span>
+                <sc-if value="{{ aSaludClosed }}" hint-placeholder-val="{{ true }}">
+                  <button onClick="{{ toggleASalud }}" style="display:flex;align-items:center;gap:3px;background:#153D24;border:none;border-radius:12px;color:#4ADE80;font-size:10.5px;font-weight:600;padding:4px 9px;cursor:pointer">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>
+                    Definir
+                  </button>
+                </sc-if>
+                <sc-if value="{{ aSaludOpen }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex;align-items:center;gap:4px;background:rgba(255,255,255,0.05);border:1px solid #4ADE80;border-radius:8px;padding:3px 5px 3px 8px">
+                    <span style="font-size:11px;color:#7A8A9C">$</span>
+                    <input value="45.000" style="font-size:11px;color:#F0F4F8;width:46px;background:none;border:none;outline:none;font-family:inherit;padding:0"></input>
+                    <button onClick="{{ toggleASalud }}" aria-label="Confirmar" style="background:none;border:none;cursor:pointer;color:#4ADE80;display:flex;padding:1px">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>
+                    </button>
+                  </div>
+                </sc-if>
+              </div>
+            </div>
+          </div>
+
+          <div style="padding:10px 16px;border-top:1px solid rgba(255,255,255,0.07)">
+            <button style="display:flex;align-items:center;gap:6px;background:none;border:none;cursor:pointer;color:#B8C4D0;font-size:11px;font-weight:500;padding:0">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>
+              Agregar categoría
+            </button>
+          </div>
+
+          <div style="border-top:1px solid rgba(255,255,255,0.12);padding:12px 16px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+              <span style="font-size:11px;color:#B8C4D0">Total presupuestado</span>
+              <span style="font-size:11px;font-weight:600;color:#F0F4F8;font-variant-numeric:tabular-nums">$1.500.000</span>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between">
+              <span style="font-size:11px;color:#B8C4D0">Sin asignar</span>
+              <span style="font-size:13px;font-weight:700;color:#4ADE80;font-variant-numeric:tabular-nums">$1.700.000</span>
+            </div>
+          </div>
+
+          <div style="padding:0 12px 12px">
+            <div style="display:flex;align-items:center;justify-content:space-between;background:rgba(24,30,38,0.95);border:1px solid #7A8A9C;border-radius:99px;padding:8px 8px 8px 14px">
+              <span style="font-size:11px;color:#B8C4D0;font-weight:500">Cambios sin guardar</span>
+              <div style="display:flex;align-items:center;gap:6px">
+                <button style="background:none;border:none;cursor:pointer;font-size:11px;color:#B8C4D0;font-weight:500;padding:6px 8px">Descartar</button>
+                <button style="border:none;border-radius:99px;padding:6px 14px;color:#080A0C;font-size:11px;font-weight:600;background:#F0F4F8;cursor:pointer">Guardar</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="dv-opt" id="2b">
+        <div class="dv-olabel"><a class="dv-oid" href="#2b">2b</a><b>Campo siempre visible</b>Sin acordeón para el caso simple: cada fila trae su campo numérico a la vista. El desglose en subcategorías pasa a ser un link secundario opcional. Es el más eficiente, pero el más denso — vale la pena vigilar que no vuelva a sentirse "hoja de cálculo".</div>
+        <div class="dv-card">
+          <div style="padding:14px 16px 12px;border-bottom:1px solid rgba(255,255,255,0.07)">
+            <div style="display:flex;align-items:center;gap:8px">
+              <button aria-label="Volver" style="background:none;border:none;cursor:pointer;color:#B8C4D0;display:flex;padding:2px 4px 2px 0">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg>
+              </button>
+              <p style="font-size:13px;font-weight:600;color:#F0F4F8;margin:0">Presupuesto mensual</p>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;margin-top:4px;padding-left:23px">
+              <p style="font-size:11px;color:#B8C4D0;margin:0">Escribe el monto directo en cada fila</p>
+              <button style="display:flex;align-items:center;gap:4px;font-size:10px;color:#7A8A9C;background:none;border:none;cursor:pointer;padding:0">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                Copiar mes anterior
+              </button>
+            </div>
+          </div>
+
+          <div style="border-top:1px solid rgba(255,255,255,0.07);padding:9px 16px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:0"><span style="width:8px;height:8px;border-radius:50%;flex-shrink:0;background:#f43f5e"></span><span style="font-size:13px;color:#F0F4F8">Salidas</span></div>
+              <span style="font-size:11px;color:#B8C4D0;font-variant-numeric:tabular-nums;flex-shrink:0">$420.000</span>
+              <div style="display:flex;align-items:center;gap:2px;background:rgba(255,255,255,0.06);border:1px solid #4ADE80;border-radius:8px;padding:4px 6px;flex-shrink:0">
+                <span style="font-size:11px;color:#7A8A9C">$</span>
+                <input value="350.000" style="width:58px;background:none;border:none;outline:none;color:#F0F4F8;font-size:11px;text-align:right;font-family:inherit;font-variant-numeric:tabular-nums;padding:0"></input>
+              </div>
+              <span style="font-size:11px;font-weight:600;padding:2px 7px;border-radius:4px;color:#FF6B6B;background:#3D1515;flex-shrink:0">+20%</span>
+            </div>
+            <div style="margin:6px 0 0;height:3px;background:rgba(255,255,255,0.12);border-radius:99px"><div style="height:100%;width:100%;background:#FF6B6B;border-radius:99px"></div></div>
+            <button style="background:none;border:none;cursor:pointer;color:#7A8A9C;font-size:10px;padding:6px 0 0">Desglosar en ítems</button>
+          </div>
+
+          <div style="border-top:1px solid rgba(255,255,255,0.07);padding:9px 16px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:0"><span style="width:8px;height:8px;border-radius:50%;flex-shrink:0;background:#6366f1"></span><span style="font-size:13px;color:#F0F4F8">Hogar</span></div>
+              <span style="font-size:11px;color:#B8C4D0;font-variant-numeric:tabular-nums;flex-shrink:0">$680.000</span>
+              <div style="display:flex;align-items:center;gap:2px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:4px 6px;flex-shrink:0">
+                <span style="font-size:11px;color:#7A8A9C">$</span>
+                <input value="750.000" style="width:58px;background:none;border:none;outline:none;color:#F0F4F8;font-size:11px;text-align:right;font-family:inherit;font-variant-numeric:tabular-nums;padding:0"></input>
+              </div>
+              <span style="font-size:11px;font-weight:600;padding:2px 7px;border-radius:4px;color:#FCD34D;background:#3D2E0F;flex-shrink:0">91%</span>
+            </div>
+            <div style="margin:6px 0 0;height:3px;background:rgba(255,255,255,0.12);border-radius:99px"><div style="height:100%;width:91%;background:#FCD34D;border-radius:99px"></div></div>
+          </div>
+
+          <div style="border-top:1px solid rgba(255,255,255,0.07);padding:9px 16px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:0"><span style="width:8px;height:8px;border-radius:50%;flex-shrink:0;background:#0ea5e9"></span><span style="font-size:13px;color:#F0F4F8">Compras Online</span></div>
+              <span style="font-size:11px;color:#B8C4D0;font-variant-numeric:tabular-nums;flex-shrink:0">$150.000</span>
+              <div style="display:flex;align-items:center;gap:2px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:4px 6px;flex-shrink:0">
+                <span style="font-size:11px;color:#7A8A9C">$</span>
+                <input placeholder="0" style="width:58px;background:none;border:none;outline:none;color:#F0F4F8;font-size:11px;text-align:right;font-family:inherit;font-variant-numeric:tabular-nums;padding:0"></input>
+              </div>
+              <span style="font-size:11px;color:#7A8A9C;flex-shrink:0;min-width:32px;text-align:right">—</span>
+            </div>
+          </div>
+
+          <div style="border-top:1px solid rgba(255,255,255,0.07);padding:9px 16px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:0"><span style="width:8px;height:8px;border-radius:50%;flex-shrink:0;background:#10b981"></span><span style="font-size:13px;color:#F0F4F8">Salud</span></div>
+              <span style="font-size:11px;color:#B8C4D0;font-variant-numeric:tabular-nums;flex-shrink:0">$45.000</span>
+              <div style="display:flex;align-items:center;gap:2px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:4px 6px;flex-shrink:0">
+                <span style="font-size:11px;color:#7A8A9C">$</span>
+                <input placeholder="0" style="width:58px;background:none;border:none;outline:none;color:#F0F4F8;font-size:11px;text-align:right;font-family:inherit;font-variant-numeric:tabular-nums;padding:0"></input>
+              </div>
+              <span style="font-size:11px;color:#7A8A9C;flex-shrink:0;min-width:32px;text-align:right">—</span>
+            </div>
+          </div>
+
+          <div style="padding:10px 16px;border-top:1px solid rgba(255,255,255,0.07)">
+            <button style="display:flex;align-items:center;gap:6px;background:none;border:none;cursor:pointer;color:#B8C4D0;font-size:11px;font-weight:500;padding:0">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>
+              Agregar categoría
+            </button>
+          </div>
+
+          <div style="border-top:1px solid rgba(255,255,255,0.12);padding:12px 16px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+              <span style="font-size:11px;color:#B8C4D0">Total presupuestado</span>
+              <span style="font-size:11px;font-weight:600;color:#F0F4F8;font-variant-numeric:tabular-nums">$1.500.000</span>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between">
+              <span style="font-size:11px;color:#B8C4D0">Sin asignar</span>
+              <span style="font-size:13px;font-weight:700;color:#4ADE80;font-variant-numeric:tabular-nums">$1.700.000</span>
+            </div>
+          </div>
+
+          <div style="padding:0 12px 12px">
+            <div style="display:flex;align-items:center;justify-content:space-between;background:rgba(24,30,38,0.95);border:1px solid #7A8A9C;border-radius:99px;padding:8px 8px 8px 14px">
+              <span style="font-size:11px;color:#B8C4D0;font-weight:500">Cambios sin guardar</span>
+              <div style="display:flex;align-items:center;gap:6px">
+                <button style="background:none;border:none;cursor:pointer;font-size:11px;color:#B8C4D0;font-weight:500;padding:6px 8px">Descartar</button>
+                <button style="border:none;border-radius:99px;padding:6px 14px;color:#080A0C;font-size:11px;font-weight:600;background:#F0F4F8;cursor:pointer">Guardar</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="dv-opt" id="2c">
+        <div class="dv-olabel"><a class="dv-oid" href="#2c">2c</a><b>Montos sugeridos</b>"+ Definir" revela 3 chips calculados desde el gasto real del mes ("igual a lo gastado", ±20%) en vez de un campo vacío — un toque en vez de escribir un número desde cero.</div>
+        <div class="dv-card">
+          <div style="padding:14px 16px 12px;border-bottom:1px solid rgba(255,255,255,0.07)">
+            <div style="display:flex;align-items:center;gap:8px">
+              <button aria-label="Volver" style="background:none;border:none;cursor:pointer;color:#B8C4D0;display:flex;padding:2px 4px 2px 0">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg>
+              </button>
+              <p style="font-size:13px;font-weight:600;color:#F0F4F8;margin:0">Presupuesto mensual</p>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;margin-top:4px;padding-left:23px">
+              <p style="font-size:11px;color:#B8C4D0;margin:0">Toca ▸ para desglosar</p>
+              <button style="display:flex;align-items:center;gap:4px;font-size:10px;color:#7A8A9C;background:none;border:none;cursor:pointer;padding:0">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                Copiar mes anterior
+              </button>
+            </div>
+          </div>
+
+          <div style="border-top:1px solid rgba(255,255,255,0.07)">
+            <div style="display:flex;align-items:center;gap:8px;padding:9px 16px">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#7A8A9C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></svg>
+              <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:0"><span style="width:8px;height:8px;border-radius:50%;flex-shrink:0;background:#f43f5e"></span><span style="font-size:13px;color:#F0F4F8">Salidas</span></div>
+              <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+                <span style="font-size:11px;color:#B8C4D0;font-variant-numeric:tabular-nums">$420.000</span>
+                <span style="font-size:11px;font-weight:600;padding:2px 7px;border-radius:4px;color:#FF6B6B;background:#3D1515">+20%</span>
+              </div>
+            </div>
+            <div style="margin:-4px 16px 10px;height:3px;background:rgba(255,255,255,0.12);border-radius:99px"><div style="height:100%;width:100%;background:#FF6B6B;border-radius:99px"></div></div>
+          </div>
+          <div style="border-top:1px solid rgba(255,255,255,0.07)">
+            <div style="display:flex;align-items:center;gap:8px;padding:9px 16px">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#7A8A9C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></svg>
+              <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:0"><span style="width:8px;height:8px;border-radius:50%;flex-shrink:0;background:#6366f1"></span><span style="font-size:13px;color:#F0F4F8">Hogar</span></div>
+              <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+                <span style="font-size:11px;color:#B8C4D0;font-variant-numeric:tabular-nums">$680.000</span>
+                <span style="font-size:11px;font-weight:600;padding:2px 7px;border-radius:4px;color:#FCD34D;background:#3D2E0F">91%</span>
+              </div>
+            </div>
+            <div style="margin:-4px 16px 10px;height:3px;background:rgba(255,255,255,0.12);border-radius:99px"><div style="height:100%;width:91%;background:#FCD34D;border-radius:99px"></div></div>
+          </div>
+
+          <div style="border-top:1px solid rgba(255,255,255,0.07)">
+            <div style="display:flex;align-items:center;gap:8px;padding:9px 16px">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#7A8A9C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></svg>
+              <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:0"><span style="width:8px;height:8px;border-radius:50%;flex-shrink:0;background:#0ea5e9"></span><span style="font-size:13px;color:#F0F4F8">Compras Online</span></div>
+              <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+                <span style="font-size:11px;color:#B8C4D0;font-variant-numeric:tabular-nums">$150.000</span>
+                <span style="font-size:11px;color:#7A8A9C">sin límite</span>
+              </div>
+            </div>
+            <div style="padding:0 16px 12px;display:flex;gap:6px;flex-wrap:wrap">
+              <button style="background:#153D24;border:1px solid #4ADE80;border-radius:99px;color:#4ADE80;font-size:10.5px;font-weight:600;padding:5px 10px;cursor:pointer">Igual a lo gastado · $150K</button>
+              <button style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);border-radius:99px;color:#B8C4D0;font-size:10.5px;font-weight:600;padding:5px 10px;cursor:pointer">+20% · $180K</button>
+              <button style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);border-radius:99px;color:#B8C4D0;font-size:10.5px;font-weight:600;padding:5px 10px;cursor:pointer">-20% · $120K</button>
+              <button style="background:none;border:none;color:#7A8A9C;font-size:10.5px;padding:5px 2px;cursor:pointer;text-decoration:underline">Otro monto</button>
+            </div>
+          </div>
+
+          <div style="border-top:1px solid rgba(255,255,255,0.07)">
+            <div style="display:flex;align-items:center;gap:8px;padding:9px 16px">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#7A8A9C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></svg>
+              <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:0"><span style="width:8px;height:8px;border-radius:50%;flex-shrink:0;background:#10b981"></span><span style="font-size:13px;color:#F0F4F8">Salud</span></div>
+              <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+                <span style="font-size:11px;color:#B8C4D0;font-variant-numeric:tabular-nums">$45.000</span>
+                <sc-if value="{{ cSaludClosed }}" hint-placeholder-val="{{ true }}">
+                  <button onClick="{{ toggleCSalud }}" style="display:flex;align-items:center;gap:3px;background:#153D24;border:none;border-radius:12px;color:#4ADE80;font-size:10.5px;font-weight:600;padding:4px 9px;cursor:pointer">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>
+                    Definir
+                  </button>
+                </sc-if>
+                <sc-if value="{{ cSaludOpen }}" hint-placeholder-val="{{ false }}">
+                  <span style="font-size:10.5px;color:#4ADE80">chips ↓</span>
+                </sc-if>
+              </div>
+            </div>
+            <sc-if value="{{ cSaludOpen }}" hint-placeholder-val="{{ false }}">
+              <div style="padding:0 16px 12px;display:flex;gap:6px;flex-wrap:wrap">
+                <button onClick="{{ toggleCSalud }}" style="background:#153D24;border:1px solid #4ADE80;border-radius:99px;color:#4ADE80;font-size:10.5px;font-weight:600;padding:5px 10px;cursor:pointer">Igual a lo gastado · $45K</button>
+                <button style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);border-radius:99px;color:#B8C4D0;font-size:10.5px;font-weight:600;padding:5px 10px;cursor:pointer">+20% · $54K</button>
+                <button style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);border-radius:99px;color:#B8C4D0;font-size:10.5px;font-weight:600;padding:5px 10px;cursor:pointer">-20% · $36K</button>
+                <button style="background:none;border:none;color:#7A8A9C;font-size:10.5px;padding:5px 2px;cursor:pointer;text-decoration:underline">Otro monto</button>
+              </div>
+            </sc-if>
+          </div>
+
+          <div style="padding:10px 16px;border-top:1px solid rgba(255,255,255,0.07)">
+            <button style="display:flex;align-items:center;gap:6px;background:none;border:none;cursor:pointer;color:#B8C4D0;font-size:11px;font-weight:500;padding:0">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>
+              Agregar categoría
+            </button>
+          </div>
+
+          <div style="border-top:1px solid rgba(255,255,255,0.12);padding:12px 16px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+              <span style="font-size:11px;color:#B8C4D0">Total presupuestado</span>
+              <span style="font-size:11px;font-weight:600;color:#F0F4F8;font-variant-numeric:tabular-nums">$1.500.000</span>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between">
+              <span style="font-size:11px;color:#B8C4D0">Sin asignar</span>
+              <span style="font-size:13px;font-weight:700;color:#4ADE80;font-variant-numeric:tabular-nums">$1.700.000</span>
+            </div>
+          </div>
+
+          <div style="padding:0 12px 12px">
+            <div style="display:flex;align-items:center;justify-content:space-between;background:rgba(24,30,38,0.95);border:1px solid #7A8A9C;border-radius:99px;padding:8px 8px 8px 14px">
+              <span style="font-size:11px;color:#B8C4D0;font-weight:500">Cambios sin guardar</span>
+              <div style="display:flex;align-items:center;gap:6px">
+                <button style="background:none;border:none;cursor:pointer;font-size:11px;color:#B8C4D0;font-weight:500;padding:6px 8px">Descartar</button>
+                <button style="border:none;border-radius:99px;padding:6px 14px;color:#080A0C;font-size:11px;font-weight:600;background:#F0F4F8;cursor:pointer">Guardar</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    <p class="dv-next">Prueba: "quédate con <a href="#2a">2a</a>" · "combina los chips de <a href="#2c">2c</a> con el campo siempre visible de <a href="#2b">2b</a>" · "sigue con el módulo Transacciones"</p>
+  </section>
+
+  <section style="padding:8px 44px 56px">
+    <p style="font:600 12px system-ui,sans-serif;color:#1a1a1a;margin:0 0 4px">Estados considerados (aplican a las 3 direcciones)</p>
+    <p style="font:400 11.5px system-ui,sans-serif;color:#666;margin:0 0 16px">Cargando · sin categorías este mes · error al guardar (hoy silencioso — se corrige aquí).</p>
+    <div style="display:flex;gap:20px;flex-wrap:wrap">
+
+      <div style="width:280px;background:#080A0C;border:1px solid rgba(0,0,0,.18);border-radius:14px;overflow:hidden">
+        <div style="padding:16px">
+          <div style="height:11px;width:150px;margin-bottom:18px;border-radius:4px;background:rgba(24,30,38,0.9);animation:pulse 1.4s ease-in-out infinite"></div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px"><div style="width:8px;height:8px;border-radius:50%;background:rgba(24,30,38,0.9)"></div><div style="height:9px;flex:1;border-radius:4px;background:rgba(24,30,38,0.9);animation:pulse 1.4s ease-in-out infinite"></div><div style="height:9px;width:40px;border-radius:4px;background:rgba(24,30,38,0.9);animation:pulse 1.4s ease-in-out infinite"></div></div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px"><div style="width:8px;height:8px;border-radius:50%;background:rgba(24,30,38,0.9)"></div><div style="height:9px;flex:1;border-radius:4px;background:rgba(24,30,38,0.9);animation:pulse 1.4s ease-in-out infinite"></div><div style="height:9px;width:40px;border-radius:4px;background:rgba(24,30,38,0.9);animation:pulse 1.4s ease-in-out infinite"></div></div>
+          <div style="display:flex;align-items:center;gap:8px"><div style="width:8px;height:8px;border-radius:50%;background:rgba(24,30,38,0.9)"></div><div style="height:9px;flex:1;border-radius:4px;background:rgba(24,30,38,0.9);animation:pulse 1.4s ease-in-out infinite"></div><div style="height:9px;width:40px;border-radius:4px;background:rgba(24,30,38,0.9);animation:pulse 1.4s ease-in-out infinite"></div></div>
+        </div>
+      </div>
+
+      <div style="width:280px;background:#080A0C;border:1px solid rgba(0,0,0,.18);border-radius:14px;overflow:hidden">
+        <div style="padding:28px 20px;text-align:center">
+          <p style="font-size:13px;font-weight:600;color:#F0F4F8;margin:0 0 4px">Aún no tienes categorías</p>
+          <p style="font-size:11.5px;color:#7A8A9C;margin:0 0 16px">Cópialas del mes pasado o agrega la primera</p>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <button style="font-size:11.5px;font-weight:600;color:#080A0C;background:#F0F4F8;border:none;border-radius:12px;padding:9px;cursor:pointer">Copiar mes anterior</button>
+            <button style="font-size:11.5px;font-weight:500;color:#B8C4D0;background:none;border:1px solid rgba(255,255,255,0.12);border-radius:12px;padding:9px;cursor:pointer">+ Agregar categoría</button>
+          </div>
+        </div>
+      </div>
+
+      <div style="width:280px;background:#080A0C;border:1px solid rgba(0,0,0,.18);border-radius:14px;overflow:hidden">
+        <div style="padding:16px">
+          <div style="display:flex;align-items:center;justify-content:space-between;background:rgba(61,21,21,0.6);border:1px solid #FF6B6B;border-radius:99px;padding:8px 8px 8px 14px">
+            <span style="font-size:11px;color:#FF6B6B;font-weight:500">Error al guardar</span>
+            <button style="border:none;border-radius:99px;padding:6px 14px;color:#F0F4F8;font-size:11px;font-weight:600;background:none;border:1px solid #FF6B6B;cursor:pointer">Reintentar</button>
+          </div>
+          <p style="font-size:11px;color:#7A8A9C;margin:10px 0 0">El fondo de la app no cambia — el mensaje explica qué falló en vez de fallar en silencio.</p>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { aSaludOpen: false, cSaludOpen: false };
+  renderVals() {
+    return {
+      aSaludOpen: this.state.aSaludOpen,
+      aSaludClosed: !this.state.aSaludOpen,
+      cSaludOpen: this.state.cSaludOpen,
+      cSaludClosed: !this.state.cSaludOpen,
+      toggleASalud: () => this.setState(s => ({ aSaludOpen: !s.aSaludOpen })),
+      toggleCSalud: () => this.setState(s => ({ cSaludOpen: !s.cSaludOpen })),
+    };
+  }
+}
+</script>
+</body>
+</html>

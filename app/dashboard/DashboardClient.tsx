@@ -10,8 +10,7 @@ import type { Transaction, MonthlyStats, Categoria } from '@/lib/types'
 import { isIngreso, isGasto } from '@/lib/types'
 import { TEST_IDS } from '@/lib/testIds'
 import MonthHero from '@/components/dashboard/MonthHero'
-import BudgetOverview from '@/components/dashboard/BudgetOverview'
-import SpendingChart from '@/components/dashboard/SpendingChart'
+import CategoriesCard from '@/components/dashboard/CategoriesCard'
 import TransactionsList from '@/components/dashboard/TransactionsList'
 import HeaderPill from '@/components/dashboard/HeaderPill'
 import AIAdvisorPanel from '@/components/dashboard/AIAdvisorPanel'
@@ -81,7 +80,6 @@ export default function DashboardClient({
 
   const [activeFilter, setActiveFilter] = useState<string>('TODOS')
   const [budgets, setBudgets] = useState<Record<string, number>>({})
-  const [showChart, setShowChart] = useState(false)
   const [manualOpen, setManualOpen] = useState(false)
   const [showHelpModal, setShowHelpModal] = useState(false)
 
@@ -227,25 +225,19 @@ export default function DashboardClient({
           ahorros={stats.ahorros}
           transacciones={stats.transacciones}
           mes={month}
-          showChart={showChart}
-          onChartToggle={() => setShowChart(v => !v)}
+          budgetTotal={Object.values(budgets).reduce((s, v) => s + (v || 0), 0)}
         />
-
-        {showChart && (
-          <SpendingChart
-            transactions={txs}
-            activeFilter={activeFilter}
-            onFilterChange={setActiveFilter}
-          />
-        )}
 
         <SavingsOverview />
 
         <div data-testid="tour-budget">
-          <BudgetOverview
+          <CategoriesCard
             mes={month}
+            transactions={txs}
             gastosPorCategoria={stats.porCategoria}
             ingresos={stats.ingresos}
+            activeFilter={activeFilter}
+            onFilterChange={setActiveFilter}
             onBudgetsChange={setBudgets}
             onSaved={bumpContext}
           />
