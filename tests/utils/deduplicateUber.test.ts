@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { deduplicateUber } from '../../lib/utils/deduplicateUber'
+import { deduplicateUber, matchUberAgainstPersisted } from '../../lib/utils/deduplicateUber'
 import type { ExtractedTransaction } from '../../lib/types'
 
 const uberTx = (id: string, fecha: string, monto: number): { id: string; extracted: ExtractedTransaction } => ({
@@ -81,5 +81,75 @@ describe('deduplicateUber', () => {
     const { transactions, preauthIds } = deduplicateUber([])
     expect(transactions).toHaveLength(0)
     expect(preauthIds).toHaveLength(0)
+  })
+})
+
+describe('matchUberAgainstPersisted', () => {
+  it('returns everything untouched when there is no persisted history', () => {
+    const txs = [uberTx('a', '2026-06-07T10:00:00Z', 15000)]
+    const { remaining, matches } = matchUberAgainstPersisted(txs, [])
+    expect(remaining).toHaveLength(1)
+    expect(matches).toHaveLength(0)
+  })
+
+  it('matches a final charge arriving in a later sync against a pre-auth already persisted', () => {
+    // pre-auth ya se sincronizó (y quedó guardada) en un sync anterior
+    const persisted = [{ id: 'db-row-1', fecha: '2026-06-07T10:00:00Z', monto: 17667 }]
+    // el cobro final llega ahora, en un sync distinto
+    const cobroFinal = uberTx('cobro-final', '2026-06-07T10:05:00Z', 8725)
+
+    const { remaining, matches } = matchUberAgainstPersisted([cobroFinal], persisted)
+
+    expect(remaining).toHaveLength(0) // no debe insertarse una fila nueva
+    expect(matches).toHaveLength(1)
+    expect(matches[0]).toMatchObject({
+      newTxId: 'cobro-final',
+      persistedId: 'db-row-1',
+      updatePersisted: true, // la fila persistida se actualiza con el monto/fecha real
+    })
+  })
+
+  it('drops a late/out-of-order pre-auth arriving after the final charge was already persisted', () => {
+    // el cobro final ya quedó guardado (llegó primero, p. ej. por orden de bandeja)
+    const persisted = [{ id: 'db-row-1', fecha: '2026-06-07T10:05:00Z', monto: 8725 }]
+    // la pre-auth llega tarde, en un sync posterior
+    const preauthTardia = uberTx('preauth-tardia', '2026-06-07T10:00:00Z', 17667)
+
+    const { remaining, matches } = matchUberAgainstPersisted([preauthTardia], persisted)
+
+    expect(remaining).toHaveLength(0)
+    expect(matches).toHaveLength(1)
+    expect(matches[0].updatePersisted).toBe(false) // no se toca la fila ya persistida
+  })
+
+  it('does not match persisted Uber rows more than 15min apart', () => {
+    const persisted = [{ id: 'db-row-1', fecha: '2026-06-07T08:00:00Z', monto: 12000 }]
+    const otroViaje = uberTx('otro-viaje', '2026-06-07T09:00:00Z', 12000)
+
+    const { remaining, matches } = matchUberAgainstPersisted([otroViaje], persisted)
+
+    expect(remaining).toHaveLength(1) // es un viaje distinto, se inserta normalmente
+    expect(matches).toHaveLength(0)
+  })
+
+  it('leaves non-Uber transactions untouched even with persisted Uber history', () => {
+    const persisted = [{ id: 'db-row-1', fecha: '2026-06-07T10:00:00Z', monto: 17667 }]
+    const txs = [otherTx('x')]
+
+    const { remaining, matches } = matchUberAgainstPersisted(txs, persisted)
+
+    expect(remaining).toHaveLength(1)
+    expect(matches).toHaveLength(0)
+  })
+
+  it('does not double-match the same persisted row against two new transactions', () => {
+    const persisted = [{ id: 'db-row-1', fecha: '2026-06-07T10:00:00Z', monto: 17667 }]
+    const a = uberTx('a', '2026-06-07T10:01:00Z', 8000)
+    const b = uberTx('b', '2026-06-07T10:02:00Z', 9000)
+
+    const { remaining, matches } = matchUberAgainstPersisted([a, b], persisted)
+
+    expect(matches).toHaveLength(1) // solo uno puede reclamar la fila persistida
+    expect(remaining).toHaveLength(1) // el otro se inserta como transacción independiente
   })
 })

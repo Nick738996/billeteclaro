@@ -2,7 +2,7 @@ import { GmailProvider, OutlookProvider } from '@/lib/email'
 import { detectBank } from '@/lib/email/gmail'
 import { trySpecificParser } from '@/lib/parsers'
 import { generateAuditId } from '@/lib/utils/auditId'
-import { deduplicateUber } from '@/lib/utils/deduplicateUber'
+import { deduplicateUber, matchUberAgainstPersisted } from '@/lib/utils/deduplicateUber'
 import { reassignCalendarMonths } from '@/lib/services/mesContableService'
 import { createAdminClient } from '@/lib/supabase/server'
 import type { EmailProvider } from '@/lib/email/types'
@@ -52,9 +52,12 @@ export async function runSync(userId: string, admin: Admin): Promise<SyncResult>
     }
 
     // 4. IDs ya procesados (transactions + todos los skipped_ids de sync_log)
-    const [{ data: existing }, { data: pastLogs }] = await Promise.all([
+    //    + transacciones de Uber ya persistidas, para dedup de pre-auth/cobro
+    //    final cuando caen en syncs distintos (ver matchUberAgainstPersisted)
+    const [{ data: existing }, { data: pastLogs }, { data: persistedUber }] = await Promise.all([
       admin.from('transactions').select('gmail_message_id').eq('user_id', userId),
       admin.from('sync_log').select('skipped_ids').eq('user_id', userId),
+      admin.from('transactions').select('id, fecha, monto').eq('user_id', userId).ilike('comercio', '%uber%'),
     ])
 
     const processedIds = new Set((existing ?? []).map(r => r.gmail_message_id))
@@ -121,7 +124,33 @@ export async function runSync(userId: string, admin: Admin): Promise<SyncResult>
     }
 
     // 7. FASE 2 — dedup Uber
-    const { transactions: deduped, preauthIds } = deduplicateUber(allTransactions)
+    //    a) dentro del mismo lote (pre-auth y cobro final llegaron en este mismo sync)
+    //    b) contra el historial ya persistido (pre-auth de un sync anterior +
+    //       cobro final que llega en este sync, o al revés)
+    const { transactions: dedupedBatch, preauthIds: batchPreauthIds } = deduplicateUber(allTransactions)
+    const { remaining: deduped, matches: crossSyncMatches } = matchUberAgainstPersisted(
+      dedupedBatch,
+      (persistedUber ?? []).map(t => ({ id: t.id, fecha: t.fecha, monto: t.monto })),
+    )
+    const preauthIds = [...batchPreauthIds, ...crossSyncMatches.map(m => m.newTxId)]
+
+    // Actualiza las filas ya persistidas cuyo cobro final llegó en este sync
+    // (monto/fecha estimados en la pre-auth → monto/fecha reales del cobro)
+    const updates = crossSyncMatches.filter(m => m.updatePersisted)
+    if (updates.length > 0) {
+      await Promise.all(updates.map(m => {
+        const tx = allTransactions.find(t => t.id === m.newTxId)!.extracted
+        const fecha = tx.fecha ? new Date(tx.fecha) : new Date()
+        console.log(`[sync] Uber cross-sync: actualizando fila ${m.persistedId} con cobro final (monto=${tx.monto})`)
+        return admin.from('transactions').update({
+          monto: tx.monto, fecha: fecha.toISOString(),
+          descripcion: tx.descripcion, flags: tx.flags,
+        }).eq('id', m.persistedId)
+      }))
+    }
+    if (crossSyncMatches.length > 0) {
+      console.log(`[sync] Uber cross-sync: ${crossSyncMatches.length} match(es) contra historial persistido (${updates.length} actualizados, ${crossSyncMatches.length - updates.length} descartados)`)
+    }
 
     // 8. FASE 3 — insertar
     let transaccionesNuevas = 0
@@ -156,10 +185,20 @@ export async function runSync(userId: string, admin: Admin): Promise<SyncResult>
     }
 
     // 9. FASE 4 — asignar mes_contable
-    if (deduped.length > 0) {
-      const mesesAfectados = [...new Set(deduped.map(({ extracted }) =>
+    //    incluye también los meses de las filas de Uber actualizadas por el
+    //    cross-sync match (el cobro final puede caer en un mes distinto al
+    //    de la pre-auth original)
+    const mesesUpdates = updates.map(m => {
+      const fecha = allTransactions.find(t => t.id === m.newTxId)!.extracted.fecha
+      return (fecha ? new Date(fecha) : new Date()).toISOString().slice(0, 7)
+    })
+    const mesesAfectados = [...new Set([
+      ...deduped.map(({ extracted }) =>
         (extracted.fecha ? new Date(extracted.fecha) : new Date()).toISOString().slice(0, 7)
-      ))]
+      ),
+      ...mesesUpdates,
+    ])]
+    if (mesesAfectados.length > 0) {
       await reassignCalendarMonths(admin, userId, mesesAfectados)
     }
 

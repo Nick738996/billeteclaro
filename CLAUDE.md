@@ -187,8 +187,12 @@ feature/<nombre>   ← una por mejora, PR a main
 ## Bugs conocidos
 
 - **`id_auditoria` con gaps** — si se borra y re-sincroniza, el contador reinicia desde -01.
-- **Uber dedup solo dentro del mismo sync** — si pre-auth y cobro caen en syncs distintos no se comparan.
 - **Bancolombia emails con imágenes** — algunos emails de Bancolombia tienen URLs de imagen antes del texto de transacción; los parsers deberían manejarlos pero si Groq está en rate limit quedan como omitidos.
+
+**✅ Resuelto — Uber dedup solo dentro del mismo sync.** `deduplicateUber()` (`lib/utils/deduplicateUber.ts`) solo comparaba transacciones dentro del mismo lote (`allTransactions` de un único `runSync`). Si la pre-auth se sincronizaba en un sync y el cobro final llegaba en uno posterior, nunca se veían juntas → el cobro final se insertaba como gasto duplicado. Se agregó `matchUberAgainstPersisted()`, que compara las transacciones de Uber nuevas contra las ya persistidas (`transactions` filtrado por `comercio ilike '%uber%'`, consultado en `syncService.ts` FASE 0). Si hay match dentro de la misma ventana de 15 min:
+  - el cobro final llega después → se hace `UPDATE` de la fila ya persistida (monto/fecha/descripcion reales) y no se inserta fila nueva.
+  - la pre-auth llega tarde/desordenada → se descarta sin tocar la fila (el cobro final ya persistido queda intacto).
+  En ambos casos el id de la transacción nueva se agrega a `skipped_ids` para no reprocesarla. Tests en `tests/utils/deduplicateUber.test.ts`.
 
 ---
 
