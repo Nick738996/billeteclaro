@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; background: #eceef1; font-family: 'Inter', system-ui, sans-serif; }
+  a { color: #2a6bd6; }
+  a:hover { color: #1d4fa3; }
+  @keyframes pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 0.9; } }
+  .dv-turn { padding: 40px 44px 32px; border-bottom: 1px solid rgba(0,0,0,.08); scroll-margin-top: 16px; }
+  .dv-thd { display: flex; align-items: baseline; gap: 10px; margin: 0 0 20px; }
+  .dv-tid { font: 600 10px ui-monospace, Menlo, monospace; padding: 3px 7px; background: #1a1a1a; color: #fff; border-radius: 4px; text-decoration: none; }
+  .dv-tname { font: 600 13px/1.2 system-ui, sans-serif; color: #1a1a1a; }
+  .dv-opts { display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-start; }
+  .dv-opt { flex: none; display: flex; flex-direction: column; gap: 9px; scroll-margin-top: 16px; }
+  .dv-oid { font: 600 10.5px ui-monospace, Menlo, monospace; padding: 3px 7px; background: rgba(0,0,0,.08); color: #1a1a1a; border-radius: 5px; text-decoration: none; }
+  .dv-olabel { display: flex; flex-direction: column; gap: 2px; font: 400 11px/1.4 system-ui, sans-serif; color: rgba(0,0,0,.6); max-width: 390px; }
+  .dv-olabel b { color: #1a1a1a; font-weight: 600; }
+  .dv-card { width: 390px; background: #080A0C; border: 1px solid rgba(0,0,0,.18); border-radius: 14px; overflow: hidden; }
+  .dv-next { margin: 22px 0 0; font: 12px/1.5 system-ui, sans-serif; color: rgba(0,0,0,.5); }
+</style>
+</helmet>
+
+<div style="max-width:1400px;margin:0 auto">
+
+  <section style="padding:44px 44px 8px">
+    <p style="font:600 10px ui-monospace,Menlo,monospace;color:#7a5230;background:#f3e4d0;display:inline-block;padding:3px 8px;border-radius:4px;margin:0 0 12px">MÓDULO 1 / 4 — DASHBOARD</p>
+    <h1 style="font:700 22px/1.3 system-ui,sans-serif;color:#1a1a1a;margin:0 0 18px">Dashboard / Home — diagnóstico y propuesta</h1>
+
+    <div style="display:flex;gap:32px;flex-wrap:wrap">
+      <div style="flex:1;min-width:320px">
+        <p style="font:600 12px system-ui,sans-serif;color:#1a1a1a;margin:0 0 8px">Diagnóstico (código real: DashboardClient, MonthHero, SpendingChart, BudgetOverview)</p>
+        <ul style="font:400 12.5px/1.6 system-ui,sans-serif;color:#333;margin:0;padding-left:18px">
+          <li>"Cómo voy este mes" se responde en 3 superficies con lenguaje visual distinto: <b>MonthHero</b> (barra ingresos/gastos), <b>SpendingChart</b> (dona de participación — y ya tiene una vista de barras vs. presupuesto) y <b>BudgetOverview</b> (barras de cumplimiento). En modo barras, SpendingChart y BudgetOverview terminan dibujando la misma fila — categoría · gastado/límite · % — con dos estilos distintos.</li>
+          <li>Buena noticia: el pedido de "ver presupuesto vs. gasto real por categoría" ya existe en el código (toggle dona/barras de SpendingChart). No hay que inventarlo — hay que dejar de tenerlo duplicado.</li>
+          <li>El gráfico de categorías está oculto por defecto (hay que tocar un ícono en MonthHero para revelarlo) mientras BudgetOverview vive siempre visible — dos comportamientos distintos para información del mismo tipo.</li>
+          <li>Header: ya está resuelto en el código actual — HeaderPill agrupa sync+tema en una píldora y mueve ayuda/logout/borrar a un menú "...". Solo aplico un ajuste menor.</li>
+          <li>Categorías con gasto pero sin presupuesto se muestran inertes (monto + "—"). Ajuste liviano aquí; la solución completa de fricción de entrada vive en el módulo Presupuesto (siguiente).</li>
+          <li>Transversal: el fondo del dashboard usa un <code>radial-gradient</code> decorativo — lo retiro en estas propuestas por el principio "sin gradientes"; lo confirmo en la pasada final.</li>
+        </ul>
+      </div>
+      <div style="flex:1;min-width:320px">
+        <p style="font:600 12px system-ui,sans-serif;color:#1a1a1a;margin:0 0 8px">Propuesta y qué cambia a nivel de componente</p>
+        <ul style="font:400 12.5px/1.6 system-ui,sans-serif;color:#333;margin:0 0 14px;padding-left:18px">
+          <li>Fusionar <b>SpendingChart</b> + <b>BudgetOverview</b> en un solo componente "Categorías" — se elimina la vista de barras duplicada de SpendingChart.</li>
+          <li><b>MonthHero</b> pierde el botón/estado <code>showChart</code>: el toggle mostrar/ocultar deja de existir en <code>DashboardClient</code>, la card de categorías queda siempre visible.</li>
+          <li><b>BudgetOverview</b> gana una fila con acción "+ Definir" para categorías con gasto sin presupuesto, en vez de texto inerte.</li>
+          <li><b>HeaderPill</b>: separador visual entre el grupo sync+tema y el menú "...", sin cambios de lógica.</li>
+        </ul>
+        <p style="font:600 12px system-ui,sans-serif;color:#1a1a1a;margin:0 0 6px">3 direcciones para el toggle dona/barras</p>
+        <p style="font:400 12.5px/1.6 system-ui,sans-serif;color:#333;margin:0">No toco <b>MonthHero</b> (pulso global del mes — pregunta distinta y honesta) ni <b>SavingsOverview</b> (cuánto tengo ahorrado — pregunta distinta). Estados vacíos, de carga y de error al final de la página.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="dv-turn" id="t1">
+    <div class="dv-thd"><a class="dv-tid" href="#t1">1</a><span class="dv-tname">Card "Categorías" — 3 direcciones</span></div>
+    <div class="dv-opts">
+
+      <div class="dv-opt" id="1a">
+        <div class="dv-olabel"><a class="dv-oid" href="#1a">1a</a><b>Toggle con etiquetas de texto</b>Un solo card, segmented control "Presupuesto / Participación" — mismo patrón de hoy pero fusionado y con etiquetas en vez de solo ícono (hoy el toggle es 2 íconos sin texto).</div>
+        <div class="dv-card">
+
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:rgba(18,24,30,0.82);border-bottom:1px solid rgba(255,255,255,0.12)">
+            <div style="display:flex;align-items:center;gap:8px">
+              <svg viewBox="0 0 100 100" width="30" height="30" aria-hidden="true" style="color:#F0F4F8">
+                <line x1="30" y1="18" x2="30" y2="82" stroke="currentColor" stroke-width="6" stroke-linecap="round"></line>
+                <path d="M30,18 Q70,18 70,34 Q70,50 30,50" stroke="currentColor" stroke-width="6" fill="none" stroke-linecap="round"></path>
+                <path d="M30,50 Q78,50 78,66 Q78,82 30,82" stroke="#4ADE80" stroke-width="6" fill="none" stroke-linecap="round"></path>
+              </svg>
+              <span style="font-size:15px;letter-spacing:-0.02em"><span style="font-weight:400;color:#F0F4F8">Billete</span><span style="font-weight:700;color:#4ADE80">Claro</span></span>
+            </div>
+            <div style="display:flex;align-items:center;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:0 6px;gap:2px;height:34px">
+              <button aria-label="Sincronizar" style="background:none;border:none;cursor:pointer;width:34px;height:30px;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#B8C4D0">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path><path d="M21 3v5h-5"></path><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path><path d="M8 16H3v5"></path></svg>
+              </button>
+              <button aria-label="Cambiar a modo claro" style="background:none;border:none;cursor:pointer;width:34px;height:30px;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#B8C4D0">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path></svg>
+              </button>
+              <div style="width:1px;height:16px;background:rgba(255,255,255,0.12);margin:0 2px;flex-shrink:0"></div>
+              <button aria-label="Más opciones" style="background:none;border:none;cursor:pointer;width:34px;height:30px;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#B8C4D0">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg>
+              </button>
+            </div>
+          </div>
+
+          <div style="padding:16px 16px 20px;display:flex;flex-direction:column;gap:20px">
+            <div>
+              <p style="font-size:13px;color:#B8C4D0;margin:0">Hola, Nicolás</p>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px">
+                <button aria-label="Mes anterior" style="width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#B8C4D0;background:none;border:none;cursor:pointer">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"></path></svg>
+                </button>
+                <h1 style="text-transform:capitalize;font-size:19px;font-weight:500;color:#F0F4F8;margin:0">julio 2026</h1>
+                <button aria-label="Mes siguiente" style="width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#B8C4D0;background:none;border:none;cursor:pointer">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></svg>
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:12px">
+                <div>
+                  <p style="font-size:11px;font-weight:400;color:#7A8A9C;margin:0 0 5px">Gastado este mes</p>
+                  <div style="display:flex;align-items:baseline;gap:8px">
+                    <span style="font-variant-numeric:tabular-nums;font-size:38px;font-weight:700;color:#F0F4F8;letter-spacing:-0.04em;line-height:1">$1.6M</span>
+                    <span style="font-size:13px;color:#B8C4D0">de $3.2M</span>
+                  </div>
+                </div>
+                <span style="font-variant-numeric:tabular-nums;font-size:13px;font-weight:700;margin-bottom:2px;color:#4ADE80">50%</span>
+              </div>
+              <div style="height:5px;background:rgba(255,255,255,0.12);border-radius:99px;margin-bottom:10px;overflow:hidden">
+                <div style="height:100%;border-radius:99px;width:50%;background:#4ADE80"></div>
+              </div>
+              <p style="font-size:11px;font-weight:500;margin:0 0 8px;color:#FCD34D">Gastando más rápido que el tiempo del mes</p>
+              <div style="display:flex;align-items:center;gap:16px">
+                <p style="font-size:11px;font-weight:500;margin:0;color:#4ADE80">$1.6M disponibles</p>
+                <p style="font-size:11px;color:#7A8A9C;margin:0">12d restantes</p>
+                <p style="font-size:11px;color:#7A8A9C;margin:0">38 mov.</p>
+              </div>
+            </div>
+
+            <div style="background:rgba(18,24,30,0.82);border:1px solid rgba(255,255,255,0.12);border-radius:24px;overflow:hidden">
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px 10px">
+                <p style="font-size:13px;font-weight:600;color:#F0F4F8;margin:0">Categorías</p>
+                <button style="display:flex;align-items:center;gap:6px;background:none;border:none;cursor:pointer;color:#B8C4D0;font-size:11px;font-weight:500;padding:2px 0">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path><path d="m15 5 4 4"></path></svg>
+                  Editar
+                </button>
+              </div>
+
+              <div style="padding:0 16px 12px">
+                <sc-if value="{{ aIsPresupuesto }}">
+                  <div style="display:flex;gap:2px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:2px">
+                    <button onClick="{{ setAPresupuesto }}" style="flex:1;padding:6px 0;border-radius:8px;border:none;cursor:pointer;font-size:11px;font-weight:600;background:rgba(18,24,30,0.9);color:#F0F4F8">Presupuesto</button>
+                    <button onClick="{{ setAParticipacion }}" style="flex:1;padding:6px 0;border-radius:8px;border:none;cursor:pointer;font-size:11px;font-weight:600;background:none;color:#7A8A9C">Participación</button>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ aIsParticipacion }}">
+                  <div style="display:flex;gap:2px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:2px">
+                    <button onClick="{{ setAPresupuesto }}" style="flex:1;padding:6px 0;border-radius:8px;border:none;cursor:pointer;font-size:11px;font-weight:600;background:none;color:#7A8A9C">Presupuesto</button>
+                    <button onClick="{{ setAParticipacion }}" style="flex:1;padding:6px 0;border-radius:8px;border:none;cursor:pointer;font-size:11px;font-weight:600;background:rgba(18,24,30,0.9);color:#F0F4F8">Participación</button>
+                  </div>
+                </sc-if>
+              </div>
+
+              <sc-if value="{{ aIsPresupuesto }}">
+                <div>
+                  <div style="padding:9px 16px;border-bottom:1px solid rgba(255,255,255,0.07)">
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+                      <span style="flex:1;font-size:13px;color:#F0F4F8;font-weight:600">Presupuestado</span>
+                      <span style="font-variant-numeric:tabular-nums;font-size:11px"><span style="color:#B8C4D0">$1.4M</span><span style="color:#7A8A9C"> / $1.5M</span></span>
+                      <span style="font-size:12px;font-weight:700;color:#FCD34D;min-width:40px;text-align:right">93%</span>
+                    </div>
+                    <div style="height:3px;background:rgba(255,255,255,0.12);border-radius:99px;overflow:hidden"><div style="height:100%;width:93%;background:#FCD34D;border-radius:99px"></div></div>
+                  </div>
+
+                  <div style="padding:9px 16px;border-bottom:1px solid rgba(255,255,255,0.07)">
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+                      <span style="width:9px;height:9px;border-radius:50%;flex-shrink:0;background:#f43f5e"></span>
+                      <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;color:#F0F4F8;font-weight:600">Salidas</span>
+                      <span style="font-variant-numeric:tabular-nums;flex-shrink:0;font-size:11px"><span style="color:#B8C4D0">$420K</span><span style="color:#7A8A9C"> / $350K</span></span>
+                      <span style="font-variant-numeric:tabular-nums;flex-shrink:0;font-size:12px;font-weight:700;color:#FF6B6B;min-width:40px;text-align:right">+20%</span>
+                    </div>
+                    <div style="height:3px;background:rgba(255,255,255,0.12);border-radius:99px;overflow:hidden"><div style="height:100%;border-radius:99px;width:100%;background:#FF6B6B"></div></div>
+                  </div>
+
+                  <div style="padding:9px 16px;border-bottom:1px solid rgba(255,255,255,0.07)">
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+                      <span style="width:9px;height:9px;border-radius:50%;flex-shrink:0;background:#6366f1"></span>
+                      <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;color:#F0F4F8;font-weight:600">Hogar</span>
+                      <span style="font-variant-numeric:tabular-nums;flex-shrink:0;font-size:11px"><span style="color:#B8C4D0">$680K</span><span style="color:#7A8A9C"> / $750K</span></span>
+                      <span style="font-variant-numeric:tabular-nums;flex-shrink:0;font-size:12px;font-weight:700;color:#FCD34D;min-width:40px;text-align:right">91%</span>
+                    </div>
+                    <div style="height:3px;background:rgba(255,255,255,0.12);border-radius:99px;overflow:hidden"><div style="height:100%;border-radius:99px;width:91%;background:#FCD34D"></div></div>
+                  </div>
+
+                  <div style="padding:9px 16px">
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+                      <span style="width:9px;height:9px;border-radius:50%;flex-shrink:0;background:#f59e0b"></span>
+                      <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;color:#F0F4F8;font-weight:600">Transporte</span>
+                      <span style="font-variant-numeric:tabular-nums;flex-shrink:0;font-size:11px"><span style="color:#B8C4D0">$210K</span><span style="color:#7A8A9C"> / $300K</span></span>
+                      <span style="font-variant-numeric:tabular-nums;flex-shrink:0;font-size:12px;font-weight:700;color:#4ADE80;min-width:40px;text-align:right">70%</span>
+                    </div>
+                    <div style="height:3px;background:rgba(255,255,255,0.12);border-radius:99px;overflow:hidden"><div style="height:100%;border-radius:99px;width:70%;background:#4ADE80"></div></div>
+                  </div>
+
+                  <p style="font-size:11px;color:#7A8A9C;padding:14px 16px 2px;margin:0;border-top:1px solid rgba(255,255,255,0.07)">Sin presupuesto</p>
+
+                  <div style="padding:9px 16px;display:flex;align-items:center;justify-content:space-between;gap:8px;border-bottom:1px solid rgba(255,255,255,0.07)">
+                    <div style="display:flex;align-items:center;gap:8px;min-width:0">
+                      <span style="width:9px;height:9px;border-radius:50%;flex-shrink:0;background:#0ea5e9"></span>
+                      <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;color:#F0F4F8;font-weight:600">Compras Online</span>
+                      <span style="font-size:11px;color:#B8C4D0;flex-shrink:0">$150K</span>
+                    </div>
+                    <button style="display:flex;align-items:center;gap:4px;background:#153D24;border:none;border-radius:12px;color:#4ADE80;font-size:11px;font-weight:600;padding:4px 10px;cursor:pointer;flex-shrink:0">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>
+                      Definir
+                    </button>
+                  </div>
+                  <div style="padding:9px 16px;display:flex;align-items:center;justify-content:space-between;gap:8px">
+                    <div style="display:flex;align-items:center;gap:8px;min-width:0">
+                      <span style="width:9px;height:9px;border-radius:50%;flex-shrink:0;background:#10b981"></span>
+                      <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;color:#F0F4F8;font-weight:600">Salud</span>
+                      <span style="font-size:11px;color:#B8C4D0;flex-shrink:0">$45K</span>
+                    </div>
+                    <button style="display:flex;align-items:center;gap:4px;background:#153D24;border:none;border-radius:12px;color:#4ADE80;font-size:11px;font-weight:600;padding:4px 10px;cursor:pointer;flex-shrink:0">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>
+                      Definir
+                    </button>
+                  </div>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ aIsParticipacion }}">
+                <div style="display:flex;gap:16px;align-items:center;padding:6px 16px 18px">
+                  <div style="position:relative;width:108px;height:108px;flex-shrink:0">
+                    <div style="width:108px;height:108px;border-radius:50%;background:conic-gradient(#6366f1 0% 42.7%, #f43f5e 42.7% 69%, #f59e0b 69% 82.2%, #0ea5e9 82.2% 91.6%, #d946ef 91.6% 97.2%, #10b981 97.2% 100%)"></div>
+                    <div style="position:absolute;inset:18px;border-radius:50%;background:#0e1319;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px">
+                      <span style="font-size:9px;color:#7A8A9C">total</span>
+                      <span style="font-variant-numeric:tabular-nums;font-weight:700;font-size:13px;color:#F0F4F8">$1.6M</span>
+                    </div>
+                  </div>
+                  <div style="flex:1;display:flex;flex-direction:column;gap:7px;min-width:0">
+                    <div>
+                      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px"><div style="display:flex;align-items:center;gap:6px;min-width:0"><span style="width:8px;height:8px;border-radius:50%;flex-shrink:0;background:#6366f1"></span><span style="font-size:11px;color:#F0F4F8">Hogar</span></div><span style="font-size:11px;color:#B8C4D0">43%</span></div>
+                      <div style="height:3px;background:rgba(255,255,255,0.12);border-radius:99px"><div style="height:100%;width:43%;background:#6366f1;border-radius:99px"></div></div>
+                    </div>
+                    <div>
+                      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px"><div style="display:flex;align-items:center;gap:6px;min-width:0"><span style="width:8px;height:8px;border-radius:50%;flex-shrink:0;background:#f43f5e"></span><span style="font-size:11px;color:#F0F4F8">Salidas</span></div><span style="font-size:11px;color:#B8C4D0">26%</span></div>
+                      <div style="height:3px;background:rgba(255,255,255,0.12);border-radius:99px"><div style="height:100%;width:26%;background:#f43f5e;border-radius:99px"></div></div>
+                    </div>
+                    <div>
+                      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px"><div style="display:flex;align-items:center;gap:6px;min-width:0"><span style="width:8px;height:8px;border-radius:50%;flex-shrink:0;background:#f59e0b"></span><span style="font-size:11px;color:#F0F4F8">Transporte</span></div><span style="font-size:11px;color:#B8C4D0">13%</span></div>
+                      <div style="height:3px;background:rgba(255,255,255,0.12);border-radius:99px"><div style="height:100%;width:13%;background:#f59e0b;border-radius:99px"></div></div>
+                    </div>
+                    <div>
+                      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px"><div style="display:flex;align-items:center;gap:6px;min-width:0"><span style="width:8px;height:8px;border-radius:50%;flex-shrink:0;background:#0ea5e9"></span><span style="font-size:11px;color:#F0F4F8">Compras Online</span></div><span style="font-size:11px;color:#B8C4D0">9%</span></div>
+                      <div style="height:3px;background:rgba(255,255,255,0.12);border-radius:99px"><div style="height:100%;width:9%;background:#0ea5e9;border-radius:99px"></div></div>
+                    </div>
+                  </div>
+                </div>
+              </sc-if>
+            </div>
+
+            <div style="background:rgba(18,24,30,0.82);border:1px solid rgba(255,255,255,0.12);border-radius:24px;overflow:hidden">
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px 10px;border-bottom:1px solid rgba(255,255,255,0.07)">
+                <p style="font-size:13px;font-weight:600;color:#F0F4F8;margin:0">Mis Ahorros</p>
+                <button style="display:flex;align-items:center;gap:6px;background:none;border:none;cursor:pointer;color:#B8C4D0;font-size:11px;font-weight:500;padding:2px 0">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path><path d="m15 5 4 4"></path></svg>
+                  Editar
+                </button>
+              </div>
+              <div style="padding:14px 16px 12px">
+                <p style="font-size:11px;font-weight:400;color:#7A8A9C;margin:0 0 4px">Total ahorrado</p>
+                <span style="font-size:28px;font-weight:700;color:#4ADE80;letter-spacing:-0.03em;line-height:1;font-variant-numeric:tabular-nums">$2.1M</span>
+              </div>
+              <button style="display:flex;align-items:center;gap:6px;width:100%;background:none;border:none;cursor:pointer;color:#B8C4D0;font-size:11px;padding:0 16px 12px">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg>
+                Ver desglose (2)
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="dv-opt" id="1b">
+        <div class="dv-olabel"><a class="dv-oid" href="#1b">1b</a><b>Primario + progresivo</b>Sin toggle: la vista de cumplimiento (accionable) queda siempre abierta arriba; la participación (dato curioso, no accionable) se revela como detalle opcional debajo.</div>
+        <div class="dv-card">
+
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:rgba(18,24,30,0.82);border-bottom:1px solid rgba(255,255,255,0.12)">
+            <div style="display:flex;align-items:center;gap:8px">
+              <svg viewBox="0 0 100 100" width="30" height="30" aria-hidden="true" style="color:#F0F4F8">
+                <line x1="30" y1="18" x2="30" y2="82" stroke="currentColor" stroke-width="6" stroke-linecap="round"></line>
+                <path d="M30,18 Q70,18 70,34 Q70,50 30,50" stroke="currentColor" stroke-width="6" fill="none" stroke-linecap="round"></path>
+                <path d="M30,50 Q78,50 78,66 Q78,82 30,82" stroke="#4ADE80" stroke-width="6" fill="none" stroke-linecap="round"></path>
+              </svg>
+              <span style="font-size:15px;letter-spacing:-0.02em"><span style="font-weight:400;color:#F0F4F8">Billete</span><span style="font-weight:700;color:#4ADE80">Claro</span></span>
+            </div>
+            <div style="display:flex;align-items:center;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:0 6px;gap:2px;height:34px">
+              <button aria-label="Sincronizar" style="background:none;border:none;cursor:pointer;width:34px;height:30px;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#B8C4D0">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path><path d="M21 3v5h-5"></path><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path><path d="M8 16H3v5"></path></svg>
+              </button>
+              <button aria-label="Cambiar a modo claro" style="background:none;border:none;cursor:pointer;width:34px;height:30px;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#B8C4D0">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path></svg>
+              </button>
+              <div style="width:1px;height:16px;background:rgba(255,255,255,0.12);margin:0 2px;flex-shrink:0"></div>
+              <button aria-label="Más opciones" style="background:none;border:none;cursor:pointer;width:34px;height:30px;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#B8C4D0">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg>
+              </button>
+            </div>
+          </div>
+
+          <div style="padding:16px 16px 20px;display:flex;flex-direction:column;gap:20px">
+            <div>
+              <p style="font-size:13px;color:#B8C4D0;margin:0">Hola, Nicolás</p>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px">
+                <button aria-label="Mes anterior" style="width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#B8C4D0;background:none;border:none;cursor:pointer">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"></path></svg>
+                </button>
+                <h1 style="text-transform:capitalize;font-size:19px;font-weight:500;color:#F0F4F8;margin:0">julio 2026</h1>
+                <button aria-label="Mes siguiente" style="width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#B8C4D0;background:none;border:none;cursor:pointer">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></svg>
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:12px">
+                <div>
+                  <p style="font-size:11px;font-weight:400;color:#7A8A9C;margin:0 0 5px">Gastado este mes</p>
+                  <div style="display:flex;align-items:baseline;gap:8px">
+                    <span style="font-variant-numeric:tabular-nums;font-size:38px;font-weight:700;color:#F0F4F8;letter-spacing:-0.04em;line-height:1">$1.6M</span>
+                    <span style="font-size:13px;color:#B8C4D0">de $3.2M</span>
+                  </div>
+                </div>
+                <span style="font-variant-numeric:tabular-nums;font-size:13px;font-weight:700;margin-bottom:2px;color:#4ADE80">50%</span>
+              </div>
+              <div style="height:5px;background:rgba(255,255,255,0.12);border-radius:99px;margin-bottom:10px;overflow:hidden">
+                <div style="height:100%;border-radius:99px;width:50%;background:#4ADE80"></div>
+              </div>
+              <p style="font-size:11px;font-weight:500;margin:0 0 8px;color:#FCD34D">Gastando más rápido que el tiempo del mes</p>
+              <div style="display:flex;align-items:center;gap:16px">
+                <p style="font-size:11px;font-weight:500;margin:0;color:#4ADE80">$1.6M disponibles</p>
+                <p style="font-size:11px;color:#7A8A9C;margin:0">12d restantes</p>
+                <p style="font-size:11px;color:#7A8A9C;margin:0">38 mov.</p>
+              </div>
+            </div>
+
+            <div style="background:rgba(18,24,30,0.82);border:1px solid rgba(255,255,255,0.12);border-radius:24px;overflow:hidden">
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px 10px;border-bottom:1px solid rgba(255,255,255,0.07)">
+                <p style="font-size:13px;font-weight:600;color:#F0F4F8;margin:0">Categorías</p>
+                <button style="display:flex;align-items:center;gap:6px;background:none;border:none;cursor:pointer;color:#B8C4D0;font-size:11px;font-weight:500;padding:2px 0">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path><path d="m15 5 4 4"></path></svg>
+                  Editar
+                </button>
+              </div>
+
+              <div style="padding:9px 16px;border-bottom:1px solid rgba(255,255,255,0.07)">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+                  <span style="flex:1;font-size:13px;color:#F0F4F8;font-weight:600">Presupuestado</span>
+                  <span style="font-variant-numeric:tabular-nums;font-size:11px"><span style="color:#B8C4D0">$1.4M</span><span style="color:#7A8A9C"> / $1.5M</span></span>
+                  <span style="font-size:12px;font-weight:700;color:#FCD34D;min-width:40px;text-align:right">93%</span>
+                </div>
+                <div style="height:3px;background:rgba(255,255,255,0.12);border-radius:99px;overflow:hidden"><div style="height:100%;width:93%;background:#FCD34D;border-radius:99px"></div></div>
+              </div>
+
+              <div style="padding:9px 16px;border-bottom:1px solid rgba(255,255,255,0.07)">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+                  <span style="width:9px;height:9px;border-radius:50%;flex-shrink:0;background:#f43f5e"></span>
+                  <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;color:#F0F4F8;font-weight:600">Salidas</span>
+                  <span style="font-variant-numeric:tabular-nums;flex-shrink:0;font-size:11px"><span style="color:#B8C4D0">$420K</span><span style="color:#7A8A9C"> / $350K</span></span>
+                  <span style="font-variant-numeric:tabular-nums;flex-shrink:0;font-size:12px;font-weight:700;color:#FF6B6B;min-width:40px;text-align:right">+20%</span>
+                </div>
+                <div style="height:3px;background:rgba(255,255,255,0.12);border-radius:99px;overflow:hidden"><div style="height:100%;border-radius:99px;width:100%;background:#FF6B6B"></div></div>
+              </div>
+
+              <div style="padding:9px 16px;border-bottom:1px solid rgba(255,255,255,0.07)">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+                  <span style="width:9px;height:9px;border-radius:50%;flex-shrink:0;background:#6366f1"></span>
+                  <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;color:#F0F4F8;font-weight:600">Hogar</span>
+                  <span style="font-variant-numeric:tabular-nums;flex-shrink:0;font-size:11px"><span style="color:#B8C4D0">$680K</span><span style="color:#7A8A9C"> / $750K</span></span>
+                  <span style="font-variant-numeric:tabular-nums;flex-shrink:0;font-size:12px;font-weight:700;color:#FCD34D;min-width:40px;text-align:right">91%</span>
+                </div>
+                <div style="height:3px;background:rgba(255,255,255,0.12);border-radius:99px;overflow:hidden"><div style="height:100%;border-radius:99px;width:91%;background:#FCD34D"></div></div>
+              </div>
+
+              <div style="padding:9px 16px">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+                  <span style="width:9px;height:9px;border-radius:50%;flex-shrink:0;background:#f59e0b"></span>
+                  <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;color:#F0F4F8;font-weight:600">Transporte</span>
+                  <span style="font-variant-numeric:tabular-nums;flex-shrink:0;font-size:11px"><span style="color:#B8C4D0">$210K</span><span style="color:#7A8A9C"> / $300K</span></span>
+                  <span style="font-variant-numeric:tabular-nums;flex-shrink:0;font-size:12px;font-weight:700;color:#4ADE80;min-width:40px;text-align:right">70%</span>
+                </div>
+                <div style="height:3px;background:rgba(255,255,255,0.12);border-radius:99px;overflow:hidden"><div style="height:100%;border-radius:99px;width:70%;background:#4ADE80"></div></div>
+              </div>
+
+              <p style="font-size:11px;color:#7A8A9C;padding:14px 16px 2px;margin:0;border-top:1px solid rgba(255,255,255,0.07)">Sin presupuesto</p>
+              <div style="padding:9px 16px;display:flex;align-items:center;justify-content:space-between;gap:8px;border-bottom:1px solid rgba(255,255,255,0.07)">
+                <div style="display:flex;align-items:center;gap:8px;min-width:0">
+                  <span style="width:9px;height:9px;border-radius:50%;flex-shrink:0;background:#0ea5e9"></span>
+                  <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;color:#F0F4F8;font-weight:600">Compras Online</span>
+                  <span style="font-size:11px;color:#B8C4D0;flex-shrink:0">$150K</span>
+                </div>
+                <button style="display:flex;align-items:center;gap:4px;background:#153D24;border:none;border-radius:12px;color:#4ADE80;font-size:11px;font-weight:600;padding:4px 10px;cursor:pointer;flex-shrink:0">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>
+                  Definir
+                </button>
+              </div>
+              <div style="padding:9px 16px;display:flex;align-items:center;justify-content:space-between;gap:8px;border-bottom:1px solid rgba(255,255,255,0.07)">
+                <div style="display:flex;align-items:center;gap:8px;min-width:0">
+                  <span style="width:9px;height:9px;border-radius:50%;flex-shrink:0;background:#10b981"></span>
+                  <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;color:#F0F4F8;font-weight:600">Salud</span>
+                  <span style="font-size:11px;color:#B8C4D0;flex-shrink:0">$45K</span>
+                </div>
+                <button style="display:flex;align-items:center;gap:4px;background:#153D24;border:none;border-radius:12px;color:#4ADE80;font-size:11px;font-weight:600;padding:4px 10px;cursor:pointer;flex-shrink:0">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>
+                  Definir
+                </button>
+              </div>
+
+              <sc-if value="{{ bShowParticipacion }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;gap:16px;align-items:center;padding:14px 16px 4px;border-top:1px solid rgba(255,255,255,0.07)">
+                  <div style="position:relative;width:96px;height:96px;flex-shrink:0">
+                    <div style="width:96px;height:96px;border-radius:50%;background:conic-gradient(#6366f1 0% 42.7%, #f43f5e 42.7% 69%, #f59e0b 69% 82.2%, #0ea5e9 82.2% 91.6%, #d946ef 91.6% 97.2%, #10b981 97.2% 100%)"></div>
+                    <div style="position:absolute;inset:16px;border-radius:50%;background:#0e1319;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px">
+                      <span style="font-size:8px;color:#7A8A9C">total</span>
+                      <span style="font-variant-numeric:tabular-nums;font-weight:700;font-size:12px;color:#F0F4F8">$1.6M</span>
+                    </div>
+                  </div>
+                  <div style="flex:1;display:flex;flex-direction:column;gap:6px;min-width:0">
+                    <div style="display:flex;align-items:center;justify-content:space-between"><div style="display:flex;align-items:center;gap:6px;min-width:0"><span style="width:7px;height:7px;border-radius:50%;flex-shrink:0;background:#6366f1"></span><span style="font-size:10.5px;color:#F0F4F8">Hogar</span></div><span style="font-size:10.5px;color:#B8C4D0">43%</span></div>
+                    <div style="display:flex;align-items:center;justify-content:space-between"><div style="display:flex;align-items:center;gap:6px;min-width:0"><span style="width:7px;height:7px;border-radius:50%;flex-shrink:0;background:#f43f5e"></span><span style="font-size:10.5px;color:#F0F4F8">Salidas</span></div><span style="font-size:10.5px;color:#B8C4D0">26%</span></div>
+                    <div style="display:flex;align-items:center;justify-content:space-between"><div style="display:flex;align-items:center;gap:6px;min-width:0"><span style="width:7px;height:7px;border-radius:50%;flex-shrink:0;background:#f59e0b"></span><span style="font-size:10.5px;color:#F0F4F8">Transporte</span></div><span style="font-size:10.5px;color:#B8C4D0">13%</span></div>
+                  </div>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ bShowParticipacion }}" hint-placeholder-val="{{ false }}">
+                <button onClick="{{ toggleBParticipacion }}" style="display:flex;align-items:center;gap:6px;width:100%;background:none;border:none;cursor:pointer;color:#7A8A9C;font-size:11px;padding:10px 16px 12px">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transform:rotate(180deg)"><path d="m6 9 6 6 6-6"></path></svg>
+                  Ocultar participación
+                </button>
+              </sc-if>
+              <sc-if value="{{ bHideParticipacion }}" hint-placeholder-val="{{ true }}">
+                <button onClick="{{ toggleBParticipacion }}" style="display:flex;align-items:center;gap:6px;width:100%;background:none;border:none;cursor:pointer;color:#7A8A9C;font-size:11px;padding:10px 16px 12px;border-top:1px solid rgba(255,255,255,0.07)">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg>
+                  Ver participación por categoría
+                </button>
+              </sc-if>
+
+            </div>
+
+            <div style="background:rgba(18,24,30,0.82);border:1px solid rgba(255,255,255,0.12);border-radius:24px;overflow:hidden">
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px 10px;border-bottom:1px solid rgba(255,255,255,0.07)">
+                <p style="font-size:13px;font-weight:600;color:#F0F4F8;margin:0">Mis Ahorros</p>
+                <button style="display:flex;align-items:center;gap:6px;background:none;border:none;cursor:pointer;color:#B8C4D0;font-size:11px;font-weight:500;padding:2px 0">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path><path d="m15 5 4 4"></path></svg>
+                  Editar
+                </button>
+              </div>
+              <div style="padding:14px 16px 12px">
+                <p style="font-size:11px;font-weight:400;color:#7A8A9C;margin:0 0 4px">Total ahorrado</p>
+                <span style="font-size:28px;font-weight:700;color:#4ADE80;letter-spacing:-0.03em;line-height:1;font-variant-numeric:tabular-nums">$2.1M</span>
+              </div>
+              <button style="display:flex;align-items:center;gap:6px;width:100%;background:none;border:none;cursor:pointer;color:#B8C4D0;font-size:11px;padding:0 16px 12px">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg>
+                Ver desglose (2)
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="dv-opt" id="1c">
+        <div class="dv-olabel"><a class="dv-oid" href="#1c">1c</a><b>Solo cumplimiento, sin dona</b>La más radical: elimina la participación relativa por completo. "Cuál es mi mayor gasto" se resuelve con una línea de texto, no con un segundo gráfico — menos densidad, un solo lenguaje visual.</div>
+        <div class="dv-card">
+
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:rgba(18,24,30,0.82);border-bottom:1px solid rgba(255,255,255,0.12)">
+            <div style="display:flex;align-items:center;gap:8px">
+              <svg viewBox="0 0 100 100" width="30" height="30" aria-hidden="true" style="color:#F0F4F8">
+                <line x1="30" y1="18" x2="30" y2="82" stroke="currentColor" stroke-width="6" stroke-linecap="round"></line>
+                <path d="M30,18 Q70,18 70,34 Q70,50 30,50" stroke="currentColor" stroke-width="6" fill="none" stroke-linecap="round"></path>
+                <path d="M30,50 Q78,50 78,66 Q78,82 30,82" stroke="#4ADE80" stroke-width="6" fill="none" stroke-linecap="round"></path>
+              </svg>
+              <span style="font-size:15px;letter-spacing:-0.02em"><span style="font-weight:400;color:#F0F4F8">Billete</span><span style="font-weight:700;color:#4ADE80">Claro</span></span>
+            </div>
+            <div style="display:flex;align-items:center;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:0 6px;gap:2px;height:34px">
+              <button aria-label="Sincronizar" style="background:none;border:none;cursor:pointer;width:34px;height:30px;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#B8C4D0">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path><path d="M21 3v5h-5"></path><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path><path d="M8 16H3v5"></path></svg>
+              </button>
+              <button aria-label="Cambiar a modo claro" style="background:none;border:none;cursor:pointer;width:34px;height:30px;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#B8C4D0">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path></svg>
+              </button>
+              <div style="width:1px;height:16px;background:rgba(255,255,255,0.12);margin:0 2px;flex-shrink:0"></div>
+              <button aria-label="Más opciones" style="background:none;border:none;cursor:pointer;width:34px;height:30px;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#B8C4D0">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg>
+              </button>
+            </div>
+          </div>
+
+          <div style="padding:16px 16px 20px;display:flex;flex-direction:column;gap:20px">
+            <div>
+              <p style="font-size:13px;color:#B8C4D0;margin:0">Hola, Nicolás</p>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px">
+                <button aria-label="Mes anterior" style="width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#B8C4D0;background:none;border:none;cursor:pointer">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"></path></svg>
+                </button>
+                <h1 style="text-transform:capitalize;font-size:19px;font-weight:500;color:#F0F4F8;margin:0">julio 2026</h1>
+                <button aria-label="Mes siguiente" style="width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#B8C4D0;background:none;border:none;cursor:pointer">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></svg>
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:12px">
+                <div>
+                  <p style="font-size:11px;font-weight:400;color:#7A8A9C;margin:0 0 5px">Gastado este mes</p>
+                  <div style="display:flex;align-items:baseline;gap:8px">
+                    <span style="font-variant-numeric:tabular-nums;font-size:38px;font-weight:700;color:#F0F4F8;letter-spacing:-0.04em;line-height:1">$1.6M</span>
+                    <span style="font-size:13px;color:#B8C4D0">de $3.2M</span>
+                  </div>
+                </div>
+                <span style="font-variant-numeric:tabular-nums;font-size:13px;font-weight:700;margin-bottom:2px;color:#4ADE80">50%</span>
+              </div>
+              <div style="height:5px;background:rgba(255,255,255,0.12);border-radius:99px;margin-bottom:10px;overflow:hidden">
+                <div style="height:100%;border-radius:99px;width:50%;background:#4ADE80"></div>
+              </div>
+              <p style="font-size:11px;font-weight:500;margin:0 0 8px;color:#FCD34D">Gastando más rápido que el tiempo del mes</p>
+              <div style="display:flex;align-items:center;gap:16px">
+                <p style="font-size:11px;font-weight:500;margin:0;color:#4ADE80">$1.6M disponibles</p>
+                <p style="font-size:11px;color:#7A8A9C;margin:0">12d restantes</p>
+                <p style="font-size:11px;color:#7A8A9C;margin:0">38 mov.</p>
+              </div>
+            </div>
+
+            <div style="background:rgba(18,24,30,0.82);border:1px solid rgba(255,255,255,0.12);border-radius:24px;overflow:hidden">
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px 2px">
+                <p style="font-size:13px;font-weight:600;color:#F0F4F8;margin:0">Categorías</p>
+                <button style="display:flex;align-items:center;gap:6px;background:none;border:none;cursor:pointer;color:#B8C4D0;font-size:11px;font-weight:500;padding:2px 0">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path><path d="m15 5 4 4"></path></svg>
+                  Editar
+                </button>
+              </div>
+              <p style="font-size:10px;color:#7A8A9C;margin:0;padding:0 16px 10px;border-bottom:1px solid rgba(255,255,255,0.07)">Mayor gasto: Hogar · $680K</p>
+
+              <div style="padding:9px 16px;border-bottom:1px solid rgba(255,255,255,0.07)">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+                  <span style="flex:1;font-size:13px;color:#F0F4F8;font-weight:600">Presupuestado</span>
+                  <span style="font-variant-numeric:tabular-nums;font-size:11px"><span style="color:#B8C4D0">$1.4M</span><span style="color:#7A8A9C"> / $1.5M</span></span>
+                  <span style="font-size:12px;font-weight:700;color:#FCD34D;min-width:40px;text-align:right">93%</span>
+                </div>
+                <div style="height:3px;background:rgba(255,255,255,0.12);border-radius:99px;overflow:hidden"><div style="height:100%;width:93%;background:#FCD34D;border-radius:99px"></div></div>
+              </div>
+
+              <div style="padding:9px 16px;border-bottom:1px solid rgba(255,255,255,0.07)">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+                  <span style="width:9px;height:9px;border-radius:50%;flex-shrink:0;background:#f43f5e"></span>
+                  <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;color:#F0F4F8;font-weight:600">Salidas</span>
+                  <span style="font-variant-numeric:tabular-nums;flex-shrink:0;font-size:11px"><span style="color:#B8C4D0">$420K</span><span style="color:#7A8A9C"> / $350K</span></span>
+                  <span style="font-variant-numeric:tabular-nums;flex-shrink:0;font-size:12px;font-weight:700;color:#FF6B6B;min-width:40px;text-align:right">+20%</span>
+                </div>
+                <div style="height:3px;background:rgba(255,255,255,0.12);border-radius:99px;overflow:hidden"><div style="height:100%;border-radius:99px;width:100%;background:#FF6B6B"></div></div>
+              </div>
+
+              <div style="padding:9px 16px;border-bottom:1px solid rgba(255,255,255,0.07)">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+                  <span style="width:9px;height:9px;border-radius:50%;flex-shrink:0;background:#6366f1"></span>
+                  <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;color:#F0F4F8;font-weight:600">Hogar</span>
+                  <span style="font-variant-numeric:tabular-nums;flex-shrink:0;font-size:11px"><span style="color:#B8C4D0">$680K</span><span style="color:#7A8A9C"> / $750K</span></span>
+                  <span style="font-variant-numeric:tabular-nums;flex-shrink:0;font-size:12px;font-weight:700;color:#FCD34D;min-width:40px;text-align:right">91%</span>
+                </div>
+                <div style="height:3px;background:rgba(255,255,255,0.12);border-radius:99px;overflow:hidden"><div style="height:100%;border-radius:99px;width:91%;background:#FCD34D"></div></div>
+              </div>
+
+              <div style="padding:9px 16px">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+                  <span style="width:9px;height:9px;border-radius:50%;flex-shrink:0;background:#f59e0b"></span>
+                  <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;color:#F0F4F8;font-weight:600">Transporte</span>
+                  <span style="font-variant-numeric:tabular-nums;flex-shrink:0;font-size:11px"><span style="color:#B8C4D0">$210K</span><span style="color:#7A8A9C"> / $300K</span></span>
+                  <span style="font-variant-numeric:tabular-nums;flex-shrink:0;font-size:12px;font-weight:700;color:#4ADE80;min-width:40px;text-align:right">70%</span>
+                </div>
+                <div style="height:3px;background:rgba(255,255,255,0.12);border-radius:99px;overflow:hidden"><div style="height:100%;border-radius:99px;width:70%;background:#4ADE80"></div></div>
+              </div>
+
+              <p style="font-size:11px;color:#7A8A9C;padding:14px 16px 2px;margin:0;border-top:1px solid rgba(255,255,255,0.07)">Sin presupuesto</p>
+              <div style="padding:9px 16px;display:flex;align-items:center;justify-content:space-between;gap:8px;border-bottom:1px solid rgba(255,255,255,0.07)">
+                <div style="display:flex;align-items:center;gap:8px;min-width:0">
+                  <span style="width:9px;height:9px;border-radius:50%;flex-shrink:0;background:#0ea5e9"></span>
+                  <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;color:#F0F4F8;font-weight:600">Compras Online</span>
+                  <span style="font-size:11px;color:#B8C4D0;flex-shrink:0">$150K</span>
+                </div>
+                <button style="display:flex;align-items:center;gap:4px;background:#153D24;border:none;border-radius:12px;color:#4ADE80;font-size:11px;font-weight:600;padding:4px 10px;cursor:pointer;flex-shrink:0">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>
+                  Definir
+                </button>
+              </div>
+              <div style="padding:9px 16px;display:flex;align-items:center;justify-content:space-between;gap:8px">
+                <div style="display:flex;align-items:center;gap:8px;min-width:0">
+                  <span style="width:9px;height:9px;border-radius:50%;flex-shrink:0;background:#10b981"></span>
+                  <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;color:#F0F4F8;font-weight:600">Salud</span>
+                  <span style="font-size:11px;color:#B8C4D0;flex-shrink:0">$45K</span>
+                </div>
+                <button style="display:flex;align-items:center;gap:4px;background:#153D24;border:none;border-radius:12px;color:#4ADE80;font-size:11px;font-weight:600;padding:4px 10px;cursor:pointer;flex-shrink:0">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>
+                  Definir
+                </button>
+              </div>
+            </div>
+
+            <div style="background:rgba(18,24,30,0.82);border:1px solid rgba(255,255,255,0.12);border-radius:24px;overflow:hidden">
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px 10px;border-bottom:1px solid rgba(255,255,255,0.07)">
+                <p style="font-size:13px;font-weight:600;color:#F0F4F8;margin:0">Mis Ahorros</p>
+                <button style="display:flex;align-items:center;gap:6px;background:none;border:none;cursor:pointer;color:#B8C4D0;font-size:11px;font-weight:500;padding:2px 0">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path><path d="m15 5 4 4"></path></svg>
+                  Editar
+                </button>
+              </div>
+              <div style="padding:14px 16px 12px">
+                <p style="font-size:11px;font-weight:400;color:#7A8A9C;margin:0 0 4px">Total ahorrado</p>
+                <span style="font-size:28px;font-weight:700;color:#4ADE80;letter-spacing:-0.03em;line-height:1;font-variant-numeric:tabular-nums">$2.1M</span>
+              </div>
+              <button style="display:flex;align-items:center;gap:6px;width:100%;background:none;border:none;cursor:pointer;color:#B8C4D0;font-size:11px;padding:0 16px 12px">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg>
+                Ver desglose (2)
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    <p class="dv-next">Prueba: "quédate con <a href="#1b">1b</a>" · "combina el caption de <a href="#1c">1c</a> con el toggle de <a href="#1a">1a</a>" · "sigue con el módulo Presupuesto"</p>
+  </section>
+
+  <section style="padding:8px 44px 56px">
+    <p style="font:600 12px system-ui,sans-serif;color:#1a1a1a;margin:0 0 4px">Estados considerados (aplican a las 3 direcciones)</p>
+    <p style="font:400 11.5px system-ui,sans-serif;color:#666;margin:0 0 16px">Cargando · sin transacciones este mes · error de sincronización.</p>
+    <div style="display:flex;gap:20px;flex-wrap:wrap">
+
+      <div style="width:280px;background:#080A0C;border:1px solid rgba(0,0,0,.18);border-radius:14px;overflow:hidden">
+        <div style="padding:16px 20px">
+          <div style="height:11px;width:110px;margin-bottom:16px;border-radius:4px;background:rgba(24,30,38,0.9);animation:pulse 1.4s ease-in-out infinite"></div>
+          <div style="margin-bottom:14px"><div style="height:10px;width:80%;margin-bottom:8px;border-radius:4px;background:rgba(24,30,38,0.9);animation:pulse 1.4s ease-in-out infinite"></div><div style="height:4px;border-radius:99px;background:rgba(24,30,38,0.9);animation:pulse 1.4s ease-in-out infinite"></div></div>
+          <div style="margin-bottom:14px"><div style="height:10px;width:60%;margin-bottom:8px;border-radius:4px;background:rgba(24,30,38,0.9);animation:pulse 1.4s ease-in-out infinite"></div><div style="height:4px;border-radius:99px;background:rgba(24,30,38,0.9);animation:pulse 1.4s ease-in-out infinite"></div></div>
+          <div><div style="height:10px;width:90%;margin-bottom:8px;border-radius:4px;background:rgba(24,30,38,0.9);animation:pulse 1.4s ease-in-out infinite"></div><div style="height:4px;border-radius:99px;background:rgba(24,30,38,0.9);animation:pulse 1.4s ease-in-out infinite"></div></div>
+        </div>
+      </div>
+
+      <div style="width:280px;background:#080A0C;border:1px solid rgba(0,0,0,.18);border-radius:14px;overflow:hidden">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px 10px;border-bottom:1px solid rgba(255,255,255,0.07)">
+          <p style="font-size:13px;font-weight:600;color:#F0F4F8;margin:0">Categorías</p>
+        </div>
+        <div style="padding:28px 16px;text-align:center">
+          <p style="font-size:13px;color:#B8C4D0;margin:0 0 12px">Sin transacciones este mes</p>
+          <button style="font-size:11px;font-weight:500;color:#4ADE80;background:#153D24;border:none;border-radius:12px;padding:6px 14px;cursor:pointer">Configurar presupuesto</button>
+        </div>
+      </div>
+
+      <div style="width:280px;background:#080A0C;border:1px solid rgba(0,0,0,.18);border-radius:14px;overflow:hidden">
+        <div style="padding:16px">
+          <div style="display:flex;align-items:center;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:0 6px;gap:2px;height:34px;width:fit-content;margin-bottom:10px">
+            <button style="background:none;border:none;width:34px;height:30px;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#FF6B6B">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+            </button>
+          </div>
+          <p style="font-size:11.5px;color:#B8C4D0;margin:0">Error al sincronizar — toca para reintentar. Si el token expiró, vuelve a entrar con Google.</p>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { aView: 'presupuesto', bShowParticipacion: false };
+  renderVals() {
+    return {
+      aIsPresupuesto: this.state.aView === 'presupuesto',
+      aIsParticipacion: this.state.aView === 'participacion',
+      bShowParticipacion: this.state.bShowParticipacion,
+      bHideParticipacion: !this.state.bShowParticipacion,
+      setAPresupuesto: () => this.setState({ aView: 'presupuesto' }),
+      setAParticipacion: () => this.setState({ aView: 'participacion' }),
+      toggleBParticipacion: () => this.setState(s => ({ bShowParticipacion: !s.bShowParticipacion })),
+    };
+  }
+}
+</script>
+</body>
+</html>

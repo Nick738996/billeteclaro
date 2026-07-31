@@ -168,6 +168,13 @@ const CUSTOM_PALETTE = [
   '#38bdf8', '#4ade80',
 ]
 
+/** Color de zona para % de presupuesto gastado: verde <80% ó 100-109% (completado), amarillo 80-99%, rojo ≥110% */
+export function zoneColor(pct: number): string {
+  if (pct >= 110) return 'var(--red)'
+  if (pct >= 80 && pct < 100) return 'var(--yellow)'
+  return 'var(--green)'
+}
+
 export function getCategoryColor(cat: string): string {
   if (cat in CATEGORIA_COLORS) return CATEGORIA_COLORS[cat as Categoria]
   let h = 0

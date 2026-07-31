@@ -44,6 +44,7 @@ export default function BudgetManager({ mes, gastosPorCategoria, ingresos = 0, i
   const [expanded,   setExpanded]   = useState<string | null>(null)
   const [saving,     setSaving]     = useState(false)
   const [savedOk,    setSavedOk]    = useState(false)
+  const [saveError,  setSaveError]  = useState<string | null>(null)
   const [loaded,     setLoaded]     = useState(!!initialBudgets)
   const [copying,    setCopying]    = useState(false)
   const [pinnedCats,   setPinnedCats]   = useState<Set<string>>(
@@ -114,6 +115,7 @@ export default function BudgetManager({ mes, gastosPorCategoria, ingresos = 0, i
   const handleSave = async () => {
     setSaving(true)
     setSavedOk(false)
+    setSaveError(null)
     try {
       const keysToSend = new Set([
         ...Object.keys(draft),
@@ -129,11 +131,15 @@ export default function BudgetManager({ mes, gastosPorCategoria, ingresos = 0, i
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mes, items }),
       })
-      if (!res.ok) throw new Error('Error')
+      if (!res.ok) throw new Error('Error al guardar')
       setSaved(draft)
       setSavedOk(true)
       onSaved?.()
       setTimeout(() => setSavedOk(false), 3000)
+    } catch {
+      // Bug corregido: el fetch no tenía catch — un fallo de red o del servidor
+      // quedaba silencioso. Ahora se muestra en la barra flotante con "Reintentar".
+      setSaveError('Error al guardar — revisa tu conexión')
     } finally {
       setSaving(false)
     }
@@ -143,6 +149,30 @@ export default function BudgetManager({ mes, gastosPorCategoria, ingresos = 0, i
   const restante = ingresos - totalPresupuestado
 
   const predefinedSet = useMemo(() => new Set<string>(PRESUPUESTO_CATS), [])
+
+  // Orden por urgencia real, no por declaración fija. Primero TODO lo que tiene
+  // presupuesto asignado (por urgencia), y solo al final lo que no tiene —
+  // para que "sin presupuesto" nunca quede interrumpiendo la mitad de la lista:
+  //  0: excedida (≥100%)                   3: con presupuesto, sin gasto este mes
+  //  1: cerca del límite (80-99%)          4: sin presupuesto pero con gasto
+  //  2: con presupuesto y gasto, sana         (candidata a "+ Definir")
+  //     (<80%)                            5: vacía (sin presupuesto ni gasto)
+  const catRank = (cat: string, draftMap: DraftMap) => {
+    const gasto  = gastosPorCategoria[cat] ?? 0
+    const limite = draftMap[cat]?.monto ?? 0
+    if (limite > 0) {
+      const pct = (gasto / limite) * 100
+      if (pct >= 100) return 0
+      if (pct >= 80) return 1
+      return gasto > 0 ? 2 : 3
+    }
+    return gasto > 0 ? 4 : 5
+  }
+  const catScore = (cat: string, draftMap: DraftMap) => {
+    const gasto  = gastosPorCategoria[cat] ?? 0
+    const limite = draftMap[cat]?.monto ?? 0
+    return limite > 0 ? gasto / limite : gasto
+  }
 
   const activeCats = useMemo(() => {
     const seen = new Set<string>()
@@ -157,7 +187,11 @@ export default function BudgetManager({ mes, gastosPorCategoria, ingresos = 0, i
         seen.add(cat); result.push(cat)
       }
     }
-    return result
+    return result.sort((a, b) => {
+      const r = catRank(a, draft) - catRank(b, draft)
+      return r !== 0 ? r : catScore(b, draft) - catScore(a, draft)
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gastosPorCategoria, draft, pinnedCats, predefinedSet])
 
   const availablePredefined = useMemo(
@@ -205,7 +239,15 @@ export default function BudgetManager({ mes, gastosPorCategoria, ingresos = 0, i
 
   if (!loaded) return (
     <div className={`card ${styles.loadingCard}`}>
-      <div className={`skeleton ${styles.loadingSkeleton}`} />
+      {[80, 60, 90].map((w, i) => (
+        <div key={i} className={styles.loadingRow}>
+          <div className={`skeleton ${styles.loadingDot}`} />
+          <div className={styles.loadingRowMain}>
+            <div className={`skeleton ${styles.loadingLabel}`} style={{ '--skel-w': `${w}%` } as React.CSSProperties} />
+            <div className={`skeleton ${styles.loadingBar}`} />
+          </div>
+        </div>
+      ))}
     </div>
   )
 
@@ -227,38 +269,68 @@ export default function BudgetManager({ mes, gastosPorCategoria, ingresos = 0, i
           )}
           <p className={styles.headerTitle}>Presupuesto mensual</p>
         </div>
-        <div className={styles.headerSub} style={{ paddingLeft: onClose ? 23 : 0 }}>
-          <p className={styles.headerHint}>
-            Toca ▸ para desglosar
-          </p>
-          <button
-            onClick={copyFromPrev}
-            disabled={copying}
-            aria-label="Copiar presupuesto del mes anterior"
-            className={styles.copyBtn}
-          >
-            <Copy size={10} />
-            {copying ? 'Copiando…' : 'Copiar mes anterior'}
-          </button>
-        </div>
+        {activeCats.length > 0 && (
+          <div className={styles.headerSub} style={{ paddingLeft: onClose ? 23 : 0 }}>
+            <p className={styles.headerHint}>
+              Toca ▸ para desglosar
+            </p>
+            <button
+              onClick={copyFromPrev}
+              disabled={copying}
+              aria-label="Copiar presupuesto del mes anterior"
+              className={styles.copyBtn}
+            >
+              <Copy size={10} />
+              {copying ? 'Copiando…' : 'Copiar mes anterior'}
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Categorías activas */}
-      {activeCats.map(cat => (
-        <CategoryRow
-          key={cat}
-          cat={cat}
-          entry={draft[cat] ?? { monto: 0, subcategorias: [] }}
-          savedEntry={saved[cat] ?? { monto: 0, subcategorias: [] }}
-          gasto={gastosPorCategoria[cat] ?? 0}
-          isExpanded={expanded === cat}
-          onToggle={() => setExpanded(prev => prev === cat ? null : cat)}
-          onChange={entry => updateEntry(cat, entry)}
-          onRemove={(gastosPorCategoria[cat] ?? 0) === 0 ? () => removeCategory(cat) : undefined}
-        />
-      ))}
+      {/* Estado vacío — mes sin categorías */}
+      {activeCats.length === 0 && !showPicker && (
+        <div className={styles.emptyState}>
+          <p className={styles.emptyTitle}>Aún no tienes categorías</p>
+          <p className={styles.emptyHint}>Cópialas del mes pasado o agrega la primera</p>
+          <div className={styles.emptyActions}>
+            <button onClick={copyFromPrev} disabled={copying} className={styles.emptyPrimaryBtn}>
+              <Copy size={12} />
+              {copying ? 'Copiando…' : 'Copiar mes anterior'}
+            </button>
+            <button onClick={() => setShowPicker(true)} className={styles.emptySecondaryBtn}>
+              <Plus size={12} />
+              Agregar categoría
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Categorías activas — las sin presupuesto siempre van al final, marcadas aparte */}
+      {activeCats.map((cat, i) => {
+        const isFirstUnbudgeted = catRank(cat, draft) >= 4 && (i === 0 || catRank(activeCats[i - 1], draft) < 4)
+        return (
+          <div key={cat}>
+            {isFirstUnbudgeted && (
+              <div className={styles.sectionDivider}>
+                <p className={styles.sectionDividerLabel}>Sin presupuesto</p>
+              </div>
+            )}
+            <CategoryRow
+              cat={cat}
+              entry={draft[cat] ?? { monto: 0, subcategorias: [] }}
+              savedEntry={saved[cat] ?? { monto: 0, subcategorias: [] }}
+              gasto={gastosPorCategoria[cat] ?? 0}
+              isExpanded={expanded === cat}
+              onToggle={() => setExpanded(prev => prev === cat ? null : cat)}
+              onChange={entry => updateEntry(cat, entry)}
+              onRemove={(gastosPorCategoria[cat] ?? 0) === 0 ? () => removeCategory(cat) : undefined}
+            />
+          </div>
+        )
+      })}
 
       {/* Agregar categoría */}
+      {(activeCats.length > 0 || showPicker) && (
       <div className={activeCats.length > 0 ? styles.addSectionBordered : styles.addSection}>
         {showPicker ? (
           <div>
@@ -328,6 +400,7 @@ export default function BudgetManager({ mes, gastosPorCategoria, ingresos = 0, i
           </button>
         )}
       </div>
+      )}
 
       {/* Footer — resumen de asignación */}
       {(totalPresupuestado > 0 || ingresos > 0) && (
@@ -355,13 +428,13 @@ export default function BudgetManager({ mes, gastosPorCategoria, ingresos = 0, i
     {/* Floating save bar */}
     {isDirty && loaded && typeof document !== 'undefined' && createPortal(
       <div className={styles.saveBarWrap}>
-        <div className={styles.saveBar}>
-          <span className={styles.saveBarLabel}>
-            Cambios sin guardar
+        <div className={`${styles.saveBar} ${saveError ? styles.saveBarError : ''}`}>
+          <span className={saveError ? styles.saveBarLabelError : styles.saveBarLabel}>
+            {saveError ?? 'Cambios sin guardar'}
           </span>
           <div className={styles.saveBarActions}>
             <button
-              onClick={() => { setDraft(saved); onBudgetsChange?.(totals(saved)) }}
+              onClick={() => { setDraft(saved); setSaveError(null); onBudgetsChange?.(totals(saved)) }}
               className={styles.discardBtn}
             >
               Descartar
@@ -370,11 +443,12 @@ export default function BudgetManager({ mes, gastosPorCategoria, ingresos = 0, i
               onClick={handleSave}
               disabled={saving}
               data-testid={TEST_IDS.BUDGET_SAVE_BUTTON}
-              aria-label={saving ? 'Guardando presupuesto' : 'Guardar presupuesto'}
-              className={`${styles.saveBtn} ${savedOk ? styles.saveBtnOk : styles.saveBtnNormal}`}
+              aria-label={saving ? 'Guardando presupuesto' : saveError ? 'Reintentar guardado' : 'Guardar presupuesto'}
+              className={`${styles.saveBtn} ${savedOk ? styles.saveBtnOk : saveError ? styles.saveBtnError : styles.saveBtnNormal}`}
             >
               {saving   ? <><RefreshCw size={11} className="animate-spin" /> Guardando…</> :
-               savedOk  ? <><Check size={11} /> Guardado</> : 'Guardar'}
+               savedOk  ? <><Check size={11} /> Guardado</> :
+               saveError ? 'Reintentar' : 'Guardar'}
             </button>
           </div>
         </div>
@@ -405,6 +479,16 @@ function CategoryRow({ cat, entry, savedEntry, gasto, isExpanded, onToggle, onCh
   const color    = limite > 0 ? pctColor(pct) : 'var(--text-muted)'
   const bgColor  = limite > 0 ? pctBg(pct) : 'transparent'
   const isDirty  = JSON.stringify(entry) !== JSON.stringify(savedEntry)
+
+  const [quickSet,   setQuickSet]   = useState(false)
+  const [quickValue, setQuickValue] = useState('')
+
+  const confirmQuickSet = () => {
+    const monto = parseInt(quickValue, 10) || 0
+    if (monto > 0) onChange({ monto, subcategorias: [] })
+    setQuickSet(false)
+    setQuickValue('')
+  }
 
   const updateSubcat = (idx: number, field: keyof BudgetSubcat, value: string | number) => {
     const subs = entry.subcategorias.map((s, i) =>
@@ -477,8 +561,37 @@ function CategoryRow({ cat, entry, savedEntry, gasto, isExpanded, onToggle, onCh
             >
               {pct >= 110 ? `+${Math.round(pct - 100)}%` : pct >= 100 ? <Check size={12} strokeWidth={2.5} /> : `${Math.round(pct)}%`}
             </span>
+          ) : quickSet ? (
+            <div className={styles.quickSetGroup} onClick={e => e.stopPropagation()}>
+              <span className={styles.quickSetSign}>$</span>
+              <input
+                autoFocus
+                className={styles.quickSetInput}
+                value={quickValue}
+                onChange={e => setQuickValue(e.target.value.replace(/\D/g, ''))}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') confirmQuickSet()
+                  if (e.key === 'Escape') { setQuickSet(false); setQuickValue('') }
+                }}
+                placeholder="0"
+                aria-label={`Definir presupuesto de ${catLabel(cat)}`}
+              />
+              <button
+                onClick={confirmQuickSet}
+                aria-label="Confirmar presupuesto"
+                className={styles.quickSetConfirm}
+              >
+                <Check size={12} strokeWidth={2.5} />
+              </button>
+            </div>
           ) : (
-            <span className={styles.noLimitLabel}>sin límite</span>
+            <button
+              onClick={e => { e.stopPropagation(); setQuickSet(true) }}
+              className={styles.defineBtn}
+            >
+              <Plus size={11} strokeWidth={2.5} />
+              Definir
+            </button>
           )}
           {onRemove && (
             <button
@@ -573,9 +686,9 @@ function SubcatRow({ sub, onNameChange, onMontoChange, onRemove }: {
   onRemove: () => void
 }) {
   return (
-    <div className={styles.subcatRow}>
+    <div className={`tx-row ${styles.subcatRow}`}>
       <input
-        className={`input-field ${styles.subcatNameInput}`}
+        className={styles.subcatNameInput}
         value={sub.nombre}
         onChange={e => onNameChange(e.target.value)}
         placeholder="Nombre (ej. Mercado)"
@@ -584,14 +697,14 @@ function SubcatRow({ sub, onNameChange, onMontoChange, onRemove }: {
       <div className={styles.subcatMontoGroup}>
         <span className={styles.subcatCurrencySign} aria-hidden="true">$</span>
         <input
-          className={`input-field ${styles.subcatMontoInput}`}
+          className={styles.subcatMontoInput}
           value={sub.monto > 0 ? sub.monto.toLocaleString('es-CO') : ''}
           onChange={e => onMontoChange(e.target.value)}
           placeholder="0"
           aria-label="Monto de la subcategoría"
         />
       </div>
-      <button onClick={onRemove} aria-label="Eliminar subcategoría" className={styles.subcatRemoveBtn}>
+      <button onClick={onRemove} aria-label="Eliminar subcategoría" className={`delete-btn ${styles.subcatRemoveBtn}`}>
         <Trash2 size={12} />
       </button>
     </div>

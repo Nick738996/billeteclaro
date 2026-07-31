@@ -11,7 +11,12 @@ import { es } from 'date-fns/locale'
 const BOGOTA_TZ = 'America/Bogota'
 const format = (date: Date | number, fmt: string, opts?: { locale?: Locale }) =>
   formatInTimeZone(date, BOGOTA_TZ, fmt, opts)
-import { Search, RefreshCw, X, Trash2, Plus, Check } from 'lucide-react'
+import {
+  Search, RefreshCw, X, Trash2, Plus, Check, ChevronDown,
+  Home, Car, Utensils, HeartPulse, Package, ShoppingBag, TrendingUp, PiggyBank,
+  Landmark, CreditCard, Gift, GraduationCap, RotateCcw, ArrowLeftRight, ArrowDown, Tag,
+  type LucideIcon,
+} from 'lucide-react'
 import {
   type Transaction,
   type Categoria,
@@ -35,41 +40,56 @@ import styles from './TransactionsList.module.css'
 //   Antes: scroll horizontal con 16 chips
 //   Después: 3 chips fijos + badge de filtro activo + bottom sheet de categorías
 
-// ── Theme maps (igual que el original) ───────────────────────────────────────
-
-const CATEGORIA_THEME: Record<Categoria, { color: string; bg: string }> = {
-  TRANSPORTE:     { color: 'var(--blue)',        bg: 'var(--blue-soft)' },
-  SALIDAS:        { color: 'var(--red)',         bg: 'var(--red-soft)' },
-  HOGAR:          { color: 'var(--green)',       bg: 'var(--green-soft)' },
-  SALUD:          { color: 'var(--green)',       bg: 'var(--green-soft)' },
-  SUSCRIPCIONES:  { color: 'var(--purple)',      bg: 'var(--purple-soft)' },
-  COMPRAS_ONLINE: { color: 'var(--yellow)',      bg: 'var(--yellow-soft)' },
-  INVERSION:      { color: 'var(--purple)',      bg: 'var(--purple-soft)' },
-  AHORROS:        { color: 'var(--blue)',        bg: 'var(--blue-soft)' },
-  PRESTAMO:       { color: 'var(--purple)',      bg: 'var(--purple-soft)' },
-  DEUDA:          { color: 'var(--red)',         bg: 'var(--red-soft)' },
-  DONACIONES:     { color: 'var(--blue)',        bg: 'var(--blue-soft)' },
-  EDUCACION:      { color: 'var(--yellow)',      bg: 'var(--yellow-soft)' },
-  REEMBOLSABLE:   { color: 'var(--yellow)',      bg: 'var(--yellow-soft)' },
-  TRANSFERENCIA:  { color: 'var(--blue)',        bg: 'var(--blue-soft)' },
-  INGRESO:        { color: 'var(--green)',       bg: 'var(--green-soft)' },
-  OTRO:           { color: 'var(--text-muted)', bg: 'var(--surface-2)' },
+// ── Theme por categoría ───────────────────────────────────────────────────────
+// Antes usaba un set de solo 5 colores (--blue/--red/--green/--purple/--yellow)
+// repetidos entre 16 categorías (ej. Hogar y Salud compartían verde), lo que
+// hacía que la placa de ícono se sintiera ruidosa/repetitiva. Ahora usa la
+// misma paleta de 16 colores distintos que ya usan la dona y las barras de
+// presupuesto (getCategoryColor), con fondo al ~15% de opacidad.
+function catTheme(cat: string): { color: string; bg: string } {
+  const hex = getCategoryColor(cat)
+  return { color: hex, bg: `${hex}26` }
 }
 
-const BANCO_LABEL: Record<Banco, { label: string; color: string }> = {
-  RAPPICARD:            { label: 'RappiCard',    color: 'var(--yellow)' },
-  RAPPIPAY:             { label: 'RappiPay',     color: 'var(--blue)' },
-  BANCOLOMBIA:          { label: 'Bancolombia',  color: 'var(--green)' },
-  DAVIVIENDA:           { label: 'Davivienda',   color: 'var(--red)' },
-  BBVA:                 { label: 'BBVA',         color: 'var(--blue)' },
-  SCOTIABANK_COLPATRIA: { label: 'Scotiabank',   color: 'var(--red)' },
-  BANCO_DE_BOGOTA:      { label: 'Banco Bogotá', color: 'var(--blue)' },
-  NU:                   { label: 'Nu',           color: 'var(--purple)' },
-  NEQUI:                { label: 'Nequi',        color: 'var(--purple)' },
-  LULO_BANK:            { label: 'Lulo Bank',    color: 'var(--green)' },
-  ITAU:                 { label: 'Itaú',         color: 'var(--yellow)' },
-  FALABELLA:            { label: 'Falabella',    color: 'var(--red)' },
-  OTRO:                 { label: 'Otro',         color: 'var(--text-muted)' },
+const BANCO_LABEL: Record<Banco, { label: string; color: string; bg: string }> = {
+  RAPPICARD:            { label: 'RappiCard',    color: 'var(--yellow)',     bg: 'var(--yellow-soft)' },
+  RAPPIPAY:             { label: 'RappiPay',     color: 'var(--blue)',       bg: 'var(--blue-soft)' },
+  BANCOLOMBIA:          { label: 'Bancolombia',  color: 'var(--green)',      bg: 'var(--green-soft)' },
+  DAVIVIENDA:           { label: 'Davivienda',   color: 'var(--red)',        bg: 'var(--red-soft)' },
+  BBVA:                 { label: 'BBVA',         color: 'var(--blue)',       bg: 'var(--blue-soft)' },
+  SCOTIABANK_COLPATRIA: { label: 'Scotiabank',   color: 'var(--red)',        bg: 'var(--red-soft)' },
+  BANCO_DE_BOGOTA:      { label: 'Banco Bogotá', color: 'var(--blue)',       bg: 'var(--blue-soft)' },
+  NU:                   { label: 'Nu',           color: 'var(--purple)',     bg: 'var(--purple-soft)' },
+  NEQUI:                { label: 'Nequi',        color: 'var(--purple)',     bg: 'var(--purple-soft)' },
+  LULO_BANK:            { label: 'Lulo Bank',    color: 'var(--green)',      bg: 'var(--green-soft)' },
+  ITAU:                 { label: 'Itaú',         color: 'var(--yellow)',     bg: 'var(--yellow-soft)' },
+  FALABELLA:            { label: 'Falabella',    color: 'var(--red)',        bg: 'var(--red-soft)' },
+  OTRO:                 { label: 'Otro',         color: 'var(--text-muted)', bg: 'var(--surface-2)' },
+}
+
+// Ícono por categoría — placa cuadrada 26×26 en TransactionRow, para escanear
+// la lista sin depender solo del color.
+const CATEGORIA_ICON: Record<Categoria, LucideIcon> = {
+  HOGAR: Home,
+  TRANSPORTE: Car,
+  SALIDAS: Utensils,
+  SALUD: HeartPulse,
+  SUSCRIPCIONES: Package,
+  COMPRAS_ONLINE: ShoppingBag,
+  INVERSION: TrendingUp,
+  AHORROS: PiggyBank,
+  PRESTAMO: Landmark,
+  DEUDA: CreditCard,
+  DONACIONES: Gift,
+  EDUCACION: GraduationCap,
+  REEMBOLSABLE: RotateCcw,
+  TRANSFERENCIA: ArrowLeftRight,
+  INGRESO: ArrowDown,
+  OTRO: Tag,
+}
+
+function getCategoryIcon(cat: string): LucideIcon {
+  return CATEGORIA_ICON[cat as Categoria] ?? Tag
 }
 
 type FilterKey = Categoria | 'TODOS' | `BANCO:${Banco}`
@@ -152,12 +172,11 @@ function groupByDate(txs: Transaction[]): Array<{ dateLabel: string; items: Tran
   return Object.values(groups)
 }
 
-// ── CategorySheet ─────────────────────────────────────────────────────────────
+// ── FilterSheet (fuente + categoría combinados) ───────────────────────────────
 
 function CatFilterBtn({ cat, active, onChange }: { cat: string; active: FilterKey; onChange: (k: FilterKey) => void }) {
   const on    = active === cat
-  const hex   = getCategoryColor(cat)
-  const theme = CATEGORIA_THEME[cat as Categoria] ?? { color: hex, bg: hex + '22' }
+  const theme = catTheme(cat)
   return (
     <button
       key={cat}
@@ -170,16 +189,40 @@ function CatFilterBtn({ cat, active, onChange }: { cat: string; active: FilterKe
   )
 }
 
-function CategorySheet({
+function BancoFilterBtn({ banco, active, onChange, testId }: {
+  banco: Banco
+  active: FilterKey
+  onChange: (k: FilterKey) => void
+  testId: string
+}) {
+  const filterKey: FilterKey = `BANCO:${banco}`
+  const on = active === filterKey
+  const info = BANCO_LABEL[banco]
+  return (
+    <button
+      onClick={() => onChange(filterKey)}
+      data-testid={testId}
+      aria-pressed={on}
+      className={`${styles.catBtn} ${on ? styles.catBtnOn : styles.catBtnOff}`}
+      style={{ '--cat-clr': info.color, '--cat-bg': info.bg } as React.CSSProperties}
+    >
+      {info.label}
+    </button>
+  )
+}
+
+function FilterSheet({
   active,
   onChange,
   onClose,
+  availableBancos,
   budgetedCats,
   otherCats,
 }: {
   active: FilterKey
   onChange: (key: FilterKey) => void
   onClose: () => void
+  availableBancos: Banco[]
   budgetedCats: string[]
   otherCats: string[]
 }) {
@@ -194,14 +237,31 @@ function CategorySheet({
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Filtrar por categoría"
+        aria-label="Filtros"
         className={styles.sheet}
         onKeyDown={e => { if (e.key === 'Escape') onClose() }}
       >
         <div className={styles.sheetHandle} />
         <p className={styles.sheetTitle}>
-          Categorías
+          Filtros
         </p>
+
+        {availableBancos.length > 0 && (
+          <>
+            <p className={styles.sectionLabel}>
+              Fuente
+            </p>
+            <div className={`${styles.chipGroup} ${styles.chipGroupMb}`}>
+              {availableBancos.map(banco => {
+                const testId = banco === 'RAPPICARD'   ? TEST_IDS.DASHBOARD_FILTER_RAPPICARD
+                             : banco === 'RAPPIPAY'    ? TEST_IDS.DASHBOARD_FILTER_RAPPIPAY
+                             : banco === 'BANCOLOMBIA' ? 'filter-bancolombia'
+                             : `filter-${banco.toLowerCase()}`
+                return <BancoFilterBtn key={banco} banco={banco} active={active} onChange={onChange} testId={testId} />
+              })}
+            </div>
+          </>
+        )}
 
         {budgetedCats.length > 0 && (
           <>
@@ -236,7 +296,7 @@ function CategorySheet({
   )
 }
 
-// ── FilterChips (colapsados) ──────────────────────────────────────────────────
+// ── FilterChips ("Todos" + botón "Filtros") ───────────────────────────────────
 
 function FilterChips({
   active,
@@ -250,9 +310,13 @@ function FilterChips({
   budgetedCats: string[]
 }) {
   const [sheetOpen, setSheetOpen] = useState(false)
-  const isCatActive    = active !== 'TODOS' && !active.startsWith('BANCO:')
-  const activeCatLabel = isCatActive ? catLabel(active) : null
-  const activeCatHex   = isCatActive ? getCategoryColor(active) : null
+  const isCatActive   = active !== 'TODOS' && !active.startsWith('BANCO:')
+  const isBancoActive = active.startsWith('BANCO:')
+  const activeBanco   = isBancoActive ? (active.slice(6) as Banco) : null
+
+  const activeLabel = isCatActive ? catLabel(active) : activeBanco ? BANCO_LABEL[activeBanco].label : null
+  const activeColor = isCatActive ? getCategoryColor(active) : activeBanco ? BANCO_LABEL[activeBanco].color : null
+  const hasActiveFilter = isCatActive || isBancoActive
 
   // Bancos que realmente tienen transacciones este mes, en orden de frecuencia
   const availableBancos = useMemo(() => {
@@ -295,60 +359,37 @@ function FilterChips({
           Todos
         </button>
 
-        {/* Bancos + categoría activa — scroll horizontal */}
-        <div className={`scroll-x-hide ${styles.filterScrollArea}`}>
-          {availableBancos.map(banco => {
-            const filterKey: FilterKey = `BANCO:${banco}`
-            const isOn  = active === filterKey
-            const info  = BANCO_LABEL[banco]
-            const testId = banco === 'RAPPICARD'   ? TEST_IDS.DASHBOARD_FILTER_RAPPICARD
-                         : banco === 'RAPPIPAY'    ? TEST_IDS.DASHBOARD_FILTER_RAPPIPAY
-                         : banco === 'BANCOLOMBIA' ? 'filter-bancolombia'
-                         : `filter-${banco.toLowerCase()}`
-            return (
-              <button
-                key={filterKey}
-                onClick={() => onChange(filterKey)}
-                data-testid={testId}
-                aria-pressed={isOn}
-                className={`${styles.filterBtn} ${isOn ? styles.filterBtnActive : styles.filterBtnInactive}`}
-              >
-                {info.label}
-              </button>
-            )
-          })}
+        {/* Filtro activo — dot + nombre + × */}
+        {hasActiveFilter && activeLabel && activeColor && (
+          <button
+            onClick={() => onChange('TODOS')}
+            className={styles.activeCatBtn}
+          >
+            <span
+              className={styles.activeCatDot}
+              style={{ '--dot-clr': activeColor } as React.CSSProperties}
+            />
+            <span className={styles.activeCatLabel}>{activeLabel}</span>
+            <span className={styles.activeCatX}>×</span>
+          </button>
+        )}
 
-          {/* Categoría activa — dot + nombre + × */}
-          {activeCatLabel && activeCatHex && (
-            <button
-              onClick={() => onChange('TODOS')}
-              className={styles.activeCatBtn}
-            >
-              <span
-                className={styles.activeCatDot}
-                style={{ '--dot-clr': activeCatHex } as React.CSSProperties}
-              />
-              <span className={styles.activeCatLabel}>{activeCatLabel}</span>
-              <span className={styles.activeCatX}>×</span>
-            </button>
-          )}
-        </div>
-
-        {/* Filtrar por categoría */}
+        {/* Abrir sheet combinado de fuente + categoría */}
         <button
           onClick={() => setSheetOpen(true)}
-          className={styles.openSheetBtn}
+          className={styles.filtersBtn}
         >
-          Categoría
-          <span className={styles.openSheetArrow}>▾</span>
+          Filtros
+          <ChevronDown size={13} />
         </button>
       </div>
 
       {sheetOpen && (
-        <CategorySheet
+        <FilterSheet
           active={active}
           onChange={key => { onChange(key); setSheetOpen(false) }}
           onClose={() => setSheetOpen(false)}
+          availableBancos={availableBancos}
           budgetedCats={budgetedCats}
           otherCats={otherCats}
         />
@@ -361,8 +402,7 @@ function FilterChips({
 
 function CatPickerBtn({ cat, current, onSelect }: { cat: string; current: string; onSelect: (c: Categoria) => void }) {
   const on    = cat === current
-  const hex   = getCategoryColor(cat)
-  const theme = CATEGORIA_THEME[cat as Categoria] ?? { color: hex, bg: hex + '22' }
+  const theme = catTheme(cat)
   return (
     <button
       key={cat}
@@ -444,8 +484,8 @@ function TransactionRow({ t, pendingCat, onCategoryClick, onDelete }: {
 
   const income     = isIngreso(t.tipo)
   const displayCat = pendingCat ?? t.categoria
-  const catHex     = getCategoryColor(displayCat)
-  const theme      = CATEGORIA_THEME[displayCat as Categoria] ?? { color: catHex, bg: catHex + '22' }
+  const theme      = catTheme(displayCat)
+  const CatIcon    = getCategoryIcon(displayCat)
   const banco      = efectivoBanco(t)
   const chip       = BANCO_LABEL[banco]
   const time       = format(new Date(t.fecha), 'HH:mm', { locale: es })
@@ -469,6 +509,10 @@ function TransactionRow({ t, pendingCat, onCategoryClick, onDelete }: {
 
   return (
     <div className={`tx-row ${styles.row}`}>
+      <div className={styles.catPlate} style={{ '--plate-bg': isDirty ? 'var(--yellow-soft)' : theme.bg, '--plate-clr': isDirty ? 'var(--yellow)' : theme.color } as React.CSSProperties}>
+        <CatIcon size={13} />
+      </div>
+
       <div className={styles.rowLeft}>
         <p className={styles.rowName}>
           {getDisplayParts(t).name}
@@ -479,14 +523,10 @@ function TransactionRow({ t, pendingCat, onCategoryClick, onDelete }: {
             aria-label={`Cambiar categoría: ${catLabel(displayCat)}`}
             className={styles.catChipBtn}
           >
-            <span
-              className={styles.catDot}
-              style={{ '--dot-clr': isDirty ? 'var(--yellow)' : theme.color } as React.CSSProperties}
-            />
             <span className={`${styles.catChipLabel} ${isDirty ? styles.catChipLabelDirty : styles.catChipLabelNormal}`}>
               {catLabel(displayCat)}
             </span>
-            <span className={`${styles.catChipArrow} ${isDirty ? styles.catChipArrowDirty : styles.catChipArrowNormal}`}>▾</span>
+            <ChevronDown size={10} className={isDirty ? styles.catChipArrowDirty : styles.catChipArrowNormal} />
           </button>
           <span className={styles.metaDot}>·</span>
           <span className={styles.metaBank}>{chip.label}</span>
@@ -502,7 +542,6 @@ function TransactionRow({ t, pendingCat, onCategoryClick, onDelete }: {
             {income ? '+' : '-'}{formatCOP(t.monto)}
           </p>
         )}
-
         {deletePhase === 'idle' && (
           <button
             onClick={startConfirm}

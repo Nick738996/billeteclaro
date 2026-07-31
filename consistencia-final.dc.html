@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; background: #eceef1; font-family: 'Inter', system-ui, sans-serif; }
+  a { color: #2a6bd6; }
+  a:hover { color: #1d4fa3; }
+</style>
+</helmet>
+
+<div style="max-width:1000px;margin:0 auto;padding:44px">
+  <p style="font:600 10px ui-monospace,Menlo,monospace;color:#7a5230;background:#f3e4d0;display:inline-block;padding:3px 8px;border-radius:4px;margin:0 0 12px">MÓDULO 4 / 4 — CONSISTENCIA TRANSVERSAL</p>
+  <h1 style="font:700 22px/1.3 system-ui,sans-serif;color:#1a1a1a;margin:0 0 6px">Pasada final</h1>
+  <p style="font:400 13px/1.6 system-ui,sans-serif;color:#555;margin:0 0 24px">Direcciones elegidas: Dashboard <b>1a</b> (toggle Presupuesto/Participación), Presupuesto <b>2a</b> (quick-set inline "+ Definir"), Transacciones <b>3a</b> (swipe para borrar).</p>
+
+  <div style="display:flex;flex-direction:column;gap:16px">
+    <div style="border:1px solid #d8dade;border-radius:12px;padding:16px 20px;background:#fff">
+      <p style="font:600 13px system-ui,sans-serif;color:#1a1a1a;margin:0 0 6px">1. Fondo del dashboard</p>
+      <p style="font:400 12.5px/1.6 system-ui,sans-serif;color:#444;margin:0">Se retira el <code>radial-gradient</code> decorativo del root (<code>DashboardClient.module.css</code>) — queda <code>var(--bg)</code> plano en las 3 pantallas, cumpliendo "sin gradientes" en todos los módulos por igual.</p>
+    </div>
+
+    <div style="border:1px solid #d8dade;border-radius:12px;padding:16px 20px;background:#fff">
+      <p style="font:600 13px system-ui,sans-serif;color:#1a1a1a;margin:0 0 6px">2. Acción "+ Definir" única</p>
+      <p style="font:400 12.5px/1.6 system-ui,sans-serif;color:#444;margin:0">El botón verde "+ Definir" (pill #153D24 / texto #4ADE80) es el mismo componente en BudgetOverview (Dashboard) y CategoryRow (Presupuesto) — mismo tamaño, radio y color en los dos lugares donde aparece.</p>
+    </div>
+
+    <div style="border:1px solid #d8dade;border-radius:12px;padding:16px 20px;background:#fff">
+      <p style="font:600 13px system-ui,sans-serif;color:#1a1a1a;margin:0 0 6px">3. Íconos de categoría</p>
+      <p style="font:400 12.5px/1.6 system-ui,sans-serif;color:#444;margin:0">Transacciones introduce placas de ícono por categoría (26px, radio 8, fondo tinte 15% del color de categoría). Se propone extender el mismo patrón a Presupuesto y al desglose de participación del Dashboard — hoy usan solo un punto de color — para que "categoría" se reconozca igual en toda la app. Pendiente de confirmar si se aplica ahora o en una segunda pasada.</p>
+    </div>
+
+    <div style="border:1px solid #d8dade;border-radius:12px;padding:16px 20px;background:#fff">
+      <p style="font:600 13px system-ui,sans-serif;color:#1a1a1a;margin:0 0 6px">4. Manejo de errores consistente</p>
+      <p style="font:400 12.5px/1.6 system-ui,sans-serif;color:#444;margin:0">Mismo patrón en los 3 módulos: barra/pill con borde rojo (#FF6B6B) + texto explicando qué falló + botón "Reintentar" — nunca un fallo silencioso. Aplica al sync del Dashboard (ya existía en <code>SyncErrorCard</code>), al guardado de Presupuesto (bug corregido en el módulo 2) y a cualquier acción de Transacciones.</p>
+    </div>
+
+    <div style="border:1px solid #d8dade;border-radius:12px;padding:16px 20px;background:#fff">
+      <p style="font:600 13px system-ui,sans-serif;color:#1a1a1a;margin:0 0 6px">5. Header</p>
+      <p style="font:400 12.5px/1.6 system-ui,sans-serif;color:#444;margin:0">Sin cambios respecto al Dashboard 1a: HeaderPill (sync + tema agrupados, separador, menú "...") se mantiene igual arriba de las 3 pantallas — ya resuelve el problema de íconos sueltos del diagnóstico inicial.</p>
+    </div>
+
+    <div style="border:1px solid #d8dade;border-radius:12px;padding:16px 20px;background:#fff">
+      <p style="font:600 13px system-ui,sans-serif;color:#1a1a1a;margin:0 0 6px">6. Tono</p>
+      <p style="font:400 12.5px/1.6 system-ui,sans-serif;color:#444;margin:0">Ningún módulo usa racha, streak, badge de logro ni copy de urgencia ("¡no gastes de más!"). Los únicos indicadores de alerta son de color semántico neutro (ámbar/rojo en barras de progreso), sin ícono de advertencia añadido ni signos de exclamación en el copy.</p>
+    </div>
+  </div>
+
+  <p style="font:400 12px system-ui,sans-serif;color:#666;margin:24px 0 0">Con esto, listo el rediseño de los 3 módulos. Punto 3 (íconos de categoría en Presupuesto/Dashboard) queda abierto para decidir — dime si lo aplico.</p>
+</div>
+
+</x-dc>
+</body>
+</html>

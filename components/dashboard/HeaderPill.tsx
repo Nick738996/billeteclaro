@@ -1,12 +1,11 @@
 'use client'
 
-// HeaderPill — Variante B: cápsula unificada con sync + reset + theme + logout
-// Reemplaza <SyncButton> + <ThemeToggle> + botón logout en DashboardClient.tsx
-// Uso: <HeaderPill onSyncComplete={fn} onSignOut={fn} />
+// HeaderPill — cápsula con sync + theme siempre visibles; reset/ayuda/logout
+// colapsados en un menú "..." para reducir ruido visual en el header.
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useTheme } from 'next-themes'
-import { RefreshCw, Check, AlertCircle, Trash2, Sun, Moon, LogOut } from 'lucide-react'
+import { RefreshCw, Check, AlertCircle, Trash2, Sun, Moon, LogOut, MoreHorizontal, HelpCircle } from 'lucide-react'
 import { TEST_IDS } from '@/lib/testIds'
 import styles from './HeaderPill.module.css'
 
@@ -29,6 +28,23 @@ export default function HeaderPill({ onSyncComplete, onSignOut, onHelp }: Props)
   const [resetState,  setResetState] = useState<ResetState>('idle')
   const [syncResult,  setSyncResult] = useState<{ transacciones_nuevas: number } | null>(null)
   const [syncError,   setSyncError]  = useState<string | null>(null)
+  const [menuOpen,    setMenuOpen]   = useState(false)
+
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!menuOpen) return
+    const close = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false)
+    }
+    const closeOnEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenuOpen(false) }
+    document.addEventListener('mousedown', close)
+    document.addEventListener('keydown', closeOnEsc)
+    return () => {
+      document.removeEventListener('mousedown', close)
+      document.removeEventListener('keydown', closeOnEsc)
+    }
+  }, [menuOpen])
 
   /* ── Sync ──────────────────────────────────────── */
   const needsReconnect = syncError?.toLowerCase().includes('token') ?? false
@@ -89,86 +105,80 @@ export default function HeaderPill({ onSyncComplete, onSignOut, onHelp }: Props)
     : syncState === 'error' ? (needsReconnect ? `${syncError} — toca para volver a entrar` : `${syncError ?? 'Error'} — toca para reintentar`)
     : 'Sincronizar'
 
-  const resetIcon = resetState === 'resetting' ? <RefreshCw size={14} className="animate-spin"/>
-                  : resetState === 'done'       ? <Check size={14}/>
-                  : resetState === 'confirm'    ? <AlertCircle size={14}/>
-                  :                               <Trash2 size={14}/>
-
-  const resetColor = resetState === 'confirm'  ? 'var(--red)'
-                   : resetState === 'done'     ? 'var(--green)'
-                   :                             'var(--text-muted)'
-
-  const resetTitle = resetState === 'confirm' ? '¿Confirmar? Toca de nuevo para borrar todos los datos'
-                   : 'Borrar todos los datos'
-
-  /* ── Single pill button ─────────────────────────── */
-  const PillBtn = ({
-    onClick, icon, color, disabled = false, title, ariaLabel, 'data-testid': testId,
-  }: {
-    onClick: () => void
-    icon: React.ReactNode
-    color: string
-    disabled?: boolean
-    title?: string
-    ariaLabel?: string
-    'data-testid'?: string
-  }) => (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      title={title}
-      aria-label={ariaLabel ?? title}
-      data-testid={testId}
-      className={disabled ? `${styles.btn} ${styles.btnDisabled}` : styles.btn}
-      style={{ '--clr': color } as React.CSSProperties}
-    >
-      {icon}
-    </button>
-  )
+  const resetLabel = resetState === 'confirm' ? '¿Confirmar borrado?' : 'Borrar todos los datos'
 
   return (
     <div className={styles.pill}>
-      <PillBtn
+      <button
         onClick={handleSync}
-        icon={syncIcon}
-        color={syncColor}
         disabled={isBusy}
         title={syncTitle}
-        ariaLabel="Sincronizar correos"
+        aria-label="Sincronizar correos"
         data-testid={TEST_IDS.DASHBOARD_SYNC_BUTTON}
-      />
-      <PillBtn
-        onClick={handleReset}
-        icon={resetIcon}
-        color={resetColor}
-        disabled={isBusy || syncState !== 'idle'}
-        title={resetTitle}
-        ariaLabel="Borrar todos los datos"
-        data-testid={TEST_IDS.DASHBOARD_RESET_BUTTON}
-      />
-      <PillBtn
-        onClick={onHelp}
-        icon={<span className={styles.helpIcon}>?</span>}
-        color="var(--text-muted)"
-        title="Ayuda y tour del dashboard"
-        ariaLabel="Ayuda y tour del dashboard"
-        data-testid={TEST_IDS.DASHBOARD_HELP_BUTTON}
-      />
-      <PillBtn
+        className={isBusy ? `${styles.btn} ${styles.btnDisabled}` : styles.btn}
+        style={{ '--clr': syncColor } as React.CSSProperties}
+      >
+        {syncIcon}
+      </button>
+
+      <button
         onClick={() => setTheme(isDark ? 'light' : 'dark')}
-        icon={isDark ? <Sun size={13}/> : <Moon size={13}/>}
-        color="var(--text-muted)"
         title={isDark ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
-        ariaLabel={isDark ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
-      />
-      <PillBtn
-        onClick={onSignOut}
-        icon={<LogOut size={13}/>}
-        color="var(--text-muted)"
-        title="Cerrar sesión"
-        ariaLabel="Cerrar sesión"
-        data-testid={TEST_IDS.AUTH_LOGOUT_BUTTON}
-      />
+        aria-label={isDark ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+        className={styles.btn}
+        style={{ '--clr': 'var(--text-muted)' } as React.CSSProperties}
+      >
+        {isDark ? <Sun size={13}/> : <Moon size={13}/>}
+      </button>
+
+      <span className={styles.divider} aria-hidden="true" />
+
+      <div className={styles.menuWrap} ref={menuRef}>
+        <button
+          onClick={() => setMenuOpen(v => !v)}
+          aria-label="Más opciones"
+          aria-haspopup="menu"
+          aria-expanded={menuOpen}
+          className={styles.btn}
+          style={{ '--clr': 'var(--text-muted)' } as React.CSSProperties}
+        >
+          <MoreHorizontal size={15}/>
+        </button>
+
+        {menuOpen && (
+          <div className={styles.menu} role="menu">
+            <button
+              role="menuitem"
+              className={styles.menuItem}
+              onClick={() => { setMenuOpen(false); onHelp() }}
+              data-testid={TEST_IDS.DASHBOARD_HELP_BUTTON}
+            >
+              <HelpCircle size={14}/>
+              Ayuda y tour
+            </button>
+            <button
+              role="menuitem"
+              className={styles.menuItem}
+              onClick={() => { setMenuOpen(false); onSignOut() }}
+              data-testid={TEST_IDS.AUTH_LOGOUT_BUTTON}
+            >
+              <LogOut size={14}/>
+              Cerrar sesión
+            </button>
+            <div className={styles.menuDivider} />
+            <button
+              role="menuitem"
+              className={`${styles.menuItem} ${styles.menuItemDanger}`}
+              onClick={handleReset}
+              disabled={isBusy}
+              data-testid={TEST_IDS.DASHBOARD_RESET_BUTTON}
+            >
+              {resetState === 'resetting' ? <RefreshCw size={14} className="animate-spin"/> : <Trash2 size={14}/>}
+              {resetLabel}
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
