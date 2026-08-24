@@ -34,6 +34,7 @@ function mkTx(categoria: Categoria, monto: number, tipo: Transaction['tipo'] = '
     mes_contable: '2026-07',
     es_sueldo: false,
     created_at: '2026-07-15T12:00:00Z',
+    contraparte_id: null,
   }
 }
 function catLabelMock(c: string) { return c }

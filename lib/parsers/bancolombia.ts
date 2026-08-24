@@ -88,13 +88,13 @@ export function parseBancolombia(email: EmailInput): ParseResult {
   // Tipo 2: Transferencia enviada
   // "Transferiste $120,000.00 desde tu cuenta 2997 a la cuenta *3232989410 el 07/06/2026 a las 08:07"
   const transferisteMatch = body.match(
-    /Transferiste\s+\$\s*([\d.,]+)\s+desde tu cuenta\s+\S+\s+a la cuenta\s+\S+\s+el\s+(\d{2})\/(\d{2})\/(\d{4})\s+a las\s+(\d{2}:\d{2})/i
+    /Transferiste\s+\$\s*([\d.,]+)\s+desde tu cuenta\s+\S+\s+a la cuenta\s+(\S+)\s+el\s+(\d{2})\/(\d{2})\/(\d{4})\s+a las\s+(\d{2}:\d{2})/i
   )
   if (transferisteMatch) {
     const monto = parseMontoBancolombia(transferisteMatch[1])
     if (monto > 0) {
       return {
-        fecha:        parseFecha(transferisteMatch[2], transferisteMatch[3], transferisteMatch[4], transferisteMatch[5]),
+        fecha:        parseFecha(transferisteMatch[3], transferisteMatch[4], transferisteMatch[5], transferisteMatch[6]),
         monto,
         comercio:     null,
         descripcion:  'Transferencia enviada',
@@ -105,6 +105,7 @@ export function parseBancolombia(email: EmailInput): ParseResult {
         moneda:       'COP',
         monto_usd:    null,
         flags:        [],
+        contraparte_id: transferisteMatch[2].replace(/\*/g, '').trim(),
       }
     }
   }
@@ -137,13 +138,13 @@ export function parseBancolombia(email: EmailInput): ParseResult {
   // Tipo 4: Pago código QR
   // "BRANDON NICK GOMEZ AYA pagaste $6,000.00 por codigo QR desde tu cuenta *2997 a la llave 0091322191 el 25/05/2026 a las 16:16"
   const pagoQrMatch = body.match(
-    /pagaste\s+\$\s*([\d.,]+)\s+por codigo QR\s+.*?el\s+(\d{2})\/(\d{2})\/(\d{4})\s+a las\s+(\d{2}:\d{2})/i
+    /pagaste\s+\$\s*([\d.,]+)\s+por codigo QR\s+.*?a la llave\s+(\S+)\s+el\s+(\d{2})\/(\d{2})\/(\d{4})\s+a las\s+(\d{2}:\d{2})/i
   )
   if (pagoQrMatch) {
     const monto = parseMontoBancolombia(pagoQrMatch[1])
     if (monto > 0) {
       return {
-        fecha:        parseFecha(pagoQrMatch[2], pagoQrMatch[3], pagoQrMatch[4], pagoQrMatch[5]),
+        fecha:        parseFecha(pagoQrMatch[3], pagoQrMatch[4], pagoQrMatch[5], pagoQrMatch[6]),
         monto,
         comercio:     null,
         descripcion:  'Pago código QR',
@@ -154,6 +155,7 @@ export function parseBancolombia(email: EmailInput): ParseResult {
         moneda:       'COP',
         monto_usd:    null,
         flags:        [],
+        contraparte_id: pagoQrMatch[2].trim(),
       }
     }
   }

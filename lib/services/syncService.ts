@@ -167,6 +167,7 @@ export async function runSync(userId: string, admin: Admin): Promise<SyncResult>
             id_auditoria: await generateAuditId(admin, userId, fecha),
             moneda: extracted.moneda, monto_usd: extracted.monto_usd,
             flags: extracted.flags, raw_snippet: null, procesado: true,
+            contraparte_id: extracted.contraparte_id ?? null,
           }
         })
       )
