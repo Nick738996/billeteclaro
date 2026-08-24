@@ -179,6 +179,19 @@
   display: flex;
   padding: 4px;
 }
+.renameHint {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+.renameRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.renameRow :global(.input-field) {
+  flex: 1;
+}
 
 /* ─── TransactionRow ─────────────────────────────────────────────────────────── */
 
@@ -211,6 +224,23 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  min-width: 0;
+}
+.rowNameBtn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+.rowNamePencil {
+  flex-shrink: 0;
+  color: var(--text-muted);
 }
 .rowMeta {
   display: flex;

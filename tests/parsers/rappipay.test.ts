@@ -90,7 +90,12 @@ Hora de la transacción
     expect(result).not.toBeNull()
     expect(result!.tipo).toBe('TRANSFERENCIA_ENVIADA')
     expect(result!.monto).toBe(150000)
-    expect(result!.comercio).toBe('@juanperez')
+  })
+
+  it('no expone la llave cruda como comercio — queda en contraparte_id para poder aliasearla', () => {
+    const result = parseRappiPay({ ...BASE_EMAIL, subject: 'Transferencia enviada', body })
+    expect(result!.comercio).toBeNull()
+    expect(result!.contraparte_id).toBe('@juanperez')
   })
 })
 
@@ -318,7 +323,12 @@ describe('parseRappiPay — transferencia enviada formato real', () => {
     expect(result).not.toBeNull()
     expect(result!.tipo).toBe('TRANSFERENCIA_ENVIADA')
     expect(result!.monto).toBe(2910000)
-    expect(result!.comercio).toBe('carlosfdezmo@me.com')
+  })
+
+  it('no expone la llave cruda como comercio — queda en contraparte_id para poder aliasearla', () => {
+    const result = parseRappiPay({ ...BASE_EMAIL, subject: 'Transferencia enviada', body })
+    expect(result!.comercio).toBeNull()
+    expect(result!.contraparte_id).toBe('carlosfdezmo@me.com')
   })
 })
 

@@ -100,17 +100,17 @@ function parseTransferenciaEnviada(email: EmailInput): ParseResult {
   if (!monto || monto <= 0) return null
 
   // Destinatario: llave (@handle) o banco destino (transferencia interbancaria)
+  // La llave nunca trae un nombre asociado en el correo — se guarda como
+  // contraparte_id para que el usuario le pueda asignar un alias.
   const llaveMatch = body.match(/Llave destino\s+(@?\S+)/i)
   const bancoDestinoMatch = body.match(/\bBanco\s+([^\n$]{1,80}?)(?=\s+(?:No\.|Nro|Fecha|Costo|¿|$))/i)
-  const destinatario = llaveMatch
-    ? llaveMatch[1].trim()
-    : bancoDestinoMatch ? toTitleCase(bancoDestinoMatch[1].trim()) : null
+  const bancoDestino = bancoDestinoMatch ? toTitleCase(bancoDestinoMatch[1].trim()) : null
 
   return {
     fecha: extractFechaHora(body, email.date),
     monto,
-    comercio: destinatario,
-    descripcion: destinatario ? `Transferencia enviada a ${destinatario}` : 'Transferencia enviada',
+    comercio: llaveMatch ? null : bancoDestino,
+    descripcion: bancoDestino ? `Transferencia enviada a ${bancoDestino}` : 'Transferencia enviada',
     banco: 'RAPPIPAY',
     tipo: 'TRANSFERENCIA_ENVIADA',
     categoria: 'TRANSFERENCIA',
@@ -118,6 +118,7 @@ function parseTransferenciaEnviada(email: EmailInput): ParseResult {
     moneda: 'COP',
     monto_usd: null,
     flags: [],
+    contraparte_id: llaveMatch ? llaveMatch[1].trim() : null,
   }
 }
 

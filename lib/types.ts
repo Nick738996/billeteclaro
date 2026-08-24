@@ -61,6 +61,14 @@ export interface Transaction {
   mes_contable: string | null
   es_sueldo: boolean
   created_at: string
+  contraparte_id: string | null
+}
+
+/** Alias que el usuario asigna a un identificador de contraparte (llave, cuenta, teléfono) */
+export interface ContactAlias {
+  id: string
+  identificador: string
+  nombre: string
 }
 
 export interface Budget {
@@ -112,6 +120,8 @@ export interface ExtractedTransaction {
   moneda: string
   monto_usd: number | null
   flags: string[]
+  /** Identificador crudo de contraparte (cuenta enmascarada, llave, teléfono) cuando el correo no trae un nombre */
+  contraparte_id?: string | null
 }
 
 export interface MonthlyStats {

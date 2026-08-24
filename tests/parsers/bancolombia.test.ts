@@ -86,6 +86,10 @@ describe('parseBancolombia — transferencia enviada', () => {
   it('categoria = TRANSFERENCIA', () => {
     expect(parseBancolombia(email)?.categoria).toBe('TRANSFERENCIA')
   })
+
+  it('extrae contraparte_id (cuenta destino sin asterisco)', () => {
+    expect(parseBancolombia(email)?.contraparte_id).toBe('3232989410')
+  })
 })
 
 describe('parseBancolombia — transferencia recibida', () => {
@@ -139,6 +143,10 @@ describe('parseBancolombia — pago código QR', () => {
 
   it('descripcion = Pago código QR', () => {
     expect(parseBancolombia(email)?.descripcion).toBe('Pago código QR')
+  })
+
+  it('extrae contraparte_id (llave destino)', () => {
+    expect(parseBancolombia(email)?.contraparte_id).toBe('0091322191')
   })
 })
 

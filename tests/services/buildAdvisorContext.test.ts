@@ -19,6 +19,7 @@ const BASE_TX: Omit<Transaction, 'id' | 'tipo' | 'monto' | 'categoria'> = {
   mes_contable:     '2026-06',
   es_sueldo:        false,
   created_at:       '2026-06-10T00:00:00Z',
+  contraparte_id:   null,
 }
 
 const tx = (id: string, tipo: Transaction['tipo'], monto: number, categoria: Transaction['categoria']): Transaction => ({

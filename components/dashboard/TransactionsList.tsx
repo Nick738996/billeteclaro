@@ -12,7 +12,7 @@ const BOGOTA_TZ = 'America/Bogota'
 const format = (date: Date | number, fmt: string, opts?: { locale?: Locale }) =>
   formatInTimeZone(date, BOGOTA_TZ, fmt, opts)
 import {
-  Search, RefreshCw, X, Trash2, Plus, Check, ChevronDown,
+  Search, RefreshCw, X, Trash2, Plus, Check, ChevronDown, Pencil,
   Home, Car, Utensils, HeartPulse, Package, ShoppingBag, TrendingUp, PiggyBank,
   Landmark, CreditCard, Gift, GraduationCap, RotateCcw, ArrowLeftRight, ArrowDown, Tag,
   type LucideIcon,
@@ -469,15 +469,79 @@ function CategoryPicker({ current, onSelect, onClose, budgetedCats }: {
   )
 }
 
+// ── RenameContact bottom sheet ────────────────────────────────────────────
+// Se usa cuando comercio viene de una llave/cuenta sin nombre (contraparte_id).
+// Permite ponerle un alias una sola vez — se aplica retroactivamente a todas
+// las transacciones con el mismo identificador.
+
+function RenameContactSheet({ current, onSave, onClose }: {
+  current: string
+  onSave: (nombre: string) => void
+  onClose: () => void
+}) {
+  const [nombre, setNombre] = useState(current)
+  const [saving, setSaving] = useState(false)
+
+  if (typeof document === 'undefined') return null
+
+  const handleSave = async () => {
+    if (!nombre.trim() || saving) return
+    setSaving(true)
+    onSave(nombre.trim())
+  }
+
+  return createPortal(
+    <>
+      <div className={styles.pickerOverlay} onClick={onClose} aria-hidden="true" />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Asignar nombre"
+        className={styles.pickerSheet}
+        onKeyDown={e => { if (e.key === 'Escape') onClose() }}
+      >
+        <div className={styles.pickerHeader}>
+          <p className={styles.pickerTitle}>Asignar nombre</p>
+          <button onClick={onClose} aria-label="Cerrar" className={styles.pickerCloseBtn}>
+            <X size={16} />
+          </button>
+        </div>
+        <p className={styles.renameHint}>
+          Este nombre se usará para todas las transacciones con esta misma llave o cuenta.
+        </p>
+        <div className={styles.renameRow}>
+          <input
+            autoFocus
+            className="input-field"
+            value={nombre}
+            onChange={e => setNombre(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') handleSave() }}
+            placeholder="Ej. Mamá, Arriendo, Juan Pérez"
+          />
+          <button
+            onClick={handleSave}
+            disabled={!nombre.trim() || saving}
+            className={`${styles.saveBtn} ${saving ? styles.saveBtnSaving : styles.saveBtnNormal}`}
+          >
+            {saving ? <RefreshCw size={11} className="animate-spin" /> : 'Guardar'}
+          </button>
+        </div>
+      </div>
+    </>,
+    document.body
+  )
+}
+
 // ── TransactionRow ─────────────────────────────────────────────────────────
 
 type DeletePhase = 'idle' | 'confirming' | 'deleting'
 
-function TransactionRow({ t, pendingCat, onCategoryClick, onDelete }: {
+function TransactionRow({ t, pendingCat, onCategoryClick, onDelete, onRenameClick }: {
   t: Transaction
   pendingCat?: Categoria
   onCategoryClick: () => void
   onDelete: () => void
+  onRenameClick: () => void
 }) {
   const [deletePhase, setDeletePhase] = useState<DeletePhase>('idle')
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -514,9 +578,20 @@ function TransactionRow({ t, pendingCat, onCategoryClick, onDelete }: {
       </div>
 
       <div className={styles.rowLeft}>
-        <p className={styles.rowName}>
-          {getDisplayParts(t).name}
-        </p>
+        {t.contraparte_id ? (
+          <button
+            onClick={onRenameClick}
+            aria-label={`Asignar nombre a: ${getDisplayParts(t).name}`}
+            className={styles.rowNameBtn}
+          >
+            <span className={styles.rowName}>{getDisplayParts(t).name}</span>
+            <Pencil size={10} className={styles.rowNamePencil} />
+          </button>
+        ) : (
+          <p className={styles.rowName}>
+            {getDisplayParts(t).name}
+          </p>
+        )}
         <div className={styles.rowMeta}>
           <button
             onClick={onCategoryClick}
@@ -595,6 +670,7 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
   const [isSaving,    setIsSaving]    = useState(false)
   const [savedOk,     setSavedOk]     = useState(false)
   const [pickerTxId,  setPickerTxId]  = useState<string | null>(null)
+  const [renameTxId,  setRenameTxId]  = useState<string | null>(null)
   const [deletedIds,  setDeletedIds]  = useState<Set<string>>(new Set())
   const activeFilterKey = activeFilter as FilterKey
   const pendingCount    = Object.keys(pendingCats).length
@@ -649,7 +725,22 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
     }
   }
 
+  const saveAlias = async (identificador: string, nombre: string) => {
+    try {
+      const res = await fetch('/api/contacts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identificador, nombre }),
+      })
+      if (!res.ok) throw new Error()
+      onCategoryChange?.()
+    } finally {
+      setRenameTxId(null)
+    }
+  }
+
   const pickerTx = pickerTxId ? transactions.find(t => t.id === pickerTxId) : null
+  const renameTx = renameTxId ? transactions.find(t => t.id === renameTxId) : null
 
   const filtered = useMemo(() => transactions.filter(t => !deletedIds.has(t.id)).filter(t => {
     let matchesCategory: boolean
@@ -738,6 +829,7 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
                     pendingCat={pendingCats[t.id]}
                     onCategoryClick={() => setPickerTxId(t.id)}
                     onDelete={() => handleDelete(t)}
+                    onRenameClick={() => setRenameTxId(t.id)}
                   />
                 </div>
               ))}
@@ -808,6 +900,14 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
         }}
         onClose={() => setPickerTxId(null)}
         budgetedCats={budgetedCats}
+      />
+    )}
+
+    {renameTx && renameTx.contraparte_id && (
+      <RenameContactSheet
+        current={renameTx.comercio ?? ''}
+        onSave={nombre => saveAlias(renameTx.contraparte_id as string, nombre)}
+        onClose={() => setRenameTxId(null)}
       />
     )}
     </>

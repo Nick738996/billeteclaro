@@ -82,7 +82,7 @@ describe('getInsights', () => {
           descripcion: null, banco: 'RAPPICARD', tipo: 'COMPRA', categoria: 'SALIDAS',
           subcategoria: null, id_auditoria: null, moneda: 'COP', monto_usd: null,
           flags: [], raw_snippet: null, procesado: true, mes_contable: '2026-06',
-          es_sueldo: false, created_at: '2026-06-10T00:00:00Z',
+          es_sueldo: false, created_at: '2026-06-10T00:00:00Z', contraparte_id: null,
         }],
         cachedInsight: null,
       })
