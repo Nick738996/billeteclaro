@@ -3,12 +3,25 @@ import type { ExtractedTransaction } from '@/lib/types'
 type TxItem = { id: string; extracted: ExtractedTransaction }
 
 // Uber hace un hold (pre-autorización) al pedir el viaje y el cargo real llega
-// al finalizarlo — el monto puede variar bastante (tarifa estimada vs. real),
-// pero ambas notificaciones del banco llegan casi al mismo tiempo. Por eso el
-// monto no es una señal confiable: solo la cercanía en el tiempo lo es.
-const VENTANA_MINUTOS = 15
+// al finalizarlo. En viajes cortos ambas notificaciones del banco llegan casi
+// al mismo tiempo y el monto puede variar bastante (tarifa estimada vs. real,
+// hasta 50%+ de diferencia) — ahí el monto no es señal confiable, solo el
+// tiempo. En viajes largos (tráfico, trancones) el cobro final puede tardar
+// más de 15 min en llegar, pero para entonces el monto ya casi no cambia
+// (diferencias de centavos/pocos pesos) — ahí sí usamos el monto para no
+// fusionar por error dos viajes distintos tomados seguidos.
+const VENTANA_ESTRICTA_MINUTOS = 15
+const VENTANA_AMPLIA_MINUTOS = 90
+const TOLERANCIA_MONTO_AMPLIA = 0.05 // 5%
 
 const esUber = (comercio: string | null) => comercio?.toLowerCase().includes('uber') ?? false
+
+function esMismoViaje(diffMinutos: number, montoA: number, montoB: number): boolean {
+  if (diffMinutos <= VENTANA_ESTRICTA_MINUTOS) return true
+  if (diffMinutos > VENTANA_AMPLIA_MINUTOS) return false
+  const diffRelativa = Math.abs(montoA - montoB) / Math.max(montoA, montoB)
+  return diffRelativa <= TOLERANCIA_MONTO_AMPLIA
+}
 
 export function deduplicateUber(txs: TxItem[]): {
   transactions: TxItem[]
@@ -24,7 +37,8 @@ export function deduplicateUber(txs: TxItem[]): {
       if (preauthIds.has(uberTxs[j].id)) continue
       const timeA = new Date(uberTxs[i].extracted.fecha ?? '').getTime()
       const timeB = new Date(uberTxs[j].extracted.fecha ?? '').getTime()
-      if (Math.abs(timeA - timeB) / 60_000 <= VENTANA_MINUTOS) {
+      const diffMinutos = Math.abs(timeA - timeB) / 60_000
+      if (esMismoViaje(diffMinutos, uberTxs[i].extracted.monto, uberTxs[j].extracted.monto)) {
         // Se queda solo la segunda transacción (el cargo real al finalizar el viaje)
         preauthIds.add(timeA <= timeB ? uberTxs[i].id : uberTxs[j].id)
       }
@@ -89,7 +103,7 @@ export function matchUberAgainstPersisted(
     for (const p of persisted) {
       if (consumedPersisted.has(p.id)) continue
       const diffMin = Math.abs(txTime - new Date(p.fecha).getTime()) / 60_000
-      if (diffMin <= VENTANA_MINUTOS && diffMin < bestDiff) {
+      if (esMismoViaje(diffMin, tx.extracted.monto, p.monto) && diffMin < bestDiff) {
         best = p
         bestDiff = diffMin
       }

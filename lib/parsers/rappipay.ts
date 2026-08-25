@@ -26,6 +26,11 @@ export function parseRappiPay(email: EmailInput): ParseResult {
     return parsePSECompra(email)
   }
 
+  // Compra directa en comercio con tarjeta débito — "Resumen de compra" / "La compra ... fue exitosa"
+  if (/resumen de compra/i.test(subject) || /la compra.*fue exitosa/i.test(body)) {
+    return parseCompra(email)
+  }
+
   // Transferencia bancaria — puede ser ENTRANTE (sueldo) o SALIENTE (envío a otro banco)
   if (/resumen transferencia bancaria|transferencia bancaria/i.test(subject + body)) {
     return /monto transferido/i.test(body)
@@ -204,6 +209,36 @@ function parsePSECompra(email: EmailInput): ParseResult {
     monto,
     comercio,
     descripcion: comercio ? `Pago PSE a ${comercio}` : 'Pago PSE',
+    banco: 'RAPPIPAY',
+    tipo: 'COMPRA',
+    categoria: guessCategoria(comercio ?? ''),
+    subcategoria: null,
+    moneda: 'COP',
+    monto_usd: null,
+    flags: [],
+  }
+}
+
+function parseCompra(email: EmailInput): ParseResult {
+  const body = email.body
+
+  const montoMatch = body.match(/\bMonto\s+\$\s*([\d.,]+)/i)
+  if (!montoMatch) return null
+
+  const monto = parseCOPAmount(montoMatch[1])
+  if (!monto || monto <= 0) return null
+
+  // "Comercio\nUBER RIDES*DL BOGOTA CO\nFecha de la transacción" — se descarta todo
+  // después del "*" (descriptor de red de tarjeta: sucursal/ciudad/país)
+  const comercioMatch = body.match(/\bComercio\s+([^\n$]{1,120}?)(?=\s+(?:Fecha|¿|Escr|$))/i)
+  const comercioRaw = comercioMatch ? comercioMatch[1].trim().split('*')[0].trim() : null
+  const comercio = comercioRaw ? toTitleCase(comercioRaw) : null
+
+  return {
+    fecha: extractFechaHora(body, email.date),
+    monto,
+    comercio,
+    descripcion: comercio ? `Compra en ${comercio}` : 'Compra RappiPay',
     banco: 'RAPPIPAY',
     tipo: 'COMPRA',
     categoria: guessCategoria(comercio ?? ''),
