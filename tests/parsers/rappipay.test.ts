@@ -248,6 +248,40 @@ Hora de la transacción
   })
 })
 
+describe('parseRappiPay — compra directa en comercio (tarjeta débito)', () => {
+  // Formato real post-stripHtml (una sola línea, sin saltos)
+  const bodyUber = ' ¡Hola, Brandon Nick ! La compra con tu RappiCuenta fue exitosa. Aquí los detalles: Monto $15.176,00 Método de pago Tarjeta digital *1532 No. de referencia 111708946 Comercio UBER RIDES*DL BOGOTA CO Fecha de la transacción 25 de agosto de 2026 Hora de la transacción 05:53 am ¿Necesitas ayuda? Escríbenos desde tu app, estamos 24/7.'
+
+  it('parses direct merchant purchase from subject', () => {
+    const result = parseRappiPay({ ...BASE_EMAIL, subject: 'Resumen de compra', body: bodyUber })
+    expect(result).not.toBeNull()
+    expect(result!.tipo).toBe('COMPRA')
+    expect(result!.monto).toBe(15176)
+    expect(result!.banco).toBe('RAPPIPAY')
+  })
+
+  it('strips card network descriptor suffix from comercio', () => {
+    const result = parseRappiPay({ ...BASE_EMAIL, subject: 'Resumen de compra', body: bodyUber })
+    expect(result!.comercio).toBe('Uber Rides')
+  })
+
+  it('categorizes as TRANSPORTE', () => {
+    const result = parseRappiPay({ ...BASE_EMAIL, subject: 'Resumen de compra', body: bodyUber })
+    expect(result!.categoria).toBe('TRANSPORTE')
+  })
+
+  it('sets fecha from body', () => {
+    const result = parseRappiPay({ ...BASE_EMAIL, subject: 'Resumen de compra', body: bodyUber })
+    expect(result!.fecha).toContain('2026-08-25')
+  })
+
+  it('ignores failed payment email even when it mentions "la compra"', () => {
+    const bodyFallo = ' ¡Hola, Brandon Nick! Algo pasó y no pudimos completar tu compra. Por favor, vuelve a intentarlo. Aquí los detalles: Monto $13.698,00 Método de pago Tarjeta digital *1532 No. de referencia 111708775 Comercio UBER RIDES*DL BOGOTA CO Fecha de la transacción 25 de agosto de 2026 Hora de la transacción 05:40 am'
+    const result = parseRappiPay({ ...BASE_EMAIL, subject: 'El pago de tu compra falló', body: bodyFallo })
+    expect(result).toBeNull()
+  })
+})
+
 describe('parseRappiPay — rentabilidad formato real (post-stripHtml, espacios)', () => {
   // Simula lo que produce stripHtml del email real de RappiPay
   const body = '¡Hola, Brandon Nick! Este es el resumen de la rentabilidad que ganaste este mes por ahorrar en tu cuenta: Aquí los detalles: Rentabilidad de Junio $46.596,43 Fecha de corte 30 de junio de 2026 Intereses retenidos $1.110,18'

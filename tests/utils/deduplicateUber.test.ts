@@ -62,9 +62,28 @@ describe('deduplicateUber', () => {
     expect(preauthIds).toContain('preauth')
   })
 
-  it('does NOT deduplicate trips more than 15min apart', () => {
+  it('does NOT deduplicate trips more than 15min apart with very different montos (viajes distintos)', () => {
     const trip1 = uberTx('trip1', '2026-06-07T08:00:00Z', 12000)
-    const trip2 = uberTx('trip2', '2026-06-07T08:30:00Z', 12000)  // 30min apart
+    const trip2 = uberTx('trip2', '2026-06-07T08:30:00Z', 25000)  // 30min apart, monto muy distinto
+    const { transactions, preauthIds } = deduplicateUber([trip1, trip2])
+    expect(transactions).toHaveLength(2)
+    expect(preauthIds).toHaveLength(0)
+  })
+
+  it('deduplicates a long ride (16-90min apart) when the monto is nearly identical', () => {
+    // Viaje largo: el cobro final tarda más de 15min en llegar, pero el monto
+    // ya casi no cambia respecto al pre-auth (a diferencia de un hold estimado)
+    const preauth = uberTx('preauth', '2026-06-07T21:42:00Z', 13808)
+    const cobro   = uberTx('cobro',   '2026-06-07T22:42:00Z', 13839)  // 60min, 31 COP de diferencia
+    const { transactions, preauthIds } = deduplicateUber([preauth, cobro])
+    expect(transactions).toHaveLength(1)
+    expect(transactions[0].id).toBe('cobro')
+    expect(preauthIds).toContain('preauth')
+  })
+
+  it('does NOT deduplicate beyond the 90min wide window even with identical montos', () => {
+    const trip1 = uberTx('trip1', '2026-06-07T08:00:00Z', 12000)
+    const trip2 = uberTx('trip2', '2026-06-07T09:41:00Z', 12000)  // 101min apart
     const { transactions, preauthIds } = deduplicateUber([trip1, trip2])
     expect(transactions).toHaveLength(2)
     expect(preauthIds).toHaveLength(0)
@@ -122,13 +141,34 @@ describe('matchUberAgainstPersisted', () => {
     expect(matches[0].updatePersisted).toBe(false) // no se toca la fila ya persistida
   })
 
-  it('does not match persisted Uber rows more than 15min apart', () => {
+  it('does not match persisted Uber rows more than 15min apart with different montos', () => {
     const persisted = [{ id: 'db-row-1', fecha: '2026-06-07T08:00:00Z', monto: 12000 }]
-    const otroViaje = uberTx('otro-viaje', '2026-06-07T09:00:00Z', 12000)
+    const otroViaje = uberTx('otro-viaje', '2026-06-07T09:00:00Z', 30000)
 
     const { remaining, matches } = matchUberAgainstPersisted([otroViaje], persisted)
 
     expect(remaining).toHaveLength(1) // es un viaje distinto, se inserta normalmente
+    expect(matches).toHaveLength(0)
+  })
+
+  it('matches a long-ride final charge (16-90min later) against a persisted pre-auth with near-identical monto', () => {
+    const persisted = [{ id: 'db-row-1', fecha: '2026-06-07T21:42:00Z', monto: 13808 }]
+    const cobroFinal = uberTx('cobro-final', '2026-06-07T22:42:00Z', 13839) // 60min, 31 COP diff
+
+    const { remaining, matches } = matchUberAgainstPersisted([cobroFinal], persisted)
+
+    expect(remaining).toHaveLength(0)
+    expect(matches).toHaveLength(1)
+    expect(matches[0]).toMatchObject({ persistedId: 'db-row-1', updatePersisted: true })
+  })
+
+  it('does not match beyond the 90min wide window even with identical montos', () => {
+    const persisted = [{ id: 'db-row-1', fecha: '2026-06-07T08:00:00Z', monto: 12000 }]
+    const otroViaje = uberTx('otro-viaje', '2026-06-07T09:41:00Z', 12000) // 101min
+
+    const { remaining, matches } = matchUberAgainstPersisted([otroViaje], persisted)
+
+    expect(remaining).toHaveLength(1)
     expect(matches).toHaveLength(0)
   })
 
