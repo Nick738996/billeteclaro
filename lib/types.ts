@@ -64,13 +64,6 @@ export interface Transaction {
   contraparte_id: string | null
 }
 
-/** Alias que el usuario asigna a un identificador de contraparte (llave, cuenta, teléfono) */
-export interface ContactAlias {
-  id: string
-  identificador: string
-  nombre: string
-}
-
 export interface Budget {
   id: string
   user_id: string

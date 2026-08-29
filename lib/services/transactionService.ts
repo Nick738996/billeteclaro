@@ -3,7 +3,6 @@ import { startOfMonth, endOfMonth, parseISO } from 'date-fns'
 import { createAdminClient } from '@/lib/supabase/server'
 import { generateAuditId } from '@/lib/utils/auditId'
 import { reassignCalendarMonths } from '@/lib/services/mesContableService'
-import { getContactAliases, applyContraparteDisplay } from '@/lib/services/contactAliasService'
 import type { Categoria, Banco, TipoTransaccion, Transaction } from '@/lib/types'
 
 type Admin = ReturnType<typeof createAdminClient>
@@ -25,13 +24,7 @@ export async function fetchMonthTransactions(
     .order('fecha', { ascending: false })
 
   if (error) throw new Error(`fetchMonthTransactions: ${error.message}`)
-  const rows = (data ?? []) as Transaction[]
-
-  if (!rows.some(r => r.contraparte_id)) return rows
-
-  const aliases = await getContactAliases(supabase, userId)
-  const aliasMap = new Map(aliases.map(a => [a.identificador, a.nombre]))
-  return rows.map(r => applyContraparteDisplay(r, aliasMap))
+  return (data ?? []) as Transaction[]
 }
 
 // ── Manual transactions ───────────────────────────────────────────────────────
