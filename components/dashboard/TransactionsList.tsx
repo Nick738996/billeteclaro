@@ -28,6 +28,8 @@ import {
   formatCOPCompact,
   isIngreso,
   isGasto,
+  SUBCATEGORIA_RETIRO_AHORROS,
+  SUBCATEGORIA_APORTE_AHORROS,
 } from '@/lib/types'
 import { TEST_IDS } from '@/lib/testIds'
 import styles from './TransactionsList.module.css'
@@ -92,7 +94,7 @@ function getCategoryIcon(cat: string): LucideIcon {
   return CATEGORIA_ICON[cat as Categoria] ?? Tag
 }
 
-type FilterKey = Categoria | 'TODOS' | `BANCO:${Banco}`
+type FilterKey = Categoria | 'TODOS' | `BANCO:${Banco}` | 'RETIRO_AHORRO'
 
 // ── Helpers (iguales al original) ─────────────────────────────────────────────
 
@@ -111,9 +113,37 @@ function toTitleCase(str: string): string {
     .join(' ')
 }
 
+// Formatea el identificador crudo de contraparte (llave, cuenta, teléfono, email)
+// para que sea legible — es la única pista real que trae el correo cuando no
+// hay nombre de destinatario, así que se muestra completo, no enmascarado.
+function formatContraparteId(raw: string): string {
+  const clean = raw.replace(/\*/g, '').trim()
+  if (clean.includes('@')) return clean
+  const digits = clean.replace(/\D/g, '')
+  if (digits.length === 10) return `${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6)}`
+  return clean
+}
+
+// Cuando el correo no trae nombre de destinatario, en vez de un texto genérico
+// ("Transferencia enviada") mostramos la llave/cuenta/email real a la que fue
+// el dinero — es la info que el usuario necesita para reconocer a quién le pagó.
+function contraparteFallbackName(t: Transaction): string {
+  const id = formatContraparteId(t.contraparte_id as string)
+  const desc = t.descripcion ? toTitleCase(t.descripcion) : null
+  switch (t.tipo) {
+    case 'TRANSFERENCIA_ENVIADA':
+      return desc && !/^transferencia enviada$/i.test(desc) ? `${desc} · ${id}` : `Transferencia a ${id}`
+    case 'PAGO_SERVICIO':
+      return `Pago QR a ${id}`
+    default:
+      return id
+  }
+}
+
 function getDisplayName(t: Transaction): string {
   const comercio = t.comercio ? toTitleCase(t.comercio) : null
   const desc = t.descripcion ? toTitleCase(t.descripcion) : null
+  if (!comercio && t.contraparte_id) return contraparteFallbackName(t)
   switch (t.tipo) {
     case 'INGRESO':
       return desc ?? (comercio ? `Ingreso de ${comercio}` : 'Ingreso')
@@ -134,19 +164,20 @@ function getDisplayName(t: Transaction): string {
 function getDisplayParts(t: Transaction): { prefix: string; name: string } {
   const comercio = t.comercio ? toTitleCase(t.comercio) : null
   const desc = t.descripcion ? toTitleCase(t.descripcion) : null
+  const fallback = !comercio && t.contraparte_id ? contraparteFallbackName(t) : null
   switch (t.tipo) {
     case 'INGRESO':
-      return { prefix: '↓', name: comercio ?? desc ?? 'Ingreso' }
+      return { prefix: '↓', name: comercio ?? fallback ?? desc ?? 'Ingreso' }
     case 'TRANSFERENCIA_ENVIADA':
-      return { prefix: '↑', name: comercio ?? desc ?? 'Transferencia' }
+      return { prefix: '↑', name: comercio ?? fallback ?? desc ?? 'Transferencia' }
     case 'TRANSFERENCIA_RECIBIDA':
-      return { prefix: '↓', name: comercio ?? desc ?? 'Transferencia' }
+      return { prefix: '↓', name: comercio ?? fallback ?? desc ?? 'Transferencia' }
     case 'ABONO_DEUDA':
       return { prefix: '↑', name: comercio ? `Pago ${comercio}` : 'Pago tarjeta' }
     case 'PAGO_SERVICIO':
-      return { prefix: '', name: comercio ?? desc ?? 'Pago servicio' }
+      return { prefix: '', name: comercio ?? fallback ?? desc ?? 'Pago servicio' }
     default:
-      return { prefix: '', name: comercio ?? desc ?? 'Transacción' }
+      return { prefix: '', name: comercio ?? fallback ?? desc ?? 'Transacción' }
   }
 }
 
@@ -211,6 +242,21 @@ function BancoFilterBtn({ banco, active, onChange, testId }: {
   )
 }
 
+function RetiroFilterBtn({ active, onChange }: { active: FilterKey; onChange: (k: FilterKey) => void }) {
+  const on = active === 'RETIRO_AHORRO'
+  const color = getCategoryColor('AHORROS')
+  return (
+    <button
+      onClick={() => onChange('RETIRO_AHORRO')}
+      aria-pressed={on}
+      className={`${styles.catBtn} ${on ? styles.catBtnOn : styles.catBtnOff}`}
+      style={{ '--cat-clr': color, '--cat-bg': `${color}26` } as React.CSSProperties}
+    >
+      Retiros de ahorro
+    </button>
+  )
+}
+
 function FilterSheet({
   active,
   onChange,
@@ -218,6 +264,7 @@ function FilterSheet({
   availableBancos,
   budgetedCats,
   otherCats,
+  hasRetiros,
 }: {
   active: FilterKey
   onChange: (key: FilterKey) => void
@@ -225,6 +272,7 @@ function FilterSheet({
   availableBancos: Banco[]
   budgetedCats: string[]
   otherCats: string[]
+  hasRetiros: boolean
 }) {
   if (typeof document === 'undefined') return null
   return createPortal(
@@ -259,6 +307,17 @@ function FilterSheet({
                              : `filter-${banco.toLowerCase()}`
                 return <BancoFilterBtn key={banco} banco={banco} active={active} onChange={onChange} testId={testId} />
               })}
+            </div>
+          </>
+        )}
+
+        {hasRetiros && (
+          <>
+            <p className={styles.sectionLabel}>
+              Ahorros
+            </p>
+            <div className={`${styles.chipGroup} ${styles.chipGroupMb}`}>
+              <RetiroFilterBtn active={active} onChange={onChange} />
             </div>
           </>
         )}
@@ -310,13 +369,14 @@ function FilterChips({
   budgetedCats: string[]
 }) {
   const [sheetOpen, setSheetOpen] = useState(false)
-  const isCatActive   = active !== 'TODOS' && !active.startsWith('BANCO:')
-  const isBancoActive = active.startsWith('BANCO:')
-  const activeBanco   = isBancoActive ? (active.slice(6) as Banco) : null
+  const isRetiroActive = active === 'RETIRO_AHORRO'
+  const isCatActive    = active !== 'TODOS' && !isRetiroActive && !active.startsWith('BANCO:')
+  const isBancoActive  = active.startsWith('BANCO:')
+  const activeBanco    = isBancoActive ? (active.slice(6) as Banco) : null
 
-  const activeLabel = isCatActive ? catLabel(active) : activeBanco ? BANCO_LABEL[activeBanco].label : null
-  const activeColor = isCatActive ? getCategoryColor(active) : activeBanco ? BANCO_LABEL[activeBanco].color : null
-  const hasActiveFilter = isCatActive || isBancoActive
+  const activeLabel = isRetiroActive ? 'Retiros de ahorro' : isCatActive ? catLabel(active) : activeBanco ? BANCO_LABEL[activeBanco].label : null
+  const activeColor = isRetiroActive ? getCategoryColor('AHORROS') : isCatActive ? getCategoryColor(active) : activeBanco ? BANCO_LABEL[activeBanco].color : null
+  const hasActiveFilter = isCatActive || isBancoActive || isRetiroActive
 
   // Bancos que realmente tienen transacciones este mes, en orden de frecuencia
   const availableBancos = useMemo(() => {
@@ -329,6 +389,12 @@ function FilterChips({
       .sort((a, b) => b[1] - a[1])
       .map(([banco]) => banco)
   }, [transactions])
+
+  // ¿Hay algún retiro de ahorros este mes? Solo entonces se ofrece el filtro.
+  const hasRetiros = useMemo(
+    () => transactions.some(t => t.subcategoria === SUBCATEGORIA_RETIRO_AHORROS),
+    [transactions]
+  )
 
   // Categorías presentes en las transacciones que no están en el presupuesto
   const otherCats = useMemo(() => {
@@ -392,6 +458,7 @@ function FilterChips({
           availableBancos={availableBancos}
           budgetedCats={budgetedCats}
           otherCats={otherCats}
+          hasRetiros={hasRetiros}
         />
       )}
     </>
@@ -469,13 +536,15 @@ function CategoryPicker({ current, onSelect, onClose, budgetedCats }: {
   )
 }
 
-// ── RenameContact bottom sheet ────────────────────────────────────────────
-// Se usa cuando comercio viene de una llave/cuenta sin nombre (contraparte_id).
-// Permite ponerle un alias una sola vez — se aplica retroactivamente a todas
-// las transacciones con el mismo identificador.
+// ── RenameTransaction bottom sheet ────────────────────────────────────────
+// Permite editar el nombre/comercio de cualquier transacción. Si viene de una
+// llave/cuenta sin nombre (contraparte_id) se muestra el identificador real
+// como referencia. El nombre editado se guarda solo en ESTA transacción — no
+// afecta a otras con la misma llave o comercio.
 
-function RenameContactSheet({ current, onSave, onClose }: {
+function RenameContactSheet({ current, identificador, onSave, onClose }: {
   current: string
+  identificador?: string
   onSave: (nombre: string) => void
   onClose: () => void
 }) {
@@ -496,18 +565,20 @@ function RenameContactSheet({ current, onSave, onClose }: {
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Asignar nombre"
+        aria-label="Editar nombre"
         className={styles.pickerSheet}
         onKeyDown={e => { if (e.key === 'Escape') onClose() }}
       >
         <div className={styles.pickerHeader}>
-          <p className={styles.pickerTitle}>Asignar nombre</p>
+          <p className={styles.pickerTitle}>Editar nombre</p>
           <button onClick={onClose} aria-label="Cerrar" className={styles.pickerCloseBtn}>
             <X size={16} />
           </button>
         </div>
         <p className={styles.renameHint}>
-          Este nombre se usará para todas las transacciones con esta misma llave o cuenta.
+          {identificador
+            ? <>Llave/cuenta destino: <strong>{identificador}</strong>. El nombre que pongas aplica solo a esta transacción.</>
+            : 'El nombre que pongas aplica solo a esta transacción.'}
         </p>
         <div className={styles.renameRow}>
           <input
@@ -578,20 +649,14 @@ function TransactionRow({ t, pendingCat, onCategoryClick, onDelete, onRenameClic
       </div>
 
       <div className={styles.rowLeft}>
-        {t.contraparte_id ? (
-          <button
-            onClick={onRenameClick}
-            aria-label={`Asignar nombre a: ${getDisplayParts(t).name}`}
-            className={styles.rowNameBtn}
-          >
-            <span className={styles.rowName}>{getDisplayParts(t).name}</span>
-            <Pencil size={10} className={styles.rowNamePencil} />
-          </button>
-        ) : (
-          <p className={styles.rowName}>
-            {getDisplayParts(t).name}
-          </p>
-        )}
+        <button
+          onClick={onRenameClick}
+          aria-label={`Editar nombre de: ${getDisplayParts(t).name}`}
+          className={styles.rowNameBtn}
+        >
+          <span className={styles.rowName}>{getDisplayParts(t).name}</span>
+          <Pencil size={10} className={styles.rowNamePencil} />
+        </button>
         <div className={styles.rowMeta}>
           <button
             onClick={onCategoryClick}
@@ -725,12 +790,12 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
     }
   }
 
-  const saveAlias = async (identificador: string, nombre: string) => {
+  const saveComercio = async (txId: string, nombre: string) => {
     try {
-      const res = await fetch('/api/contacts', {
-        method: 'POST',
+      const res = await fetch('/api/transactions', {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ identificador, nombre }),
+        body: JSON.stringify({ id: txId, comercio: nombre }),
       })
       if (!res.ok) throw new Error()
       onCategoryChange?.()
@@ -746,6 +811,8 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
     let matchesCategory: boolean
     if (activeFilter === 'TODOS') {
       matchesCategory = true
+    } else if (activeFilter === 'RETIRO_AHORRO') {
+      matchesCategory = t.subcategoria === SUBCATEGORIA_RETIRO_AHORROS
     } else if (activeFilter.startsWith('BANCO:')) {
       const banco = activeFilter.slice(6) as Banco
       matchesCategory = efectivoBanco(t) === banco
@@ -903,10 +970,17 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
       />
     )}
 
-    {renameTx && renameTx.contraparte_id && (
+    {renameTx && (
       <RenameContactSheet
-        current={renameTx.comercio ?? ''}
-        onSave={nombre => saveAlias(renameTx.contraparte_id as string, nombre)}
+        current={renameTx.comercio ? toTitleCase(renameTx.comercio) : getDisplayParts(renameTx).name}
+        identificador={
+          renameTx.contraparte_id
+          && renameTx.subcategoria !== SUBCATEGORIA_RETIRO_AHORROS
+          && renameTx.subcategoria !== SUBCATEGORIA_APORTE_AHORROS
+            ? formatContraparteId(renameTx.contraparte_id)
+            : undefined
+        }
+        onSave={nombre => saveComercio(renameTx.id, nombre)}
         onClose={() => setRenameTxId(null)}
       />
     )}

@@ -3,7 +3,7 @@ import { startOfMonth, endOfMonth, parseISO } from 'date-fns'
 import { createAdminClient } from '@/lib/supabase/server'
 import { generateAuditId } from '@/lib/utils/auditId'
 import { reassignCalendarMonths } from '@/lib/services/mesContableService'
-import { getContactAliases, applyContraparteDisplay } from '@/lib/services/contactAliasService'
+import { SUBCATEGORIA_RETIRO_AHORROS, SUBCATEGORIA_APORTE_AHORROS } from '@/lib/types'
 import type { Categoria, Banco, TipoTransaccion, Transaction } from '@/lib/types'
 
 type Admin = ReturnType<typeof createAdminClient>
@@ -25,13 +25,7 @@ export async function fetchMonthTransactions(
     .order('fecha', { ascending: false })
 
   if (error) throw new Error(`fetchMonthTransactions: ${error.message}`)
-  const rows = (data ?? []) as Transaction[]
-
-  if (!rows.some(r => r.contraparte_id)) return rows
-
-  const aliases = await getContactAliases(supabase, userId)
-  const aliasMap = new Map(aliases.map(a => [a.identificador, a.nombre]))
-  return rows.map(r => applyContraparteDisplay(r, aliasMap))
+  return (data ?? []) as Transaction[]
 }
 
 // ── Manual transactions ───────────────────────────────────────────────────────
@@ -43,6 +37,8 @@ export interface ManualTxInput {
   categoria: Categoria
   tipo: TipoTransaccion
   banco: Banco
+  subcategoria?: string | null
+  contraparte_id?: string | null
 }
 
 export async function createManualTransactions(
@@ -65,6 +61,8 @@ export async function createManualTransactions(
       banco:            tx.banco,
       tipo:             tx.tipo,
       categoria:        tx.categoria,
+      subcategoria:     tx.subcategoria ?? null,
+      contraparte_id:   tx.contraparte_id ?? null,
       id_auditoria:     await generateAuditId(admin, userId, fecha),
       mes_contable:     tx.fecha.slice(0, 7),
       procesado:        true,
@@ -112,7 +110,7 @@ export async function deleteTransaction(
 ): Promise<void> {
   const { data: tx } = await supabase
     .from('transactions')
-    .select('id, gmail_message_id')
+    .select('id, gmail_message_id, subcategoria, contraparte_id, monto')
     .eq('id', id)
     .eq('user_id', userId)
     .single()
@@ -121,6 +119,26 @@ export async function deleteTransaction(
 
   const { error } = await supabase.from('transactions').delete().eq('id', id).eq('user_id', userId)
   if (error) throw new Error(`deleteTransaction: ${error.message}`)
+
+  // Si esta transacción vino de un retiro/aporte en Mis Ahorros (ver
+  // savingsService.ts), revertir el ajuste de saldo que hizo — si no, borrar
+  // la transacción deja el saldo de la cuenta desincronizado con la realidad.
+  if (tx.contraparte_id && (tx.subcategoria === SUBCATEGORIA_RETIRO_AHORROS || tx.subcategoria === SUBCATEGORIA_APORTE_AHORROS)) {
+    const { data: account } = await admin
+      .from('savings_accounts')
+      .select('saldo')
+      .eq('id', tx.contraparte_id)
+      .eq('user_id', userId)
+      .single()
+    if (account) {
+      const sign = tx.subcategoria === SUBCATEGORIA_RETIRO_AHORROS ? 1 : -1
+      await admin
+        .from('savings_accounts')
+        .update({ saldo: account.saldo + sign * tx.monto, updated_at: new Date().toISOString() })
+        .eq('id', tx.contraparte_id)
+        .eq('user_id', userId)
+    }
+  }
 
   // Gmail transactions: agregar a skipped_ids para que el próximo sync las ignore
   const isManual = tx.gmail_message_id?.startsWith('manual_')

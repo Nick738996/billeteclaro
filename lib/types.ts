@@ -64,13 +64,6 @@ export interface Transaction {
   contraparte_id: string | null
 }
 
-/** Alias que el usuario asigna a un identificador de contraparte (llave, cuenta, teléfono) */
-export interface ContactAlias {
-  id: string
-  identificador: string
-  nombre: string
-}
-
 export interface Budget {
   id: string
   user_id: string
@@ -107,6 +100,12 @@ export const PRESUPUESTO_CATS: Categoria[] = [
   'HOGAR', 'TRANSPORTE', 'SALIDAS', 'SALUD', 'SUSCRIPCIONES',
   'COMPRAS_ONLINE', 'INVERSION', 'AHORROS', 'DEUDA', 'DONACIONES', 'EDUCACION', 'REEMBOLSABLE', 'OTRO',
 ]
+
+// Subcategoria usada en la transacción que se crea al retirar/aportar desde
+// Mis Ahorros — permite filtrarlas aparte de otros ingresos/gastos que
+// comparten la misma categoria (INGRESO / AHORROS).
+export const SUBCATEGORIA_RETIRO_AHORROS = 'retiro_ahorros'
+export const SUBCATEGORIA_APORTE_AHORROS = 'aporte_ahorros'
 
 export interface ExtractedTransaction {
   fecha: string | null

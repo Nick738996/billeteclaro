@@ -87,6 +87,11 @@ export default function DashboardClient({
   const [contextVersion, setContextVersion] = useState(0)
   const bumpContext = useCallback(() => setContextVersion(v => v + 1), [])
 
+  // Sube cada vez que borrar una transacción pudo revertir un saldo de ahorro
+  // (ver deleteTransaction), para forzar el refetch de SavingsOverview.
+  const [savingsRefresh, setSavingsRefresh] = useState(0)
+  const bumpSavingsRefresh = useCallback(() => setSavingsRefresh(v => v + 1), [])
+
   const tour = useTour()
 
   // Auto-activar tour al primer login (si no fue completado)
@@ -228,7 +233,10 @@ export default function DashboardClient({
           budgetTotal={Object.values(budgets).reduce((s, v) => s + (v || 0), 0)}
         />
 
-        <SavingsOverview />
+        <SavingsOverview
+          onTransaction={() => { loadMonth(month); bumpContext() }}
+          refreshSignal={savingsRefresh}
+        />
 
         <div data-testid="tour-budget">
           <CategoriesCard
@@ -267,7 +275,7 @@ export default function DashboardClient({
             activeFilter={activeFilter}
             onFilterChange={setActiveFilter}
             onCategoryChange={() => loadMonth(month)}
-            onTransactionDeleted={() => { loadMonth(month); bumpContext() }}
+            onTransactionDeleted={() => { loadMonth(month); bumpContext(); bumpSavingsRefresh() }}
             onAdd={() => setManualOpen(v => !v)}
             budgets={budgets}
           />
