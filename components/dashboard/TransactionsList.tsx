@@ -28,6 +28,8 @@ import {
   formatCOPCompact,
   isIngreso,
   isGasto,
+  SUBCATEGORIA_RETIRO_AHORROS,
+  SUBCATEGORIA_APORTE_AHORROS,
 } from '@/lib/types'
 import { TEST_IDS } from '@/lib/testIds'
 import styles from './TransactionsList.module.css'
@@ -92,7 +94,7 @@ function getCategoryIcon(cat: string): LucideIcon {
   return CATEGORIA_ICON[cat as Categoria] ?? Tag
 }
 
-type FilterKey = Categoria | 'TODOS' | `BANCO:${Banco}`
+type FilterKey = Categoria | 'TODOS' | `BANCO:${Banco}` | 'RETIRO_AHORRO'
 
 // ── Helpers (iguales al original) ─────────────────────────────────────────────
 
@@ -240,6 +242,21 @@ function BancoFilterBtn({ banco, active, onChange, testId }: {
   )
 }
 
+function RetiroFilterBtn({ active, onChange }: { active: FilterKey; onChange: (k: FilterKey) => void }) {
+  const on = active === 'RETIRO_AHORRO'
+  const color = getCategoryColor('AHORROS')
+  return (
+    <button
+      onClick={() => onChange('RETIRO_AHORRO')}
+      aria-pressed={on}
+      className={`${styles.catBtn} ${on ? styles.catBtnOn : styles.catBtnOff}`}
+      style={{ '--cat-clr': color, '--cat-bg': `${color}26` } as React.CSSProperties}
+    >
+      Retiros de ahorro
+    </button>
+  )
+}
+
 function FilterSheet({
   active,
   onChange,
@@ -247,6 +264,7 @@ function FilterSheet({
   availableBancos,
   budgetedCats,
   otherCats,
+  hasRetiros,
 }: {
   active: FilterKey
   onChange: (key: FilterKey) => void
@@ -254,6 +272,7 @@ function FilterSheet({
   availableBancos: Banco[]
   budgetedCats: string[]
   otherCats: string[]
+  hasRetiros: boolean
 }) {
   if (typeof document === 'undefined') return null
   return createPortal(
@@ -288,6 +307,17 @@ function FilterSheet({
                              : `filter-${banco.toLowerCase()}`
                 return <BancoFilterBtn key={banco} banco={banco} active={active} onChange={onChange} testId={testId} />
               })}
+            </div>
+          </>
+        )}
+
+        {hasRetiros && (
+          <>
+            <p className={styles.sectionLabel}>
+              Ahorros
+            </p>
+            <div className={`${styles.chipGroup} ${styles.chipGroupMb}`}>
+              <RetiroFilterBtn active={active} onChange={onChange} />
             </div>
           </>
         )}
@@ -339,13 +369,14 @@ function FilterChips({
   budgetedCats: string[]
 }) {
   const [sheetOpen, setSheetOpen] = useState(false)
-  const isCatActive   = active !== 'TODOS' && !active.startsWith('BANCO:')
-  const isBancoActive = active.startsWith('BANCO:')
-  const activeBanco   = isBancoActive ? (active.slice(6) as Banco) : null
+  const isRetiroActive = active === 'RETIRO_AHORRO'
+  const isCatActive    = active !== 'TODOS' && !isRetiroActive && !active.startsWith('BANCO:')
+  const isBancoActive  = active.startsWith('BANCO:')
+  const activeBanco    = isBancoActive ? (active.slice(6) as Banco) : null
 
-  const activeLabel = isCatActive ? catLabel(active) : activeBanco ? BANCO_LABEL[activeBanco].label : null
-  const activeColor = isCatActive ? getCategoryColor(active) : activeBanco ? BANCO_LABEL[activeBanco].color : null
-  const hasActiveFilter = isCatActive || isBancoActive
+  const activeLabel = isRetiroActive ? 'Retiros de ahorro' : isCatActive ? catLabel(active) : activeBanco ? BANCO_LABEL[activeBanco].label : null
+  const activeColor = isRetiroActive ? getCategoryColor('AHORROS') : isCatActive ? getCategoryColor(active) : activeBanco ? BANCO_LABEL[activeBanco].color : null
+  const hasActiveFilter = isCatActive || isBancoActive || isRetiroActive
 
   // Bancos que realmente tienen transacciones este mes, en orden de frecuencia
   const availableBancos = useMemo(() => {
@@ -358,6 +389,12 @@ function FilterChips({
       .sort((a, b) => b[1] - a[1])
       .map(([banco]) => banco)
   }, [transactions])
+
+  // ¿Hay algún retiro de ahorros este mes? Solo entonces se ofrece el filtro.
+  const hasRetiros = useMemo(
+    () => transactions.some(t => t.subcategoria === SUBCATEGORIA_RETIRO_AHORROS),
+    [transactions]
+  )
 
   // Categorías presentes en las transacciones que no están en el presupuesto
   const otherCats = useMemo(() => {
@@ -421,6 +458,7 @@ function FilterChips({
           availableBancos={availableBancos}
           budgetedCats={budgetedCats}
           otherCats={otherCats}
+          hasRetiros={hasRetiros}
         />
       )}
     </>
@@ -773,6 +811,8 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
     let matchesCategory: boolean
     if (activeFilter === 'TODOS') {
       matchesCategory = true
+    } else if (activeFilter === 'RETIRO_AHORRO') {
+      matchesCategory = t.subcategoria === SUBCATEGORIA_RETIRO_AHORROS
     } else if (activeFilter.startsWith('BANCO:')) {
       const banco = activeFilter.slice(6) as Banco
       matchesCategory = efectivoBanco(t) === banco
@@ -933,7 +973,13 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
     {renameTx && (
       <RenameContactSheet
         current={renameTx.comercio ? toTitleCase(renameTx.comercio) : getDisplayParts(renameTx).name}
-        identificador={renameTx.contraparte_id ? formatContraparteId(renameTx.contraparte_id) : undefined}
+        identificador={
+          renameTx.contraparte_id
+          && renameTx.subcategoria !== SUBCATEGORIA_RETIRO_AHORROS
+          && renameTx.subcategoria !== SUBCATEGORIA_APORTE_AHORROS
+            ? formatContraparteId(renameTx.contraparte_id)
+            : undefined
+        }
         onSave={nombre => saveComercio(renameTx.id, nombre)}
         onClose={() => setRenameTxId(null)}
       />

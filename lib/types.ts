@@ -101,6 +101,12 @@ export const PRESUPUESTO_CATS: Categoria[] = [
   'COMPRAS_ONLINE', 'INVERSION', 'AHORROS', 'DEUDA', 'DONACIONES', 'EDUCACION', 'REEMBOLSABLE', 'OTRO',
 ]
 
+// Subcategoria usada en la transacción que se crea al retirar/aportar desde
+// Mis Ahorros — permite filtrarlas aparte de otros ingresos/gastos que
+// comparten la misma categoria (INGRESO / AHORROS).
+export const SUBCATEGORIA_RETIRO_AHORROS = 'retiro_ahorros'
+export const SUBCATEGORIA_APORTE_AHORROS = 'aporte_ahorros'
+
 export interface ExtractedTransaction {
   fecha: string | null
   monto: number
