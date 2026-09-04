@@ -1,5 +1,6 @@
 import { randomBytes, createHash } from 'crypto'
 import { detectBank } from '@/lib/email/bankSenders'
+import { cleanForwardedBody } from '@/lib/utils/cleanForwardedBody'
 import { extractTransaction } from '@/lib/services/emailPipeline'
 import { deduplicateUber, matchUberAgainstPersisted } from '@/lib/utils/deduplicateUber'
 import { generateAuditId } from '@/lib/utils/auditId'
@@ -71,18 +72,24 @@ async function tryAutoConfirm(admin: Admin, userId: string, body: string): Promi
 }
 
 // El reenvío llega sin el remitente bancario en el header `From` (ese ahora
-// es quien reenvió) — buscamos una línea "De:"/"From:" del bloque de reenvío
-// citado para recuperar el remitente original y poder usar detectBank().
+// es quien reenvió) — buscamos las líneas "De:"/"From:" de los bloques de
+// reenvío citados para recuperar el remitente original y poder usar
+// detectBank(). Un correo puede reenviarse más de una vez (alguien le
+// reenvía al usuario un correo que ya venía reenviado) — la primera línea
+// "De:" encontrada es la del reenvío más reciente, no necesariamente la del
+// banco, así que se prueban todas y se usa la primera que resuelva a un
+// banco conocido.
 function detectBankFromForwardedBody(body: string): Banco {
-  const match = body.match(/^(?:De|From):\s*(.+)$/im)
-  if (!match) return 'OTRO'
-  return detectBank(match[1])
+  for (const match of body.matchAll(/^(?:De|From):\s*(.+)$/gim)) {
+    const banco = detectBank(match[1])
+    if (banco !== 'OTRO') return banco
+  }
+  return 'OTRO'
 }
 
 export interface ProcessResult {
   processed: boolean
   reason: string
-  debug?: string
 }
 
 export async function processForwardedEmail(payload: ForwardedEmailPayload, admin: Admin): Promise<ProcessResult> {
@@ -115,15 +122,13 @@ export async function processForwardedEmail(payload: ForwardedEmailPayload, admi
     from: payload.from,
     subject: payload.subject,
     date: payload.date,
-    body: payload.body,
+    body: cleanForwardedBody(payload.body),
     provider: 'forwarded',
     authenticated: true,
   }
 
   const extracted = await extractTransaction(email, banco)
-  if (!extracted) {
-    return { processed: false, reason: 'extraction_failed', debug: `banco=${banco} body=${email.body.slice(0, 5000)}` }
-  }
+  if (!extracted) return { processed: false, reason: 'extraction_failed' }
 
   // Dedup de Uber (pre-auth vs. cobro final) contra el historial ya persistido
   // — mismo patrón que syncService.ts FASE 2, pero para un solo item.

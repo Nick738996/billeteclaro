@@ -25,6 +25,7 @@ export const BANK_SENDERS: Record<string, Banco> = {
 
   // Scotiabank Colpatria
   'notificaciones@colpatria.com':                                'SCOTIABANK_COLPATRIA',
+  'colpatriainforma@scotiabankcolpatria.com':                    'SCOTIABANK_COLPATRIA',
 
   // Banco de Bogotá
   'alertas@bancodebogota.com.co':                                'BANCO_DE_BOGOTA',

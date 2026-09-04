@@ -55,13 +55,13 @@ Remitente: ${params.from}
 Asunto: ${params.subject}
 Fecha del correo: ${params.date}
 Cuerpo:
-${params.body.slice(0, 1000)}`
+${params.body.slice(0, 4000)}`
 
   try {
     const completion = await getGroq().chat.completions.create({
       model: 'openai/gpt-oss-20b',
       temperature: 0.1,
-      max_tokens: 512,
+      max_tokens: 2048,
       response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },

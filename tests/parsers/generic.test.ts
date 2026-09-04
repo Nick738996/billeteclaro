@@ -145,3 +145,47 @@ describe('tryGenericParser — inglés (bancos extranjeros)', () => {
     expect(result!.monto).toBe(85000)
   })
 })
+
+describe('tryGenericParser — tabla COMERCIO/MONTO/FECHA/HORA', () => {
+  it('parsea una tabla real de Scotiabank Colpatria (reenvío doble, ya limpio)', () => {
+    const body = `*Apreciado(a) Cliente: *
+
+Scotiabank Colpatria notifica que el día de hoy realizaste con tu tarjeta Visa
+Platinum la siguiente transacción o compra recurrente:
+
+*COMERCIO* *MONTO* *FECHA* *HORA*
+DL*DIDI RIDES CO 9,200 2025/03/06 18:09:09
+
+Si requieres más información, contáctanos en nuestros canales de atención`
+    const result = tryGenericParser({ ...BASE_EMAIL, subject: 'Scotiabank Colpatria en Linea', body }, 'SCOTIABANK_COLPATRIA')
+    expect(result).not.toBeNull()
+    expect(result!.tipo).toBe('COMPRA')
+    expect(result!.monto).toBe(9200)
+    expect(result!.comercio).toBe('Dl*didi Rides Co')
+    expect(result!.moneda).toBe('COP')
+    expect(result!.flags).toContain('parser_tabla')
+    expect(result!.fecha).toBe(new Date(Date.UTC(2025, 2, 6, 23, 9, 9)).toISOString())
+  })
+
+  it('acepta fecha en formato dd/mm/yyyy', () => {
+    const body = `COMERCIO MONTO FECHA HORA
+Exito 45000 06/03/2025 10:00:00`
+    const result = tryGenericParser({ ...BASE_EMAIL, subject: 'Notificación', body }, 'OTRO')
+    expect(result!.monto).toBe(45000)
+    expect(result!.comercio).toBe('Exito')
+  })
+
+  it('funciona sin la columna HORA', () => {
+    const body = `COMERCIO MONTO FECHA
+Netflix 32900 2025/03/06`
+    const result = tryGenericParser({ ...BASE_EMAIL, subject: 'Notificación', body }, 'OTRO')
+    expect(result!.monto).toBe(32900)
+    expect(result!.comercio).toBe('Netflix')
+  })
+
+  it('no confunde un encabezado suelto sin fila de datos válida', () => {
+    const body = 'COMERCIO MONTO FECHA HORA\nEsto no es una fila de datos válida'
+    const result = tryGenericParser({ ...BASE_EMAIL, subject: 'Notificación', body }, 'OTRO')
+    expect(result).toBeNull()
+  })
+})

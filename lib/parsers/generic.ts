@@ -13,7 +13,7 @@ import type { EmailInput, ParseResult } from './types'
 import {
   parseCOPAmount, parseUSAmount,
   parseSpanishDate, parseEnglishDate, parseISOLikeDate,
-  toTitleCase,
+  toTitleCase, bogotaDateToUTC,
 } from './utils'
 import { guessCategoria } from './commerceCategories'
 
@@ -122,8 +122,61 @@ function build(
   }
 }
 
+// Algunos bancos (ej. Scotiabank Colpatria) no narran la transacción en una
+// oración sino en una tabla de columnas fijas — COMERCIO/MONTO/FECHA/HORA.
+// No es un patrón de un banco en particular: cualquier correo que use este
+// mismo formato de tabla (encabezado + una fila de datos) cae acá, sin IA.
+const TABLE_HEADER_RE = /^comercio\s+monto\s+fecha(?:\s+hora)?$/i
+const TABLE_ROW_RE = /^(.+?)\s+([\d][\d.,]*)\s+(\d{4}\/\d{1,2}\/\d{1,2}|\d{1,2}\/\d{1,2}\/\d{4})(?:\s+(\d{1,2}:\d{2}(?::\d{2})?))?\s*$/
+
+function parseTableDate(fecha: string, hora?: string): string | null {
+  const segs = fecha.split('/')
+  if (segs.length !== 3) return null
+  // yyyy/mm/dd si el primer campo tiene 4 dígitos, si no dd/mm/yyyy
+  const [year, month, day] = (segs[0].length === 4 ? segs : [segs[2], segs[1], segs[0]]).map(Number)
+  if (!year || !month || !day) return null
+
+  let hours = 0, minutes = 0, seconds = 0
+  if (hora) {
+    const tm = hora.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/)
+    if (tm) { hours = parseInt(tm[1]); minutes = parseInt(tm[2]); seconds = tm[3] ? parseInt(tm[3]) : 0 }
+  }
+  return bogotaDateToUTC(year, month - 1, day, hours, minutes, seconds)
+}
+
+function tryTableFormat(text: string, banco: Banco): ParseResult | null {
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean)
+  const headerIdx = lines.findIndex(l => TABLE_HEADER_RE.test(l.replace(/\*/g, '').trim().replace(/\s+/g, ' ')))
+  if (headerIdx === -1 || headerIdx + 1 >= lines.length) return null
+
+  const row = lines[headerIdx + 1].match(TABLE_ROW_RE)
+  if (!row) return null
+
+  const [, comercioRaw, montoRaw, fechaRaw, horaRaw] = row
+  const monto = parseCOPAmount(montoRaw)
+  if (!Number.isFinite(monto) || monto <= 0) return null
+
+  const comercio = toTitleCase(comercioRaw.trim())
+  return {
+    fecha: parseTableDate(fechaRaw, horaRaw),
+    monto,
+    comercio,
+    descripcion: null,
+    banco,
+    tipo: 'COMPRA',
+    categoria: guessCategoria(comercio),
+    subcategoria: null,
+    moneda: 'COP',
+    monto_usd: null,
+    flags: ['parser_generico', 'parser_tabla'],
+  }
+}
+
 export function tryGenericParser(email: EmailInput, banco: Banco): ParseResult {
   const text = `${email.subject}\n${email.body}`
+
+  const table = tryTableFormat(text, banco)
+  if (table) return table
 
   const tipoEs = detectTipo(text, TIPO_PATTERNS_ES)
   if (tipoEs) {
