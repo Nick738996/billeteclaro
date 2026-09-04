@@ -2,6 +2,7 @@
 // Requiere columna en user_tokens: outlook_refresh_token text
 // Prerrequisito: registrar app en Azure Portal (ver CLAUDE.md sección PASO 3)
 import type { EmailMessage, EmailProvider } from './types'
+import { isAuthenticatedSender } from './authResults'
 
 const GRAPH_BASE = 'https://graph.microsoft.com/v1.0'
 
@@ -70,7 +71,7 @@ export class OutlookProvider implements EmailProvider {
     const access = await this._ensureToken()
 
     const res = await fetch(
-      `${GRAPH_BASE}/me/messages/${id}?$select=id,from,subject,receivedDateTime,body`,
+      `${GRAPH_BASE}/me/messages/${id}?$select=id,from,subject,receivedDateTime,body,internetMessageHeaders`,
       { headers: { Authorization: `Bearer ${access}` } }
     )
     if (!res.ok) throw new Error(`Outlook getMessage failed: ${res.status}`)
@@ -81,6 +82,7 @@ export class OutlookProvider implements EmailProvider {
       subject: string
       receivedDateTime: string
       body: { content: string; contentType: string }
+      internetMessageHeaders?: { name: string; value: string }[]
     }
 
     const rawBody = msg.body?.content ?? ''
@@ -88,13 +90,19 @@ export class OutlookProvider implements EmailProvider {
       ? stripHtml(rawBody).slice(0, 8000)
       : rawBody.slice(0, 8000)
 
+    const authResultsHeader = msg.internetMessageHeaders
+      ?.find(h => h.name.toLowerCase() === 'authentication-results')
+      ?.value ?? ''
+    const from = msg.from?.emailAddress?.address ?? ''
+
     return {
       id: msg.id,
-      from: msg.from?.emailAddress?.address ?? '',
+      from,
       subject: msg.subject ?? '',
       date: msg.receivedDateTime ?? '',
       body,
       provider: 'outlook',
+      authenticated: isAuthenticatedSender(authResultsHeader, from),
     }
   }
 

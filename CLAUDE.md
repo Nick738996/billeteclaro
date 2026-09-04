@@ -56,6 +56,7 @@ NEXT_PUBLIC_APP_URL
 OUTLOOK_CLIENT_ID      # Azure App Registration → Application (client) ID
 OUTLOOK_CLIENT_SECRET  # Azure App Registration → Client Secret
 OUTLOOK_TENANT_ID      # 'common' para cuentas personales y corporativas
+TOKEN_ENCRYPTION_KEY   # cifra en reposo gmail_refresh_token/outlook_refresh_token (AES-256-GCM). Sin esta var, se guardan en texto plano (compat legado)
 ```
 
 ---

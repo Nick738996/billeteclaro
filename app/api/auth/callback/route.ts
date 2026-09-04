@@ -1,10 +1,16 @@
 import { NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { encryptToken } from '@/lib/utils/tokenCrypto'
 
 export async function GET(request: Request) {
   const url = new URL(request.url)
   const code = url.searchParams.get('code')
-  const next = url.searchParams.get('next') ?? '/dashboard'
+  const rawNext = url.searchParams.get('next') ?? '/dashboard'
+  // Solo permitimos rutas relativas internas con caracteres seguros. No basta
+  // con chequear que empiece con "/" y no con "//": WHATWG URL normaliza un
+  // "\" líder a "/" (igual que los navegadores), así que "/\evil.com" también
+  // resolvería a un host externo vía `new URL(next, request.url)` más abajo.
+  const next = /^\/(?!\/|\\)[A-Za-z0-9\-_/]*$/.test(rawNext) ? rawNext : '/dashboard'
 
   if (!code) {
     return NextResponse.redirect(new URL('/?error=no_code', request.url))
@@ -32,7 +38,7 @@ export async function GET(request: Request) {
       // Supabase entregó el token directamente — guardarlo
       const { error: upsertErr } = await admin.from('user_tokens').upsert({
         user_id: user.id,
-        outlook_refresh_token: provider_refresh_token,
+        outlook_refresh_token: encryptToken(provider_refresh_token),
         updated_at: new Date().toISOString(),
       })
       if (upsertErr) {
@@ -54,7 +60,7 @@ export async function GET(request: Request) {
     await admin.from('user_tokens').upsert({
       user_id: user.id,
       gmail_access_token: provider_token ?? null,
-      gmail_refresh_token: provider_refresh_token,
+      gmail_refresh_token: encryptToken(provider_refresh_token),
       token_expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
       updated_at: new Date().toISOString(),
     })

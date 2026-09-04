@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { OUTLOOK_STATE_COOKIE, readStateCookie } from '@/lib/auth/oauthState'
+import { encryptToken } from '@/lib/utils/tokenCrypto'
 
 interface MicrosoftTokenResponse {
   access_token?: string
@@ -11,11 +13,25 @@ interface MicrosoftTokenResponse {
 export async function GET(request: Request) {
   const url  = new URL(request.url)
   const code = url.searchParams.get('code')
+  const state = url.searchParams.get('state')
   const error = url.searchParams.get('error')
+
+  const clearStateCookie = (response: NextResponse) => {
+    response.cookies.set(OUTLOOK_STATE_COOKIE, '', { maxAge: 0, path: '/' })
+    return response
+  }
 
   if (error || !code) {
     console.error('[outlook-callback] OAuth error:', error, url.searchParams.get('error_description'))
-    return NextResponse.redirect(new URL('/?error=outlook_denied', request.url))
+    return clearStateCookie(NextResponse.redirect(new URL('/?error=outlook_denied', request.url)))
+  }
+
+  // Protección CSRF: el `state` debe coincidir con el generado en /outlook-connect,
+  // igual que en el flujo de Gmail — evita login/account-linking CSRF.
+  const expectedState = readStateCookie(request, OUTLOOK_STATE_COOKIE)
+  if (!state || !expectedState || state !== expectedState) {
+    console.error('[outlook-callback] state inválido o ausente')
+    return clearStateCookie(NextResponse.redirect(new URL('/?error=outlook_invalid_state', request.url)))
   }
 
   console.log('[outlook-callback] code received, length:', code.length)
@@ -26,7 +42,7 @@ export async function GET(request: Request) {
   console.log('[outlook-callback] supabase user:', user?.id ?? 'NULL', 'error:', userErr?.message ?? 'none')
   if (!user) {
     console.error('[outlook-callback] No Supabase session — redirecting to /')
-    return NextResponse.redirect(new URL('/', request.url))
+    return clearStateCookie(NextResponse.redirect(new URL('/', request.url)))
   }
 
   // Intercambiar código directamente con Microsoft
@@ -59,21 +75,21 @@ export async function GET(request: Request) {
 
   if (!tokenData.refresh_token) {
     console.error('[outlook-callback] No refresh_token — redirecting to /?error=outlook_no_token')
-    return NextResponse.redirect(new URL('/?error=outlook_no_token', request.url))
+    return clearStateCookie(NextResponse.redirect(new URL('/?error=outlook_no_token', request.url)))
   }
 
   const admin = createAdminClient()
   const { error: upsertErr } = await admin.from('user_tokens').upsert({
     user_id:               user.id,
-    outlook_refresh_token: tokenData.refresh_token,
+    outlook_refresh_token: encryptToken(tokenData.refresh_token),
     updated_at:            new Date().toISOString(),
   })
 
   if (upsertErr) {
     console.error('[outlook-callback] upsert error:', upsertErr.message, upsertErr.code)
-    return NextResponse.redirect(new URL('/?error=outlook_save_failed', request.url))
+    return clearStateCookie(NextResponse.redirect(new URL('/?error=outlook_save_failed', request.url)))
   }
 
   console.log('[outlook-callback] ✅ token saved for user', user.id)
-  return NextResponse.redirect(new URL('/dashboard', request.url))
+  return clearStateCookie(NextResponse.redirect(new URL('/dashboard', request.url)))
 }
