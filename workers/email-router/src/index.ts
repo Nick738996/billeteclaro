@@ -6,6 +6,11 @@ export interface Env {
   FORWARD_INGEST_SECRET: string
   // URL completa de la ruta de ingesta, ej. https://billeteclaro.com/api/ingest/forward
   INGEST_URL: string
+  // Solo necesario mientras INGEST_URL apunta a un preview de Vercel (que
+  // por defecto bloquea acceso público) — en producción Vercel lo ignora si
+  // no hace falta, así que es seguro dejarlo siempre configurado.
+  // wrangler secret put VERCEL_PROTECTION_BYPASS
+  VERCEL_PROTECTION_BYPASS?: string
 }
 
 export default {
@@ -34,12 +39,16 @@ export default {
     }
 
     try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'X-Forward-Secret': env.FORWARD_INGEST_SECRET,
+      }
+      if (env.VERCEL_PROTECTION_BYPASS) {
+        headers['x-vercel-protection-bypass'] = env.VERCEL_PROTECTION_BYPASS
+      }
       const res = await fetch(env.INGEST_URL, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Forward-Secret': env.FORWARD_INGEST_SECRET,
-        },
+        headers,
         body: JSON.stringify(payload),
       })
       if (!res.ok) {

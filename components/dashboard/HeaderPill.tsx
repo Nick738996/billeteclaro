@@ -4,8 +4,9 @@
 // colapsados en un menú "..." para reducir ruido visual en el header.
 
 import { useState, useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { useTheme } from 'next-themes'
-import { RefreshCw, Check, AlertCircle, Trash2, Sun, Moon, LogOut, MoreHorizontal, HelpCircle, MailX } from 'lucide-react'
+import { RefreshCw, Check, AlertCircle, Trash2, Sun, Moon, LogOut, MoreHorizontal, HelpCircle, MailX, Mail } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { TEST_IDS } from '@/lib/testIds'
 import styles from './HeaderPill.module.css'
@@ -21,6 +22,7 @@ type ResetState      = 'idle' | 'confirm' | 'resetting' | 'done'
 type DisconnectState = 'idle' | 'confirm' | 'disconnecting'
 
 export default function HeaderPill({ onSyncComplete, onSignOut, onHelp }: Props) {
+  const router = useRouter()
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
   useEffect(() => setMounted(true), [])
@@ -200,6 +202,15 @@ export default function HeaderPill({ onSyncComplete, onSignOut, onHelp }: Props)
             >
               <LogOut size={14}/>
               Cerrar sesión
+            </button>
+            <button
+              role="menuitem"
+              className={styles.menuItem}
+              onClick={() => { setMenuOpen(false); router.push('/dashboard/forwarding') }}
+              data-testid={TEST_IDS.DASHBOARD_FORWARDING_BUTTON}
+            >
+              <Mail size={14}/>
+              Reenvío de correo
             </button>
             <div className={styles.menuDivider} />
             <button
