@@ -122,7 +122,7 @@ export async function processForwardedEmail(payload: ForwardedEmailPayload, admi
 
   const extracted = await extractTransaction(email, banco)
   if (!extracted) {
-    return { processed: false, reason: 'extraction_failed', debug: `banco=${banco} body(0-1000)=${email.body.slice(0, 1000)}` }
+    return { processed: false, reason: 'extraction_failed', debug: `banco=${banco} body=${email.body.slice(0, 5000)}` }
   }
 
   // Dedup de Uber (pre-auth vs. cobro final) contra el historial ya persistido
