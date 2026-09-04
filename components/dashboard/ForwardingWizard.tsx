@@ -109,7 +109,7 @@ export default function ForwardingWizard({ eyebrow, onDone, doneLabel = 'Continu
           </h1>
           <p style={{ fontSize: 'var(--text-base)', color: 'var(--text-muted)', lineHeight: 1.6 }}>
             De ahora en adelante, cada vez que tu banco te avise de una compra, transferencia o pago,
-            ese correo llega solo a BilleteClaro y aparece en tu dashboard — sin que hagas nada más.
+            ese correo llega solo a BilleteClaro y aparece en tu dashboard, sin que hagas nada más.
           </p>
         </div>
         <button
@@ -137,7 +137,7 @@ export default function ForwardingWizard({ eyebrow, onDone, doneLabel = 'Continu
           Reenvía tus correos de banco
         </h1>
         <p style={{ fontSize: 'var(--text-base)', color: 'var(--text-muted)', lineHeight: 1.6 }}>
-          BilleteClaro nunca pide acceso a tu correo. Tú decides qué reenviar — configuras un filtro
+          BilleteClaro nunca pide acceso a tu correo. Tú decides qué reenviar, configuras un filtro
           en tu propio Gmail/Outlook y solo esos correos nos llegan.
         </p>
       </div>
@@ -181,7 +181,7 @@ export default function ForwardingWizard({ eyebrow, onDone, doneLabel = 'Continu
                 {!confirmed && pendingConfirmUrl && (
                   <div className="flex flex-col gap-2" style={{ marginTop: 10 }}>
                     <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-                      Ya recibimos la confirmación de Google — ábrela en tu navegador para completar la verificación:
+                      Ya recibimos la confirmación de Google, ábrela en tu navegador para completar la verificación:
                     </p>
                     <a
                       href={pendingConfirmUrl}
@@ -195,16 +195,19 @@ export default function ForwardingWizard({ eyebrow, onDone, doneLabel = 'Continu
                     <button
                       onClick={handleManualConfirm}
                       disabled={confirming || justConfirmed}
-                      className="flex items-center gap-1 transition-opacity hover:opacity-80"
+                      className="flex items-center justify-center gap-2 font-semibold transition-opacity hover:opacity-90"
                       style={{
-                        fontSize: 'var(--text-xs)',
-                        color: justConfirmed ? 'var(--green)' : 'var(--text-muted)',
-                        background: 'none', border: 'none', padding: 0, textAlign: 'left',
+                        fontSize: 'var(--text-sm)',
+                        color: justConfirmed ? 'var(--green)' : 'var(--text)',
+                        background: 'var(--surface)',
+                        border: `1px solid ${justConfirmed ? 'var(--green)' : 'var(--border)'}`,
+                        borderRadius: 'var(--radius-md)',
+                        padding: '10px 16px',
                         cursor: confirming || justConfirmed ? 'default' : 'pointer',
                       }}
                     >
-                      {justConfirmed && <Check size={12} />}
-                      {justConfirmed ? 'Confirmado' : confirming ? 'Confirmando...' : 'Ya la abrí y quedó verificada — continuar'}
+                      {justConfirmed && <Check size={16} />}
+                      {justConfirmed ? 'Confirmado' : confirming ? 'Confirmando...' : 'Ya la verifiqué en Gmail, continuar'}
                     </button>
                   </div>
                 )}

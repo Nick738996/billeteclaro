@@ -139,7 +139,7 @@ export default function HeaderPill({ onSyncComplete, onSignOut, onHelp }: Props)
 
   const syncTitle = syncState === 'done' && syncResult
     ? `+${syncResult.transacciones_nuevas} transacción${syncResult.transacciones_nuevas !== 1 ? 'es' : ''} nueva${syncResult.transacciones_nuevas !== 1 ? 's' : ''}`
-    : syncState === 'error' ? (needsReconnect ? `${syncError} — toca para volver a entrar` : `${syncError ?? 'Error'} — toca para reintentar`)
+    : syncState === 'error' ? (needsReconnect ? `${syncError}, toca para volver a entrar` : `${syncError ?? 'Error'}, toca para reintentar`)
     : 'Sincronizar'
 
   const resetLabel = resetState === 'confirm' ? '¿Confirmar borrado?' : 'Borrar todos los datos'

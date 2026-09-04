@@ -11,7 +11,7 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: {
-    default: 'BilleteClaro — Tu radar financiero',
+    default: 'BilleteClaro, Tu radar financiero',
     template: '%s | BilleteClaro',
   },
   description: 'Tu plata, clara. BilleteClaro lee tus correos de banco automáticamente y te muestra en qué gastas, sin que hagas nada. Gratis.',
@@ -39,14 +39,14 @@ export const metadata: Metadata = {
     locale: 'es_CO',
     url: 'https://www.billeteclaro.com',
     siteName: 'BilleteClaro',
-    title: 'BilleteClaro — Tu radar financiero',
+    title: 'BilleteClaro, Tu radar financiero',
     description: 'Tu plata, clara. Lee tus correos de banco automáticamente y te muestra en qué gastas. Sin hacer nada. Gratis.',
     images: [
       {
         url: '/og-image.png',
         width: 1200,
         height: 630,
-        alt: 'BilleteClaro — Tu radar financiero personal',
+        alt: 'BilleteClaro, Tu radar financiero personal',
         type: 'image/png',
       },
     ],
@@ -54,7 +54,7 @@ export const metadata: Metadata = {
 
   twitter: {
     card: 'summary_large_image',
-    title: 'BilleteClaro — Tu radar financiero',
+    title: 'BilleteClaro, Tu radar financiero',
     description: 'Tu plata, clara. Lee tus correos de banco y te muestra en qué gastas. Sin hacer nada.',
     images: ['/og-image.png'],
     creator: '@billeteclaro',

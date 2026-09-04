@@ -287,7 +287,7 @@ export default function CategoriesCard({
                   {cat === 'TRANSFERENCIA' && (
                     <span
                       className={styles.infoIcon}
-                      title="Transferencias — considera recategorizarlas en la lista de movimientos"
+                      title="Transferencias, considera recategorizarlas en la lista de movimientos"
                     >
                       <Info size={10} />
                     </span>
@@ -338,7 +338,7 @@ export default function CategoriesCard({
                       role="button"
                       tabIndex={0}
                       data-testid={TEST_IDS.DASHBOARD_DONUT_SLICE}
-                      aria-label={`${sl.name}: ${Math.round(sl.pct * 100)}%${isSelected ? ' — activo, presiona para limpiar filtro' : ' — presiona para filtrar'}`}
+                      aria-label={`${sl.name}: ${Math.round(sl.pct * 100)}%${isSelected ? ', activo, presiona para limpiar filtro' : ', presiona para filtrar'}`}
                       aria-pressed={isSelected}
                       onClick={() => onFilterChange(isSelected ? 'TODOS' : sl.categoria)}
                       onKeyDown={e => {
