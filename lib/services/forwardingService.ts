@@ -44,11 +44,13 @@ export async function getOrCreateForwardingAddress(admin: Admin, userId: string)
 }
 
 // ── Confirmación de reenvío (Gmail/Outlook) ─────────────────────────────────
-// No hay callback de éxito para el link de confirmación — tratamos el envío
-// exitoso del GET como confirmación (mismo comportamiento observado en
-// Finvot: "Reenvío confirmado" aparece casi inmediatamente tras agregar la
-// dirección). Si el fetch falla, el link queda guardado para que el wizard
-// ofrezca un botón de confirmación manual.
+// Probado en vivo: un GET servidor-a-servidor al link de confirmación
+// devuelve 200 pero Google NO lo cuenta como confirmación real (el reenvío
+// sigue en "Verificar" en la configuración de Gmail) — necesita una visita
+// real de navegador. Por eso no confiamos en el resultado del fetch: solo lo
+// intentamos como best-effort, y siempre guardamos el link para que el
+// wizard lo abra en el navegador del usuario (ver ForwardingWizard.tsx) o el
+// usuario confirme manualmente que ya lo verificó (POST /api/forwarding/confirm).
 const CONFIRMATION_SENDER_RE = /forwarding-noreply@google\.com|no-?reply@.*outlook\.com|postmaster@.*microsoft\.com/i
 const CONFIRMATION_LINK_RE = /https?:\/\/[^\s"'<>]*\/mail\/vf-[^\s"'<>]+/i
 
@@ -58,15 +60,9 @@ async function tryAutoConfirm(admin: Admin, userId: string, body: string): Promi
   const confirmUrl = match[0]
 
   try {
-    const res = await fetch(confirmUrl, { method: 'GET' })
-    if (res.ok) {
-      await admin.from('forwarding_addresses')
-        .update({ confirmed_at: new Date().toISOString(), pending_confirm_url: null })
-        .eq('user_id', userId)
-      return true
-    }
+    await fetch(confirmUrl, { method: 'GET' })
   } catch (err) {
-    console.error('[forwardingService] auto-confirm fetch falló:', err)
+    console.error('[forwardingService] auto-confirm fetch falló (no bloqueante):', err)
   }
 
   await admin.from('forwarding_addresses').update({ pending_confirm_url: confirmUrl }).eq('user_id', userId)

@@ -45,7 +45,21 @@ export default function ForwardingWizard({ eyebrow, onDone, doneLabel = 'Continu
   const [email, setEmail] = useState<string | null>(null)
   const [confirmed, setConfirmed] = useState(false)
   const [pendingConfirmUrl, setPendingConfirmUrl] = useState<string | null>(null)
+  const [confirming, setConfirming] = useState(false)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const handleManualConfirm = async () => {
+    setConfirming(true)
+    try {
+      const res = await fetch('/api/forwarding/confirm', { method: 'POST' })
+      if (res.ok) {
+        setConfirmed(true)
+        setStep(s => (s === 'confirm' ? 'filter' : s))
+      }
+    } finally {
+      setConfirming(false)
+    }
+  }
 
   const bancos = bankSendersByBanco()
 
@@ -155,21 +169,35 @@ export default function ForwardingWizard({ eyebrow, onDone, doneLabel = 'Continu
                   Agregar una dirección de reenvío → pega esto → acepta el diálogo de confirmación.
                 </p>
                 <CopyField value={email} />
-                {!confirmed && (
+                {!confirmed && !pendingConfirmUrl && (
                   <p className="flex items-center gap-2" style={{ fontSize: 'var(--text-xs)', color: 'var(--text-subtle)', marginTop: 8 }}>
                     <RefreshCw size={12} className="animate-spin" />
-                    Esperando confirmación...
+                    Esperando el correo de confirmación de Google/Outlook...
                   </p>
                 )}
                 {!confirmed && pendingConfirmUrl && (
-                  <a
-                    href={pendingConfirmUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{ fontSize: 'var(--text-xs)', color: 'var(--green)', marginTop: 8, display: 'inline-block' }}
-                  >
-                    No se confirmó solo — confirmar manualmente
-                  </a>
+                  <div className="flex flex-col gap-2" style={{ marginTop: 10 }}>
+                    <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                      Ya recibimos la confirmación de Google — ábrela en tu navegador para completar la verificación:
+                    </p>
+                    <a
+                      href={pendingConfirmUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center justify-center gap-2 font-semibold transition-opacity hover:opacity-90"
+                      style={{ background: 'var(--green)', color: '#000', padding: '10px 16px', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', textDecoration: 'none' }}
+                    >
+                      Abrir confirmación de Google
+                    </a>
+                    <button
+                      onClick={handleManualConfirm}
+                      disabled={confirming}
+                      className="transition-opacity hover:opacity-80"
+                      style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', background: 'none', border: 'none', cursor: confirming ? 'default' : 'pointer', padding: 0, textAlign: 'left' }}
+                    >
+                      {confirming ? 'Confirmando...' : 'Ya la abrí y quedó verificada — continuar'}
+                    </button>
+                  </div>
                 )}
               </>
             ) : (
