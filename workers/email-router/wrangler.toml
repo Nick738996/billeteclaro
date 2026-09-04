@@ -3,10 +3,7 @@ main = "src/index.ts"
 compatibility_date = "2026-01-01"
 
 [vars]
-# TEMPORAL mientras se valida en el preview de Vercel de la rama
-# mejora-deteccion-transacciones — volver a "https://billeteclaro.com/api/ingest/forward"
-# antes de mergear a main.
-INGEST_URL = "https://billeteclaro-git-mejora-deteccion-t-43ca33-nick738996s-projects.vercel.app/api/ingest/forward"
+INGEST_URL = "https://billeteclaro.com/api/ingest/forward"
 
 # El secreto NO va acá — se configura una sola vez con:
 #   wrangler secret put FORWARD_INGEST_SECRET

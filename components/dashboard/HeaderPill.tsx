@@ -2,14 +2,14 @@
 
 // HeaderPill — cápsula con theme siempre visible; reset/ayuda/logout/reenvío
 // colapsados en un menú "..." para reducir ruido visual en el header.
-// (El botón de sincronizar se quitó: la ingesta ahora es push vía reenvío
-// de correo, no hay nada que "ir a buscar" con un click — ver
-// lib/services/forwardingService.ts.)
+// (El botón de sincronizar y "Desconectar correo" se quitaron: la ingesta
+// ahora es push vía reenvío de correo — no hay tokens OAuth que desconectar
+// ni nada que "ir a buscar" con un click — ver lib/services/forwardingService.ts.)
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTheme } from 'next-themes'
-import { RefreshCw, Trash2, Sun, Moon, LogOut, MoreHorizontal, HelpCircle, MailX, Mail } from 'lucide-react'
+import { RefreshCw, Trash2, Sun, Moon, LogOut, MoreHorizontal, HelpCircle, Mail } from 'lucide-react'
 import { TEST_IDS } from '@/lib/testIds'
 import styles from './HeaderPill.module.css'
 
@@ -18,8 +18,7 @@ interface Props {
   onHelp:    () => void
 }
 
-type ResetState      = 'idle' | 'confirm' | 'resetting' | 'done'
-type DisconnectState = 'idle' | 'confirm' | 'disconnecting'
+type ResetState = 'idle' | 'confirm' | 'resetting' | 'done'
 
 export default function HeaderPill({ onSignOut, onHelp }: Props) {
   const router = useRouter()
@@ -28,9 +27,8 @@ export default function HeaderPill({ onSignOut, onHelp }: Props) {
   useEffect(() => setMounted(true), [])
   const isDark = mounted && theme === 'dark'
 
-  const [resetState,  setResetState] = useState<ResetState>('idle')
-  const [disconnectState, setDisconnectState] = useState<DisconnectState>('idle')
-  const [menuOpen,    setMenuOpen]   = useState(false)
+  const [resetState, setResetState] = useState<ResetState>('idle')
+  const [menuOpen,   setMenuOpen]   = useState(false)
 
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -67,29 +65,8 @@ export default function HeaderPill({ onSignOut, onHelp }: Props) {
     }
   }
 
-  /* ── Desconectar correo ───────────────────────────── */
-  const handleDisconnect = async () => {
-    if (disconnectState === 'idle') {
-      setDisconnectState('confirm')
-      setTimeout(() => setDisconnectState(s => s === 'confirm' ? 'idle' : s), 4000)
-      return
-    }
-    if (disconnectState === 'confirm') {
-      setDisconnectState('disconnecting')
-      try {
-        const res = await fetch('/api/auth/disconnect', { method: 'POST' })
-        if (!res.ok) throw new Error('Error al desconectar')
-        window.location.href = '/onboarding'
-      } catch {
-        setDisconnectState('idle')
-      }
-    }
-  }
-
-  const isBusy = resetState === 'resetting' || disconnectState === 'disconnecting'
-
+  const isBusy = resetState === 'resetting'
   const resetLabel = resetState === 'confirm' ? '¿Confirmar borrado?' : 'Borrar todos los datos'
-  const disconnectLabel = disconnectState === 'confirm' ? '¿Confirmar desconexión?' : 'Desconectar correo'
 
   return (
     <div className={styles.pill}>
@@ -147,17 +124,6 @@ export default function HeaderPill({ onSignOut, onHelp }: Props) {
               Reenvío de correo
             </button>
             <div className={styles.menuDivider} />
-            <button
-              role="menuitem"
-              className={`${styles.menuItem} ${styles.menuItemDanger}`}
-              onClick={handleDisconnect}
-              disabled={isBusy}
-              title="Revoca el acceso a tu correo y borra los tokens guardados"
-              data-testid={TEST_IDS.DASHBOARD_DISCONNECT_BUTTON}
-            >
-              {disconnectState === 'disconnecting' ? <RefreshCw size={14} className="animate-spin"/> : <MailX size={14}/>}
-              {disconnectLabel}
-            </button>
             <button
               role="menuitem"
               className={`${styles.menuItem} ${styles.menuItemDanger}`}

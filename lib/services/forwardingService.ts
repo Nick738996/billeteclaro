@@ -1,5 +1,5 @@
 import { randomBytes, createHash } from 'crypto'
-import { detectBank } from '@/lib/email/gmail'
+import { detectBank } from '@/lib/email/bankSenders'
 import { extractTransaction } from '@/lib/services/emailPipeline'
 import { deduplicateUber, matchUberAgainstPersisted } from '@/lib/utils/deduplicateUber'
 import { generateAuditId } from '@/lib/utils/auditId'
