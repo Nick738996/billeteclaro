@@ -145,8 +145,6 @@ export default function DashboardClient({
     loadMonth(m)
   }
 
-  const handleSyncComplete = () => { loadMonth(month); bumpContext() }
-
   const handleSignOut = async () => {
     await supabase.auth.signOut()
     router.push('/')
@@ -180,7 +178,7 @@ export default function DashboardClient({
             </span>
           </div>
           <div className={styles.headerActions}>
-            <HeaderPill onSyncComplete={handleSyncComplete} onSignOut={handleSignOut} onHelp={handleHelp}/>
+            <HeaderPill onSignOut={handleSignOut} onHelp={handleHelp}/>
           </div>
         </div>
       </header>

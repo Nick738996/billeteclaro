@@ -1,5 +1,4 @@
 export const TEST_IDS = {
-  DASHBOARD_SYNC_BUTTON:    'dashboard-sync-button',
   DASHBOARD_RESET_BUTTON:   'dashboard-reset-button',
   DASHBOARD_MONTH_PREV:     'dashboard-month-prev',
   DASHBOARD_MONTH_NEXT:     'dashboard-month-next',

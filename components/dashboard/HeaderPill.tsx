@@ -1,46 +1,36 @@
 'use client'
 
-// HeaderPill — cápsula con sync + theme siempre visibles; reset/ayuda/logout
+// HeaderPill — cápsula con theme siempre visible; reset/ayuda/logout/reenvío
 // colapsados en un menú "..." para reducir ruido visual en el header.
+// (El botón de sincronizar se quitó: la ingesta ahora es push vía reenvío
+// de correo, no hay nada que "ir a buscar" con un click — ver
+// lib/services/forwardingService.ts.)
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTheme } from 'next-themes'
-import { RefreshCw, Check, AlertCircle, Trash2, Sun, Moon, LogOut, MoreHorizontal, HelpCircle, MailX, Mail } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
+import { RefreshCw, Trash2, Sun, Moon, LogOut, MoreHorizontal, HelpCircle, MailX, Mail } from 'lucide-react'
 import { TEST_IDS } from '@/lib/testIds'
 import styles from './HeaderPill.module.css'
 
 interface Props {
-  onSyncComplete: () => void
-  onSignOut:      () => void
-  onHelp:         () => void
+  onSignOut: () => void
+  onHelp:    () => void
 }
 
-type SyncState       = 'idle' | 'syncing' | 'done'  | 'error'
 type ResetState      = 'idle' | 'confirm' | 'resetting' | 'done'
 type DisconnectState = 'idle' | 'confirm' | 'disconnecting'
 
-export default function HeaderPill({ onSyncComplete, onSignOut, onHelp }: Props) {
+export default function HeaderPill({ onSignOut, onHelp }: Props) {
   const router = useRouter()
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
   useEffect(() => setMounted(true), [])
   const isDark = mounted && theme === 'dark'
 
-  const [syncState,   setSyncState]  = useState<SyncState>('idle')
   const [resetState,  setResetState] = useState<ResetState>('idle')
   const [disconnectState, setDisconnectState] = useState<DisconnectState>('idle')
-  const [syncResult,  setSyncResult] = useState<{ transacciones_nuevas: number } | null>(null)
-  const [syncError,   setSyncError]  = useState<string | null>(null)
   const [menuOpen,    setMenuOpen]   = useState(false)
-  const [provider,    setProvider]   = useState<'gmail' | 'outlook'>('gmail')
-
-  useEffect(() => {
-    createClient().auth.getUser().then(({ data }) => {
-      if (data.user?.app_metadata?.provider === 'azure') setProvider('outlook')
-    })
-  }, [])
 
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -57,35 +47,6 @@ export default function HeaderPill({ onSyncComplete, onSignOut, onHelp }: Props)
       document.removeEventListener('keydown', closeOnEsc)
     }
   }, [menuOpen])
-
-  /* ── Sync ──────────────────────────────────────── */
-  const needsReconnect = (() => {
-    const msg = syncError?.toLowerCase() ?? ''
-    return msg.includes('token') || msg.includes('no hay cuenta de correo conectada')
-  })()
-
-  const handleSync = async () => {
-    if (syncState === 'syncing') return
-    if (needsReconnect) {
-      window.location.href = `/api/auth/${provider}-connect?next=${encodeURIComponent('/dashboard')}`
-      return
-    }
-    setSyncState('syncing')
-    setSyncResult(null)
-    setSyncError(null)
-    try {
-      const res  = await fetch('/api/sync', { method: 'POST' })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error ?? 'Error')
-      setSyncResult(data)
-      setSyncState('done')
-      onSyncComplete()
-      setTimeout(() => setSyncState('idle'), 5000)
-    } catch (e) {
-      setSyncError(e instanceof Error ? e.message : 'Error')
-      setSyncState('error')
-    }
-  }
 
   /* ── Reset ─────────────────────────────────────── */
   const handleReset = async () => {
@@ -125,40 +86,13 @@ export default function HeaderPill({ onSyncComplete, onSignOut, onHelp }: Props)
     }
   }
 
-  const isBusy = syncState === 'syncing' || resetState === 'resetting' || disconnectState === 'disconnecting'
-
-  /* ── Icon / color helpers ───────────────────────── */
-  const syncIcon = syncState === 'syncing'  ? <RefreshCw size={14} className="animate-spin"/>
-                 : syncState === 'done'     ? <Check size={14}/>
-                 : syncState === 'error'    ? <AlertCircle size={14}/>
-                 :                            <RefreshCw size={14}/>
-
-  const syncColor = syncState === 'done'   ? 'var(--green)'
-                  : syncState === 'error'  ? 'var(--red)'
-                  :                         'var(--text-muted)'
-
-  const syncTitle = syncState === 'done' && syncResult
-    ? `+${syncResult.transacciones_nuevas} transacción${syncResult.transacciones_nuevas !== 1 ? 'es' : ''} nueva${syncResult.transacciones_nuevas !== 1 ? 's' : ''}`
-    : syncState === 'error' ? (needsReconnect ? `${syncError}, toca para volver a entrar` : `${syncError ?? 'Error'}, toca para reintentar`)
-    : 'Sincronizar'
+  const isBusy = resetState === 'resetting' || disconnectState === 'disconnecting'
 
   const resetLabel = resetState === 'confirm' ? '¿Confirmar borrado?' : 'Borrar todos los datos'
   const disconnectLabel = disconnectState === 'confirm' ? '¿Confirmar desconexión?' : 'Desconectar correo'
 
   return (
     <div className={styles.pill}>
-      <button
-        onClick={handleSync}
-        disabled={isBusy}
-        title={syncTitle}
-        aria-label="Sincronizar correos"
-        data-testid={TEST_IDS.DASHBOARD_SYNC_BUTTON}
-        className={isBusy ? `${styles.btn} ${styles.btnDisabled}` : styles.btn}
-        style={{ '--clr': syncColor } as React.CSSProperties}
-      >
-        {syncIcon}
-      </button>
-
       <button
         onClick={() => setTheme(isDark ? 'light' : 'dark')}
         title={isDark ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
