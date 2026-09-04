@@ -46,13 +46,16 @@ export default function ForwardingWizard({ eyebrow, onDone, doneLabel = 'Continu
   const [confirmed, setConfirmed] = useState(false)
   const [pendingConfirmUrl, setPendingConfirmUrl] = useState<string | null>(null)
   const [confirming, setConfirming] = useState(false)
+  const [justConfirmed, setJustConfirmed] = useState(false)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const handleManualConfirm = async () => {
+    if (confirming || justConfirmed) return
     setConfirming(true)
     try {
       const res = await fetch('/api/forwarding/confirm', { method: 'POST' })
       if (res.ok) {
+        setJustConfirmed(true)
         setConfirmed(true)
         setStep(s => (s === 'confirm' ? 'filter' : s))
       }
@@ -191,11 +194,17 @@ export default function ForwardingWizard({ eyebrow, onDone, doneLabel = 'Continu
                     </a>
                     <button
                       onClick={handleManualConfirm}
-                      disabled={confirming}
-                      className="transition-opacity hover:opacity-80"
-                      style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', background: 'none', border: 'none', cursor: confirming ? 'default' : 'pointer', padding: 0, textAlign: 'left' }}
+                      disabled={confirming || justConfirmed}
+                      className="flex items-center gap-1 transition-opacity hover:opacity-80"
+                      style={{
+                        fontSize: 'var(--text-xs)',
+                        color: justConfirmed ? 'var(--green)' : 'var(--text-muted)',
+                        background: 'none', border: 'none', padding: 0, textAlign: 'left',
+                        cursor: confirming || justConfirmed ? 'default' : 'pointer',
+                      }}
                     >
-                      {confirming ? 'Confirmando...' : 'Ya la abrí y quedó verificada — continuar'}
+                      {justConfirmed && <Check size={12} />}
+                      {justConfirmed ? 'Confirmado' : confirming ? 'Confirmando...' : 'Ya la abrí y quedó verificada — continuar'}
                     </button>
                   </div>
                 )}
