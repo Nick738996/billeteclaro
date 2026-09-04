@@ -6,6 +6,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useTheme } from 'next-themes'
 import { RefreshCw, Check, AlertCircle, Trash2, Sun, Moon, LogOut, MoreHorizontal, HelpCircle, MailX } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 import { TEST_IDS } from '@/lib/testIds'
 import styles from './HeaderPill.module.css'
 
@@ -31,6 +32,13 @@ export default function HeaderPill({ onSyncComplete, onSignOut, onHelp }: Props)
   const [syncResult,  setSyncResult] = useState<{ transacciones_nuevas: number } | null>(null)
   const [syncError,   setSyncError]  = useState<string | null>(null)
   const [menuOpen,    setMenuOpen]   = useState(false)
+  const [provider,    setProvider]   = useState<'gmail' | 'outlook'>('gmail')
+
+  useEffect(() => {
+    createClient().auth.getUser().then(({ data }) => {
+      if (data.user?.app_metadata?.provider === 'azure') setProvider('outlook')
+    })
+  }, [])
 
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -49,11 +57,17 @@ export default function HeaderPill({ onSyncComplete, onSignOut, onHelp }: Props)
   }, [menuOpen])
 
   /* ── Sync ──────────────────────────────────────── */
-  const needsReconnect = syncError?.toLowerCase().includes('token') ?? false
+  const needsReconnect = (() => {
+    const msg = syncError?.toLowerCase() ?? ''
+    return msg.includes('token') || msg.includes('no hay cuenta de correo conectada')
+  })()
 
   const handleSync = async () => {
     if (syncState === 'syncing') return
-    if (needsReconnect) { window.location.href = '/' ; return }
+    if (needsReconnect) {
+      window.location.href = `/api/auth/${provider}-connect?next=${encodeURIComponent('/dashboard')}`
+      return
+    }
     setSyncState('syncing')
     setSyncResult(null)
     setSyncError(null)

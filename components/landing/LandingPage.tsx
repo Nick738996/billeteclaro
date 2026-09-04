@@ -59,20 +59,17 @@ const STEPS = [
 export default function LandingPage() {
   const supabase = createClient()
 
+  // Login = solo identidad. El permiso de lectura de correo (gmail.readonly /
+  // Mail.Read) se pide después, como acción explícita y separada, cuando el
+  // usuario decide conectar su correo para sincronizar (ver gmail-connect /
+  // outlook-connect) — así el primer login nunca muestra un consentimiento
+  // de "esta app quiere leer tu Gmail".
   const handleLoginGmail = async () => {
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
         redirectTo: `${window.location.origin}/api/auth/callback`,
-        scopes: [
-          'email',
-          'profile',
-          'https://www.googleapis.com/auth/gmail.readonly',
-        ].join(' '),
-        queryParams: {
-          access_type: 'offline',
-          prompt: 'consent',
-        },
+        scopes: 'email profile',
       },
     })
   }
@@ -82,7 +79,7 @@ export default function LandingPage() {
       provider: 'azure',
       options: {
         redirectTo: `${window.location.origin}/api/auth/callback`,
-        scopes: 'openid profile email Mail.Read offline_access User.Read',
+        scopes: 'openid profile email User.Read',
         queryParams: {
           prompt: 'select_account',
         },

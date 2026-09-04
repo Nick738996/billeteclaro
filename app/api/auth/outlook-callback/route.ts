@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
-import { OUTLOOK_STATE_COOKIE, readStateCookie } from '@/lib/auth/oauthState'
+import { OUTLOOK_STATE_COOKIE, OUTLOOK_CONNECT_NEXT_COOKIE, readStateCookie, sanitizeNextPath } from '@/lib/auth/oauthState'
 import { encryptToken } from '@/lib/utils/tokenCrypto'
 
 interface MicrosoftTokenResponse {
@@ -16,8 +16,11 @@ export async function GET(request: Request) {
   const state = url.searchParams.get('state')
   const error = url.searchParams.get('error')
 
+  const next = sanitizeNextPath(readStateCookie(request, OUTLOOK_CONNECT_NEXT_COOKIE), '/dashboard')
+
   const clearStateCookie = (response: NextResponse) => {
     response.cookies.set(OUTLOOK_STATE_COOKIE, '', { maxAge: 0, path: '/' })
+    response.cookies.set(OUTLOOK_CONNECT_NEXT_COOKIE, '', { maxAge: 0, path: '/' })
     return response
   }
 
@@ -91,5 +94,5 @@ export async function GET(request: Request) {
   }
 
   console.log('[outlook-callback] ✅ token saved for user', user.id)
-  return clearStateCookie(NextResponse.redirect(new URL('/dashboard', request.url)))
+  return clearStateCookie(NextResponse.redirect(new URL(next, request.url)))
 }

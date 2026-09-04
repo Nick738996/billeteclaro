@@ -1,0 +1,11 @@
+name = "billeteclaro-email-router"
+main = "src/index.ts"
+compatibility_date = "2026-01-01"
+
+[vars]
+INGEST_URL = "https://billeteclaro.com/api/ingest/forward"
+
+# El secreto NO va acá — se configura una sola vez con:
+#   wrangler secret put FORWARD_INGEST_SECRET
+# (debe ser el mismo valor que FORWARD_INGEST_SECRET en las variables de
+# entorno de Vercel, ver app/api/ingest/forward/route.ts)

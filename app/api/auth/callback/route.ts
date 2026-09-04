@@ -1,16 +1,14 @@
 import { NextResponse } from 'next/server'
-import { createClient, createAdminClient } from '@/lib/supabase/server'
-import { encryptToken } from '@/lib/utils/tokenCrypto'
+import { createClient } from '@/lib/supabase/server'
+import { sanitizeNextPath } from '@/lib/auth/oauthState'
 
+// Callback de login (Supabase) — solo identidad. Conectar Gmail/Outlook para
+// sincronizar es una acción separada y explícita (ver gmail-connect /
+// outlook-connect), nunca algo que el login otorgue de forma implícita.
 export async function GET(request: Request) {
   const url = new URL(request.url)
   const code = url.searchParams.get('code')
-  const rawNext = url.searchParams.get('next') ?? '/dashboard'
-  // Solo permitimos rutas relativas internas con caracteres seguros. No basta
-  // con chequear que empiece con "/" y no con "//": WHATWG URL normaliza un
-  // "\" líder a "/" (igual que los navegadores), así que "/\evil.com" también
-  // resolvería a un host externo vía `new URL(next, request.url)` más abajo.
-  const next = /^\/(?!\/|\\)[A-Za-z0-9\-_/]*$/.test(rawNext) ? rawNext : '/dashboard'
+  const next = sanitizeNextPath(url.searchParams.get('next'), '/dashboard')
 
   if (!code) {
     return NextResponse.redirect(new URL('/?error=no_code', request.url))
@@ -24,60 +22,5 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL('/?error=auth_failed', request.url))
   }
 
-  const { session } = data
-  const { provider_token, provider_refresh_token, user } = session
-  const provider = user.app_metadata?.provider as string | undefined
-
-  const admin = createAdminClient()
-
-  // ── Flujo Microsoft (Azure) ──────────────────────────────────────────────
-  if (provider === 'azure') {
-    console.log(`[auth/callback] Azure login user=${user.id} refresh_token=${provider_refresh_token ? 'present' : 'NULL'}`)
-
-    if (provider_refresh_token) {
-      // Supabase entregó el token directamente — guardarlo
-      const { error: upsertErr } = await admin.from('user_tokens').upsert({
-        user_id: user.id,
-        outlook_refresh_token: encryptToken(provider_refresh_token),
-        updated_at: new Date().toISOString(),
-      })
-      if (upsertErr) {
-        console.error('[auth/callback] Azure upsert error:', upsertErr.message)
-        // Columna puede no existir — redirigir al flujo dedicado
-        return NextResponse.redirect(new URL('/api/auth/outlook-connect', request.url))
-      }
-      console.log('[auth/callback] Azure token saved OK via provider_refresh_token')
-      return NextResponse.redirect(new URL(next, request.url))
-    }
-
-    // Supabase no retornó el token — usar el flujo dedicado (igual que Gmail)
-    console.log('[auth/callback] Azure: no provider_refresh_token, redirecting to outlook-connect')
-    return NextResponse.redirect(new URL('/api/auth/outlook-connect', request.url))
-  }
-
-  // ── Flujo Google (Gmail) ─────────────────────────────────────────────────
-  if (provider_refresh_token) {
-    await admin.from('user_tokens').upsert({
-      user_id: user.id,
-      gmail_access_token: provider_token ?? null,
-      gmail_refresh_token: encryptToken(provider_refresh_token),
-      token_expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
-      updated_at: new Date().toISOString(),
-    })
-    return NextResponse.redirect(new URL(next, request.url))
-  }
-
-  // Google sin refresh token — verificar si ya tenemos uno guardado
-  const { data: existing } = await admin
-    .from('user_tokens')
-    .select('gmail_refresh_token')
-    .eq('user_id', user.id)
-    .single()
-
-  if (existing?.gmail_refresh_token) {
-    return NextResponse.redirect(new URL(next, request.url))
-  }
-
-  // Sin token en ningún lado — pedir permiso de Gmail
-  return NextResponse.redirect(new URL('/api/auth/gmail-connect', request.url))
+  return NextResponse.redirect(new URL(next, request.url))
 }

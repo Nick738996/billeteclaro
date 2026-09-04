@@ -4,8 +4,14 @@ export type EmailMessage = {
   subject: string
   date: string
   body: string
-  provider: 'gmail' | 'outlook'
-  /** true si el correo pasó SPF o DKIM según el proveedor — el header `From` por sí solo es falsificable. */
+  provider: 'gmail' | 'outlook' | 'forwarded'
+  /**
+   * true si el correo pasó SPF o DKIM según el proveedor (gmail/outlook) — el
+   * header `From` por sí solo es falsificable. Para `provider: 'forwarded'`
+   * la confianza no viene de SPF/DKIM del reenvío sino de que la dirección de
+   * reenvío ya fue confirmada (ver lib/services/forwardingService.ts) —
+   * siempre `true` en ese caso.
+   */
   authenticated: boolean
 }
 

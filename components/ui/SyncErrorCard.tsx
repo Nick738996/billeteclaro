@@ -3,6 +3,7 @@
 import { AlertTriangle, RefreshCw, ExternalLink } from 'lucide-react'
 
 export type SyncErrorType =
+  | 'not_connected'
   | 'auth_expired'
   | 'auth_permission_denied'
   | 'no_emails_found'
@@ -16,15 +17,20 @@ interface ErrorInfo {
 }
 
 const ERROR_MESSAGES: Record<SyncErrorType, ErrorInfo> = {
+  not_connected: {
+    titulo: 'Tu correo no está conectado',
+    descripcion: 'Conecta tu Gmail u Outlook para que podamos leer las notificaciones de tus bancos.',
+    accion: { label: 'Conectar correo', href: '/' },
+  },
   auth_expired: {
-    titulo: 'La sesión expiró',
-    descripcion: 'Tu acceso al correo se venció. Vuelve a iniciar sesión para sincronizar.',
-    accion: { label: 'Volver a entrar', href: '/' },
+    titulo: 'La conexión con tu correo expiró',
+    descripcion: 'El acceso a tu correo se venció. Vuelve a conectarlo para sincronizar.',
+    accion: { label: 'Reconectar correo', href: '/' },
   },
   auth_permission_denied: {
     titulo: 'Sin permiso de lectura',
-    descripcion: 'BilleteClaro necesita permiso para leer tus correos de banco. Vuelve a iniciar sesión y acepta los permisos.',
-    accion: { label: 'Volver a entrar', href: '/' },
+    descripcion: 'BilleteClaro necesita permiso para leer tus correos de banco. Vuelve a conectar tu correo y acepta el permiso.',
+    accion: { label: 'Reconectar correo', href: '/' },
   },
   no_emails_found: {
     titulo: 'No encontramos correos de banco',
@@ -43,10 +49,13 @@ const ERROR_MESSAGES: Record<SyncErrorType, ErrorInfo> = {
 interface Props {
   type: SyncErrorType
   onRetry?: () => void
+  /** Sobreescribe el href de la acción (p.ej. `/api/auth/gmail-connect?next=...` según el proveedor del usuario) */
+  reconnectHref?: string
 }
 
-export default function SyncErrorCard({ type, onRetry }: Props) {
+export default function SyncErrorCard({ type, onRetry, reconnectHref }: Props) {
   const info = ERROR_MESSAGES[type]
+  const accion = info.accion && reconnectHref ? { ...info.accion, href: reconnectHref } : info.accion
 
   return (
     <div
@@ -67,25 +76,25 @@ export default function SyncErrorCard({ type, onRetry }: Props) {
           <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', lineHeight: 1.5 }}>
             {info.descripcion}
           </p>
-          {(info.accion || onRetry) && (
+          {(accion || onRetry) && (
             <div className="flex gap-3 mt-3">
-              {info.accion && (
-                info.accion.href ? (
+              {accion && (
+                accion.href ? (
                   <a
-                    href={info.accion.href}
+                    href={accion.href}
                     className="flex items-center gap-1 font-medium transition-opacity hover:opacity-80"
                     style={{ fontSize: 'var(--text-xs)', color: 'var(--red)' }}
                   >
                     <ExternalLink size={12} />
-                    {info.accion.label}
+                    {accion.label}
                   </a>
                 ) : (
                   <button
-                    onClick={info.accion.onClick}
+                    onClick={accion.onClick}
                     className="flex items-center gap-1 font-medium transition-opacity hover:opacity-80"
                     style={{ fontSize: 'var(--text-xs)', color: 'var(--red)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
                   >
-                    {info.accion.label}
+                    {accion.label}
                   </button>
                 )
               )}

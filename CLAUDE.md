@@ -18,8 +18,8 @@
 | Base de datos          | Supabase (PostgreSQL, us-east-1)                                    |
 | Auth                   | Supabase Auth + Google OAuth                                        |
 | Email                  | Gmail API v1 (`gmail.readonly`)                                     |
-| IA / extracción emails | Groq API — `llama-3.3-70b-versatile`, `temperature: 0.1`            |
-| IA / asesor            | Groq API — `llama-3.3-70b-versatile`, JSON mode / `temperature: 0.4` |
+| IA / extracción emails | Groq API — `openai/gpt-oss-20b`, `temperature: 0.1`, JSON mode       |
+| IA / asesor            | Groq API — `openai/gpt-oss-120b`, JSON mode / `temperature: 0.4`     |
 | UI                     | Tailwind CSS + CSS variables propias                                |
 | Iconos                 | lucide-react                                                        |
 | Temas                  | next-themes (`data-theme` attribute, `defaultTheme: "dark"`)        |
@@ -57,6 +57,8 @@ OUTLOOK_CLIENT_ID      # Azure App Registration → Application (client) ID
 OUTLOOK_CLIENT_SECRET  # Azure App Registration → Client Secret
 OUTLOOK_TENANT_ID      # 'common' para cuentas personales y corporativas
 TOKEN_ENCRYPTION_KEY   # cifra en reposo gmail_refresh_token/outlook_refresh_token (AES-256-GCM). Sin esta var, se guardan en texto plano (compat legado)
+FORWARD_INGEST_SECRET  # secreto compartido entre el Worker de Cloudflare (workers/email-router) y /api/ingest/forward
+FORWARD_DOMAIN         # dominio de reenvío mostrado al usuario — billeteclaro.com (Email Routing activo sobre el dominio raíz, no un subdominio)
 ```
 
 ---
@@ -72,6 +74,7 @@ TOKEN_ENCRYPTION_KEY   # cifra en reposo gmail_refresh_token/outlook_refresh_tok
 | `ai_insights`   | Cache de insights. UNIQUE `(user_id, mes)`. Columnas: `insights jsonb`, `context_hash`, `generated_at`    |
 | `chat_messages` | Historial del chat con el asesor. `role CHECK IN ('user','assistant')`                                    |
 | `user_settings` | `onboarding_completed boolean DEFAULT false`                                                              |
+| `forwarding_addresses` | Dirección única de reenvío por usuario (`token`, `confirmed_at`, `pending_confirm_url`). Reemplaza la ingesta por OAuth — ver `lib/services/forwardingService.ts` |
 
 - RLS habilitado en todas las tablas con `auth.uid() = user_id`
 - `id_auditoria` formato `MMDD-NN` — puede tener gaps si se borra y re-sincroniza
@@ -95,7 +98,7 @@ TOKEN_ENCRYPTION_KEY   # cifra en reposo gmail_refresh_token/outlook_refresh_tok
 | `alertas@itau.co`                                      | ITAU (→ OTRO)          |
 | `notificaciones@falabella.com.co`                      | FALABELLA (→ OTRO)     |
 
-Nota: los bancos marcados **(→ OTRO)** se detectan en el query Gmail/Outlook pero no tienen parser específico. Sus correos quedan omitidos hasta que se agregue el parser.
+Nota: los bancos marcados **(→ OTRO)** se detectan en el query Gmail/Outlook pero no tienen parser específico — se procesan vía el parser genérico o, si este no logra extraer los datos con certeza, vía el fallback de IA (ver `lib/services/emailPipeline.ts`).
 
 **Para agregar un banco nuevo:** crear `lib/parsers/mibanaco.ts`, registrar en `lib/parsers/index.ts`, agregar sender en `BANK_SENDERS` en `lib/email/gmail.ts` (y `lib/email/outlook.ts`).
 
@@ -106,9 +109,11 @@ Nota: los bancos marcados **(→ OTRO)** se detectan en el query Gmail/Outlook p
 - `rappicard.ts` — `parsePurchase` (COMPRA) + `parsePayment` (ABONO_DEUDA)
 - `rappipay.ts` — transferencias, ingresos, pagos, rentabilidad
 - `bancolombia.ts` — Compra, Transferencia enviada/recibida, Pago QR. Emails en formato de oraciones (no tablas)
+- `davibank.ts` — Compra (Davivienda)
+- `generic.ts` — `tryGenericParser(email, banco)`: capa intermedia por patrones comunes (verbos en español: "compraste", "transferiste", "recibiste una transferencia", "retiro en cajero", etc.) para bancos sin parser dedicado (BBVA, Nequi, Nu, Scotiabank Colpatria, Banco de Bogotá, Lulo Bank, Itaú, Falabella). Solo devuelve resultado si encuentra `tipo` Y `monto` con certeza; si no, `null`. Marca `flags: ['parser_generico']` para diferenciarlo de un parser dedicado.
 - `commerceCategories.ts` — `guessCategoria(comercio)`: 120+ patrones colombianos
 
-`trySpecificParser(banco, email)` devuelve `null` → fallback a Groq.
+`lib/services/emailPipeline.ts::extractTransaction(email, banco)` es el punto de entrada del pipeline de extracción: parser específico (`trySpecificParser`) → parser genérico (`tryGenericParser`) → fallback IA (`lib/ai/extractor.ts::extractWithGroq`, solo si el banco fue identificado por remitente — nunca para `banco === 'OTRO'`).
 
 ---
 
@@ -117,7 +122,7 @@ Nota: los bancos marcados **(→ OTRO)** se detectan en el query Gmail/Outlook p
 ```
 Gmail OAuth refresh → listBankMessageIds() → filtrar ya procesados
   (processedIds = gmail_message_ids de transactions + todos los skipped_ids de sync_log)
-→ FASE 1: trySpecificParser() → null → omitido (sin fallback IA — Groq reservado para el asesor)
+→ FASE 1: extractTransaction() — parser específico → parser genérico → Groq (ver lib/services/emailPipeline.ts) → null → omitido
 → FASE 2: deduplicateUber() — pre-auths → sync_log.skipped_ids
 → FASE 3: upsert en transactions (ignoreDuplicates: true)
 → FASE 4: asignar mes_contable para meses afectados
@@ -202,7 +207,7 @@ feature/<nombre>   ← una por mejora, PR a main
 ### ⬜ Etapa 2 — Categorización inteligente (parcial)
 
 - [x] `guessCategoria()` con 120+ patrones — `lib/parsers/commerceCategories.ts`
-- [ ] **Caché por comercio** — nueva tabla `commerce_rules`. Si el usuario cambia "Uber" a TRANSPORTE una vez, se aplica siempre en futuros syncs. (El fallback Groq fue removido — Groq reservado para el asesor.)
+- [ ] **Caché por comercio** — nueva tabla `commerce_rules`. Si el usuario cambia "Uber" a TRANSPORTE una vez, se aplica siempre en futuros syncs.
 
 ### ⬜ Accesibilidad (a11y) — WCAG 2.1 AA
 
@@ -321,3 +326,13 @@ Con esto, cada PR corre los 115 tests y el type check antes de mergear. Vercel d
 ```
 feature/xxx → PR → CI corre tests → merge a main → Vercel deploya a prod automáticamente
 ```
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->
