@@ -1,49 +1,9 @@
 import { google } from 'googleapis'
-import type { Banco } from '@/lib/types'
 import type { EmailMessage, EmailProvider } from './types'
 import { isAuthenticatedSender } from './authResults'
+import { BANK_SENDERS, detectBank, stripHtml as sharedStripHtml } from './bankSenders'
 
-export const BANK_SENDERS: Record<string, Banco> = {
-  // Rappi
-  'noreply@rappicard.co':                                        'RAPPICARD',
-  'noreply@rappipay.co':                                         'RAPPIPAY',
-  'noreply@holdingrappipay.co':                                  'RAPPIPAY',
-
-  // Bancolombia
-  'alertasynotificaciones@an.notificacionesbancolombia.com':     'BANCOLOMBIA',
-  'alertasynotificaciones@notificacionesbancolombia.com':        'BANCOLOMBIA',
-
-  // Davivienda
-  'notificaciones@davivienda.com':                               'DAVIVIENDA',
-  'alertas@davivienda.com':                                      'DAVIVIENDA',
-  'davibankinforma@davibank.com':                                'DAVIVIENDA',
-
-  // BBVA
-  'alertas@bbva.com.co':                                         'BBVA',
-  'notificaciones@bbva.com.co':                                  'BBVA',
-
-  // Scotiabank Colpatria
-  'notificaciones@colpatria.com':                                'SCOTIABANK_COLPATRIA',
-
-  // Banco de Bogotá
-  'alertas@bancodebogota.com.co':                                'BANCO_DE_BOGOTA',
-
-  // Nu Colombia
-  'no-reply@nu.com.co':                                          'NU',
-  'notificaciones@nu.com.co':                                    'NU',
-
-  // Nequi
-  'no-reply@nequi.com.co':                                       'NEQUI',
-
-  // Lulo Bank
-  'notificaciones@lulobank.com':                                 'LULO_BANK',
-
-  // Itaú
-  'alertas@itau.co':                                             'ITAU',
-
-  // Falabella
-  'notificaciones@falabella.com.co':                             'FALABELLA',
-}
+export { BANK_SENDERS, detectBank }
 
 // Senders divididos en chunks para no superar el límite de longitud de query de Gmail
 const GMAIL_SENDERS = Object.keys(BANK_SENDERS)
@@ -51,12 +11,6 @@ const GMAIL_CHUNK_SIZE = 5
 const GMAIL_SENDER_CHUNKS: string[][] = []
 for (let i = 0; i < GMAIL_SENDERS.length; i += GMAIL_CHUNK_SIZE) {
   GMAIL_SENDER_CHUNKS.push(GMAIL_SENDERS.slice(i, i + GMAIL_CHUNK_SIZE))
-}
-
-export function detectBank(fromHeader: string): Banco {
-  const emailMatch = fromHeader.match(/<([^>]+)>/)
-  const email = (emailMatch ? emailMatch[1] : fromHeader).toLowerCase().trim()
-  return BANK_SENDERS[email] ?? 'OTRO'
 }
 
 
@@ -169,7 +123,7 @@ function extractBody(payload: any): string {
   if (!payload) return ''
   if (payload.body?.data) {
     const decoded = Buffer.from(payload.body.data, 'base64url').toString('utf-8')
-    return payload.mimeType === 'text/html' ? stripHtml(decoded) : decoded
+    return payload.mimeType === 'text/html' ? sharedStripHtml(decoded) : decoded
   }
   if (!payload.parts) return ''
   // Plain text first: RappiPay/RappiCard transaction emails contain the full
@@ -178,7 +132,7 @@ function extractBody(payload: any): string {
   const plain = findPart(payload.parts, 'text/plain')
   if (plain) return plain
   const html = findPart(payload.parts, 'text/html')
-  if (html) return stripHtml(html)
+  if (html) return sharedStripHtml(html)
   return ''
 }
 
@@ -193,24 +147,4 @@ function findPart(parts: any[], mimeType: string): string | null {
     }
   }
   return null
-}
-
-export function stripHtml(html: string): string {
-  return html
-    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&aacute;/g, 'á').replace(/&eacute;/g, 'é').replace(/&iacute;/g, 'í')
-    .replace(/&oacute;/g, 'ó').replace(/&uacute;/g, 'ú').replace(/&uuml;/g, 'ü')
-    .replace(/&ntilde;/g, 'ñ').replace(/&Ntilde;/g, 'Ñ')
-    .replace(/&Aacute;/g, 'Á').replace(/&Eacute;/g, 'É').replace(/&Iacute;/g, 'Í')
-    .replace(/&Oacute;/g, 'Ó').replace(/&Uacute;/g, 'Ú')
-    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
-    .replace(/\s{2,}/g, ' ')
-    .trim()
 }

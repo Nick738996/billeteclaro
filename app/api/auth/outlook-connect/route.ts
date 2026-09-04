@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server'
-import { OUTLOOK_STATE_COOKIE, generateOAuthState } from '@/lib/auth/oauthState'
+import { OUTLOOK_STATE_COOKIE, OUTLOOK_CONNECT_NEXT_COOKIE, generateOAuthState, sanitizeNextPath } from '@/lib/auth/oauthState'
 
-export async function GET() {
+// Conectar Outlook para sincronizar — acción explícita y separada del login
+// (que hoy solo pide identidad). El usuario llega aquí desde un botón, no
+// automáticamente.
+export async function GET(request: Request) {
+  const next = sanitizeNextPath(new URL(request.url).searchParams.get('next'), '/dashboard')
   const state = generateOAuthState()
 
   const params = new URLSearchParams({
@@ -18,6 +22,13 @@ export async function GET() {
     `https://login.microsoftonline.com/${process.env.OUTLOOK_TENANT_ID ?? 'common'}/oauth2/v2.0/authorize?${params}`
   )
   response.cookies.set(OUTLOOK_STATE_COOKIE, state, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: 600,
+    path: '/',
+  })
+  response.cookies.set(OUTLOOK_CONNECT_NEXT_COOKIE, next, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { google } from 'googleapis'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
-import { GMAIL_STATE_COOKIE, readStateCookie } from '@/lib/auth/oauthState'
+import { GMAIL_STATE_COOKIE, GMAIL_CONNECT_NEXT_COOKIE, readStateCookie, sanitizeNextPath } from '@/lib/auth/oauthState'
 import { encryptToken } from '@/lib/utils/tokenCrypto'
 
 export async function GET(request: Request) {
@@ -11,9 +11,11 @@ export async function GET(request: Request) {
   const error = url.searchParams.get('error')
 
   const expectedState = readStateCookie(request, GMAIL_STATE_COOKIE)
+  const next = sanitizeNextPath(readStateCookie(request, GMAIL_CONNECT_NEXT_COOKIE), '/dashboard')
 
   const clearStateCookie = (response: NextResponse) => {
     response.cookies.set(GMAIL_STATE_COOKIE, '', { maxAge: 0, path: '/' })
+    response.cookies.set(GMAIL_CONNECT_NEXT_COOKIE, '', { maxAge: 0, path: '/' })
     return response
   }
 
@@ -60,7 +62,7 @@ export async function GET(request: Request) {
       updated_at: new Date().toISOString(),
     })
 
-    return clearStateCookie(NextResponse.redirect(new URL('/dashboard', request.url)))
+    return clearStateCookie(NextResponse.redirect(new URL(next, request.url)))
   } catch {
     return clearStateCookie(NextResponse.redirect(new URL('/dashboard?gmail_error=exchange_failed', request.url)))
   }

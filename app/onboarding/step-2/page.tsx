@@ -2,93 +2,75 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { RefreshCw, CheckCircle2, ChevronRight, Mail } from 'lucide-react'
-import SyncErrorCard, { type SyncErrorType } from '@/components/ui/SyncErrorCard'
+import { Copy, Check, ChevronRight, ChevronDown, Mail, RefreshCw } from 'lucide-react'
+import { bankSendersByBanco } from '@/lib/email/bankSenders'
+import { BANCO_LABELS } from '@/lib/types'
 import { TEST_IDS } from '@/lib/testIds'
 
-const LOADING_MESSAGES = [
-  'Conectando con tu correo...',
-  'Leyendo correos de banco...',
-  'Extrayendo transacciones...',
-  'Organizando tu historial...',
-  'Casi listo...',
-]
+type Step = 'confirm' | 'filter' | 'done'
 
-function classifyError(status: number, message: string): SyncErrorType {
-  const msg = message.toLowerCase()
-  if (status === 400 && msg.includes('token')) return 'auth_expired'
-  if (msg.includes('permission') || msg.includes('permiso')) return 'auth_permission_denied'
-  if (msg.includes('timeout') || msg.includes('tarde')) return 'sync_timeout'
-  return 'unknown'
+function CopyField({ value }: { value: string }) {
+  const [copied, setCopied] = useState(false)
+  return (
+    <div
+      className="flex items-center justify-between gap-2"
+      style={{
+        background: 'var(--surface)', border: '1px solid var(--border)',
+        borderRadius: 'var(--radius-sm)', padding: '10px 12px',
+      }}
+    >
+      <code style={{ fontSize: 'var(--text-xs)', color: 'var(--text)', wordBreak: 'break-all' }}>{value}</code>
+      <button
+        onClick={() => { navigator.clipboard.writeText(value); setCopied(true); setTimeout(() => setCopied(false), 1500) }}
+        aria-label="Copiar"
+        style={{ background: 'none', border: 'none', color: copied ? 'var(--green)' : 'var(--text-muted)', cursor: 'pointer', flexShrink: 0 }}
+      >
+        {copied ? <Check size={16} /> : <Copy size={16} />}
+      </button>
+    </div>
+  )
 }
-
-type SyncState = 'idle' | 'syncing' | 'success' | 'no_emails' | 'error'
 
 export default function OnboardingStep2() {
   const router = useRouter()
-  const [state, setState] = useState<SyncState>('idle')
-  const [msgIdx, setMsgIdx] = useState(0)
-  const [txCount, setTxCount] = useState(0)
-  const [errorType, setErrorType] = useState<SyncErrorType>('unknown')
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const [step, setStep] = useState<Step>('confirm')
+  const [email, setEmail] = useState<string | null>(null)
+  const [confirmed, setConfirmed] = useState(false)
+  const [pendingConfirmUrl, setPendingConfirmUrl] = useState<string | null>(null)
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const bancos = bankSendersByBanco()
+
+  const fetchStatus = async () => {
+    try {
+      const res = await fetch('/api/forwarding/status')
+      const data = await res.json()
+      if (!res.ok) return
+      setEmail(data.email)
+      setPendingConfirmUrl(data.pendingConfirmUrl ?? null)
+      if (data.confirmed) {
+        setConfirmed(true)
+        setStep(s => (s === 'confirm' ? 'filter' : s))
+      }
+    } catch {
+      // reintenta en el próximo poll
+    }
+  }
 
   useEffect(() => {
-    if (state === 'syncing') {
-      intervalRef.current = setInterval(() => {
-        setMsgIdx(i => (i + 1) % LOADING_MESSAGES.length)
-      }, 1800)
+    fetchStatus()
+    pollRef.current = setInterval(fetchStatus, 4000)
+    return () => { if (pollRef.current) clearInterval(pollRef.current) }
+  }, [])
+
+  useEffect(() => {
+    if (confirmed && pollRef.current) {
+      clearInterval(pollRef.current)
+      pollRef.current = null
     }
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
-  }, [state])
+  }, [confirmed])
 
-  const handleSync = async () => {
-    setState('syncing')
-    setMsgIdx(0)
-    try {
-      const res = await fetch('/api/sync', { method: 'POST' })
-      const body = await res.json()
-      if (!res.ok) {
-        setErrorType(classifyError(res.status, body?.error ?? ''))
-        setState('error')
-        return
-      }
-      const count: number = body?.transacciones_nuevas ?? 0
-      const totalBanco: number = body?.total_correos_banco ?? 0
-      const revisados: number = body?.correos_revisados ?? 0
-      setTxCount(count)
-      // no_emails solo si no hay ningún correo de banco (nunca llegó ninguno)
-      setState(totalBanco === 0 && revisados === 0 ? 'no_emails' : 'success')
-    } catch {
-      setErrorType('sync_timeout')
-      setState('error')
-    }
-  }
-
-  if (state === 'syncing') {
-    return (
-      <div className="flex flex-col items-center justify-center gap-8 py-12">
-        <div
-          className="flex items-center justify-center"
-          style={{ width: 64, height: 64, borderRadius: '50%', background: 'var(--green-soft)', color: 'var(--green)' }}
-        >
-          <RefreshCw size={28} className="animate-spin" aria-hidden="true" />
-        </div>
-        <div className="text-center" data-testid={TEST_IDS.ONBOARDING_STEP2_STATUS} aria-live="polite" aria-label="Estado de sincronización">
-          <p className="font-semibold" style={{ fontSize: 'var(--text-lg)', color: 'var(--text)', marginBottom: 8 }}>
-            Sincronizando...
-          </p>
-          <p key={msgIdx} style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>
-            {LOADING_MESSAGES[msgIdx]}
-          </p>
-        </div>
-        <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-subtle)' }}>
-          Esto puede tardar hasta 30 segundos
-        </p>
-      </div>
-    )
-  }
-
-  if (state === 'success') {
+  if (step === 'done') {
     return (
       <div className="flex flex-col gap-8">
         <div>
@@ -99,24 +81,13 @@ export default function OnboardingStep2() {
             ¡Listo!
           </h1>
           <p style={{ fontSize: 'var(--text-base)', color: 'var(--text-muted)', lineHeight: 1.6 }}>
-            Encontramos{' '}
-            <strong style={{ color: 'var(--text)' }}>
-              {txCount} transacción{txCount !== 1 ? 'es' : ''}
-            </strong>{' '}
-            en tus correos de banco.
-          </p>
-        </div>
-        <div
-          className="flex flex-col items-center justify-center"
-          style={{ background: 'var(--green-soft)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '32px 20px' }}
-        >
-          <CheckCircle2 size={48} style={{ color: 'var(--green)', marginBottom: 12 }} />
-          <p className="font-semibold" style={{ fontSize: 'var(--text-base)', color: 'var(--text)' }}>
-            Sincronización exitosa
+            De ahora en adelante, cada vez que tu banco te avise de una compra, transferencia o pago,
+            ese correo llega solo a BilleteClaro y aparece en tu dashboard — sin que hagas nada más.
           </p>
         </div>
         <button
           onClick={() => router.push('/onboarding/step-3')}
+          data-testid={TEST_IDS.ONBOARDING_STEP2_SYNC}
           className="w-full flex items-center justify-center gap-2 font-semibold transition-opacity hover:opacity-90 active:scale-95"
           style={{ background: 'var(--green)', color: '#000', padding: '14px 24px', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-base)', border: 'none', cursor: 'pointer' }}
         >
@@ -127,54 +98,6 @@ export default function OnboardingStep2() {
     )
   }
 
-  if (state === 'no_emails') {
-    return (
-      <div className="flex flex-col gap-8">
-        <div>
-          <p style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--green)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
-            Paso 2 de 3
-          </p>
-          <h1 style={{ fontSize: 'var(--text-3xl)', fontWeight: 700, color: 'var(--text)', lineHeight: 1.1, marginBottom: 12 }}>
-            Sin correos por ahora
-          </h1>
-        </div>
-        <SyncErrorCard type="no_emails_found" onRetry={() => setState('idle')} />
-        <button
-          onClick={() => router.push('/onboarding/step-3')}
-          className="w-full flex items-center justify-center gap-2 font-semibold transition-opacity hover:opacity-90 active:scale-95"
-          style={{ background: 'var(--surface)', color: 'var(--text)', padding: '14px 24px', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-base)', border: '1px solid var(--border)', cursor: 'pointer' }}
-        >
-          Continuar de todas formas
-          <ChevronRight size={18} />
-        </button>
-      </div>
-    )
-  }
-
-  if (state === 'error') {
-    return (
-      <div className="flex flex-col gap-8">
-        <div>
-          <p style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--green)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
-            Paso 2 de 3
-          </p>
-          <h1 style={{ fontSize: 'var(--text-3xl)', fontWeight: 700, color: 'var(--text)', lineHeight: 1.1, marginBottom: 12 }}>
-            Algo salió mal
-          </h1>
-        </div>
-        <SyncErrorCard type={errorType} onRetry={() => setState('idle')} />
-        <button
-          onClick={() => router.push('/onboarding/step-3')}
-          className="w-full text-center transition-opacity hover:opacity-70"
-          style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0' }}
-        >
-          Saltar por ahora
-        </button>
-      </div>
-    )
-  }
-
-  // idle
   return (
     <div className="flex flex-col gap-8">
       <div>
@@ -182,48 +105,130 @@ export default function OnboardingStep2() {
           Paso 2 de 3
         </p>
         <h1 style={{ fontSize: 'var(--text-3xl)', fontWeight: 700, color: 'var(--text)', lineHeight: 1.1, marginBottom: 12 }}>
-          Sincroniza tus correos
+          Reenvía tus correos de banco
         </h1>
         <p style={{ fontSize: 'var(--text-base)', color: 'var(--text-muted)', lineHeight: 1.6 }}>
-          Vamos a leer tus correos de notificaciones bancarias. Solo lectura — nunca escribimos nada en tu nombre.
+          BilleteClaro nunca pide acceso a tu correo. Tú decides qué reenviar — configuras un filtro
+          en tu propio Gmail/Outlook y solo esos correos nos llegan.
         </p>
       </div>
 
+      {/* Paso A — confirmar reenvío */}
       <div
         style={{
-          background: 'var(--surface)',
-          border: '1px solid var(--border)',
-          borderRadius: 'var(--radius-lg)',
-          padding: '16px 18px',
+          background: 'var(--surface)', border: '1px solid var(--border)',
+          borderRadius: 'var(--radius-lg)', padding: '16px 18px',
         }}
       >
         <div className="flex items-start gap-3">
           <div
             className="flex items-center justify-center flex-shrink-0"
-            style={{ width: 36, height: 36, borderRadius: 'var(--radius-sm)', background: 'var(--green-soft)', color: 'var(--green)' }}
+            style={{
+              width: 28, height: 28, borderRadius: '50%',
+              background: confirmed ? 'var(--green-soft)' : 'var(--surface)',
+              border: confirmed ? 'none' : '1px solid var(--border)',
+              color: confirmed ? 'var(--green)' : 'var(--text-muted)',
+            }}
           >
-            <Mail size={16} />
+            {confirmed ? <Check size={14} /> : <span style={{ fontSize: 'var(--text-xs)', fontWeight: 700 }}>1</span>}
           </div>
-          <div>
+          <div className="flex-1 min-w-0">
             <p className="font-semibold" style={{ fontSize: 'var(--text-sm)', color: 'var(--text)', marginBottom: 4 }}>
-              Bancos soportados
+              Agrega tu dirección de reenvío
             </p>
-            <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-              Bancolombia, Davivienda y RappiCard. La primera sincronización revisa los últimos 2 meses.
+            {email ? (
+              <>
+                <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginBottom: 8, lineHeight: 1.5 }}>
+                  En Gmail: Configuración → Ver toda la configuración → Reenvío y correo POP/IMAP →
+                  Agregar una dirección de reenvío → pega esto → acepta el diálogo de confirmación.
+                </p>
+                <CopyField value={email} />
+                {!confirmed && (
+                  <p className="flex items-center gap-2" style={{ fontSize: 'var(--text-xs)', color: 'var(--text-subtle)', marginTop: 8 }}>
+                    <RefreshCw size={12} className="animate-spin" />
+                    Esperando confirmación...
+                  </p>
+                )}
+                {!confirmed && pendingConfirmUrl && (
+                  <a
+                    href={pendingConfirmUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ fontSize: 'var(--text-xs)', color: 'var(--green)', marginTop: 8, display: 'inline-block' }}
+                  >
+                    No se confirmó solo — confirmar manualmente
+                  </a>
+                )}
+              </>
+            ) : (
+              <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>Generando tu dirección...</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Paso B — crear el filtro */}
+      <div
+        style={{
+          background: 'var(--surface)', border: '1px solid var(--border)',
+          borderRadius: 'var(--radius-lg)', padding: '16px 18px',
+          opacity: confirmed ? 1 : 0.5,
+        }}
+      >
+        <div className="flex items-start gap-3">
+          <div
+            className="flex items-center justify-center flex-shrink-0"
+            style={{ width: 28, height: 28, borderRadius: '50%', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
+          >
+            <span style={{ fontSize: 'var(--text-xs)', fontWeight: 700 }}>2</span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold" style={{ fontSize: 'var(--text-sm)', color: 'var(--text)', marginBottom: 4 }}>
+              Crea un filtro por cada banco
             </p>
+            <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginBottom: 8, lineHeight: 1.5 }}>
+              Filtros y direcciones bloqueadas → Crear un nuevo filtro → pega el remitente de tu banco en &quot;De&quot; →
+              Crear filtro → marca &quot;Reenviar a&quot; y elige tu dirección. Marca también{' '}
+              <strong style={{ color: 'var(--text)' }}>&quot;Aplicar también a las conversaciones coincidentes&quot;</strong>{' '}
+              para traer tu historial, no solo lo nuevo.
+            </p>
+            {confirmed && (
+              <div className="flex flex-col gap-2" style={{ marginTop: 8 }}>
+                {bancos.map(({ banco, senders }) => (
+                  <details key={banco} style={{ fontSize: 'var(--text-xs)' }}>
+                    <summary
+                      className="flex items-center gap-1"
+                      style={{ cursor: 'pointer', color: 'var(--text)', fontWeight: 600, padding: '4px 0' }}
+                    >
+                      <ChevronDown size={12} />
+                      {BANCO_LABELS[banco]}
+                    </summary>
+                    <div className="flex flex-col gap-2" style={{ paddingLeft: 16, marginTop: 4 }}>
+                      {senders.map(s => <CopyField key={s} value={s} />)}
+                    </div>
+                  </details>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
 
       <div className="flex flex-col gap-3">
         <button
-          onClick={handleSync}
-          data-testid={TEST_IDS.ONBOARDING_STEP2_SYNC}
+          onClick={() => setStep('done')}
+          disabled={!confirmed}
+          data-testid={TEST_IDS.ONBOARDING_STEP2_STATUS}
           className="w-full flex items-center justify-center gap-2 font-semibold transition-opacity hover:opacity-90 active:scale-95"
-          style={{ background: 'var(--green)', color: '#000', padding: '14px 24px', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-base)', border: 'none', cursor: 'pointer' }}
+          style={{
+            background: confirmed ? 'var(--green)' : 'var(--surface)',
+            color: confirmed ? '#000' : 'var(--text-muted)',
+            padding: '14px 24px', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-base)',
+            border: confirmed ? 'none' : '1px solid var(--border)', cursor: confirmed ? 'pointer' : 'not-allowed',
+          }}
         >
-          <RefreshCw size={18} aria-hidden="true" />
-          Sincronizar mis correos
+          <Mail size={18} aria-hidden="true" />
+          Ya configuré mi filtro
         </button>
         <button
           onClick={() => router.push('/onboarding/step-3')}

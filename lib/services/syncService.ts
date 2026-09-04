@@ -1,6 +1,6 @@
 import { GmailProvider, OutlookProvider } from '@/lib/email'
 import { detectBank } from '@/lib/email/gmail'
-import { trySpecificParser } from '@/lib/parsers'
+import { extractTransaction } from '@/lib/services/emailPipeline'
 import { generateAuditId } from '@/lib/utils/auditId'
 import { deduplicateUber, matchUberAgainstPersisted } from '@/lib/utils/deduplicateUber'
 import { reassignCalendarMonths } from '@/lib/services/mesContableService'
@@ -125,7 +125,7 @@ export async function runSync(userId: string, admin: Admin): Promise<SyncResult>
     const bancoCount: Record<string, number> = {}
     const unauthenticatedIds: string[] = []
 
-    // 6. FASE 1 — parsers específicos (sin fallback IA)
+    // 6. FASE 1 — parser específico → parser genérico → Groq (ver lib/services/emailPipeline.ts)
     for (let i = 0; i < newIds.length; i += BATCH_SIZE) {
       const batch = newIds.slice(i, i + BATCH_SIZE)
       const emailResults = await Promise.allSettled(
@@ -155,20 +155,14 @@ export async function runSync(userId: string, admin: Admin): Promise<SyncResult>
         if (banco === 'RAPPIPAY' || banco === 'RAPPICARD') {
           console.log(`[scan] ${banco} — "${email.subject}" | body[0:120]=${JSON.stringify(email.body.slice(0, 120))}`)
         }
-        const parsed = trySpecificParser(banco, {
-          id: email.id,
-          from: email.from,
-          subject: email.subject,
-          date: email.date,
-          body: email.body,
-        })
-        if (parsed) {
+        const extracted = await extractTransaction(email, banco)
+        if (extracted) {
           parserCount++
-          const isIncome = parsed.tipo === 'INGRESO' || parsed.tipo === 'TRANSFERENCIA_RECIBIDA'
+          const isIncome = extracted.tipo === 'INGRESO' || extracted.tipo === 'TRANSFERENCIA_RECIBIDA'
           if (banco === 'RAPPIPAY' || isIncome) {
-            console.log(`[sync] parsed ${banco} tipo=${parsed.tipo} monto=${parsed.monto} fecha=${parsed.fecha?.slice(0, 10)} — "${email.subject}"`)
+            console.log(`[sync] parsed ${banco} tipo=${extracted.tipo} monto=${extracted.monto} fecha=${extracted.fecha?.slice(0, 10)} — "${email.subject}"`)
           }
-          allTransactions.push({ id: email.id, extracted: { ...parsed, banco } })
+          allTransactions.push({ id: email.id, extracted })
         } else {
           omitidosCount++
           console.log(`[sync] omitido ${banco} (${email.provider}) — "${email.subject}"`)
