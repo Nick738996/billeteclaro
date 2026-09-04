@@ -90,6 +90,7 @@ function detectBankFromForwardedBody(body: string): Banco {
 export interface ProcessResult {
   processed: boolean
   reason: string
+  debug?: string
 }
 
 export async function processForwardedEmail(payload: ForwardedEmailPayload, admin: Admin): Promise<ProcessResult> {
@@ -127,8 +128,10 @@ export async function processForwardedEmail(payload: ForwardedEmailPayload, admi
     authenticated: true,
   }
 
+  const debug = `banco=${banco} senderLines=${JSON.stringify([...payload.body.matchAll(/^(?:De|From):\s*(.+)$/gim)].map(m => m[1]))} body(0-800)=${email.body.slice(0, 800)}`
+
   const extracted = await extractTransaction(email, banco)
-  if (!extracted) return { processed: false, reason: 'extraction_failed' }
+  if (!extracted) return { processed: false, reason: 'extraction_failed', debug }
 
   // Dedup de Uber (pre-auth vs. cobro final) contra el historial ya persistido
   // — mismo patrón que syncService.ts FASE 2, pero para un solo item.
@@ -201,5 +204,5 @@ export async function processForwardedEmail(payload: ForwardedEmailPayload, admi
   if (!inserted || inserted.length === 0) return { processed: false, reason: 'already_processed' }
 
   await reassignCalendarMonths(admin, userId, [toColombiaDate(fecha.toISOString()).slice(0, 7)])
-  return { processed: true, reason: 'inserted' }
+  return { processed: true, reason: 'inserted', debug }
 }
