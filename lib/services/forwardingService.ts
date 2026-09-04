@@ -54,7 +54,14 @@ const CONFIRMATION_LINK_RE = /https?:\/\/[^\s"'<>]*\/mail\/vf-[^\s"'<>]+/i
 
 async function tryAutoConfirm(admin: Admin, userId: string, body: string): Promise<boolean> {
   const match = body.match(CONFIRMATION_LINK_RE)
-  if (!match) return false
+  if (!match) {
+    // DEBUG temporal — guarda un fragmento del cuerpo real para ajustar el
+    // regex del link de confirmación. Quitar una vez confirmado el formato.
+    await admin.from('forwarding_addresses')
+      .update({ pending_confirm_url: `DEBUG_NO_MATCH: ${body.slice(0, 800)}` })
+      .eq('user_id', userId)
+    return false
+  }
   const confirmUrl = match[0]
 
   try {
