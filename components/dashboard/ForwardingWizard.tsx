@@ -114,7 +114,7 @@ export default function ForwardingWizard({ eyebrow, onDone, doneLabel = 'Continu
         </div>
         <button
           onClick={onDone}
-          data-testid={TEST_IDS.ONBOARDING_STEP2_SYNC}
+          data-testid={TEST_IDS.FORWARDING_WIZARD_DONE_CONTINUE}
           className="w-full flex items-center justify-center gap-2 font-semibold transition-opacity hover:opacity-90 active:scale-95"
           style={{ background: 'var(--green)', color: '#000', padding: '14px 24px', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-base)', border: 'none', cursor: 'pointer' }}
         >
@@ -270,7 +270,7 @@ export default function ForwardingWizard({ eyebrow, onDone, doneLabel = 'Continu
         <button
           onClick={() => setStep('done')}
           disabled={!confirmed}
-          data-testid={TEST_IDS.ONBOARDING_STEP2_STATUS}
+          data-testid={TEST_IDS.FORWARDING_WIZARD_FILTER_DONE}
           className="w-full flex items-center justify-center gap-2 font-semibold transition-opacity hover:opacity-90 active:scale-95"
           style={{
             background: confirmed ? 'var(--green)' : 'var(--surface)',
