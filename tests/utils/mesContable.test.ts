@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { asignarMesContable } from '../../lib/utils/mesContable'
+import { asignarMesContable, colombiaMonthRangeUTC } from '../../lib/utils/mesContable'
 
 type TxInput = {
   id: string
@@ -130,5 +130,28 @@ describe('asignarMesContable', () => {
 
   it('retorna array vacío para entrada vacía', () => {
     expect(asignarMesContable([])).toEqual([])
+  })
+})
+
+describe('colombiaMonthRangeUTC', () => {
+  // Bug real: reassignCalendarMonths consultaba la DB con límites de mes en
+  // UTC crudo. Una transacción a las 19:45 COL del 31 de agosto (= 2026-09-01
+  // T00:45Z) quedaba fuera de la consulta de "agosto" y nunca se comparaba
+  // contra el sueldo de ese mes, dejándola con mes_contable incorrecto.
+  it('el rango de agosto incluye una transacción de las 19:45 COL del día 31 (00:45 UTC del 1 sep)', () => {
+    const { start, end } = colombiaMonthRangeUTC('2026-08')
+    const fecha = '2026-09-01T00:45:00.000Z'
+    expect(fecha >= start && fecha <= end).toBe(true)
+  })
+
+  it('el rango de agosto NO incluye una transacción ya de septiembre en hora Colombia', () => {
+    const { start, end } = colombiaMonthRangeUTC('2026-08')
+    const fecha = '2026-09-01T05:00:00.000Z' // 00:00 COL del 1 de sep
+    expect(fecha >= start && fecha <= end).toBe(false)
+  })
+
+  it('el rango de agosto empieza justo en 2026-08-01T05:00:00Z (medianoche COL)', () => {
+    const { start } = colombiaMonthRangeUTC('2026-08')
+    expect(start).toBe('2026-08-01T05:00:00.000Z')
   })
 })

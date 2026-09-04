@@ -1,4 +1,4 @@
-import { asignarMesContable } from '@/lib/utils/mesContable'
+import { asignarMesContable, colombiaMonthRangeUTC } from '@/lib/utils/mesContable'
 import { createAdminClient } from '@/lib/supabase/server'
 
 type Admin = ReturnType<typeof createAdminClient>
@@ -15,16 +15,17 @@ export async function reassignCalendarMonths(
   calendarMonths: string[]
 ): Promise<void> {
   for (const mes of calendarMonths) {
-    const mesStart = `${mes}-01`
-    const [y, m] = mes.split('-').map(Number)
-    const mesEnd = new Date(y, m, 0).toISOString().slice(0, 10)
+    // Rango en hora Colombia, no UTC — una transacción a las 19:45 COL del 31
+    // de agosto ya es 2026-09-01T00:45Z, pero sigue siendo agosto en Colombia
+    // (y por lo tanto debe verse junto con el sueldo de agosto al reasignar).
+    const { start: mesStart, end: mesEnd } = colombiaMonthRangeUTC(mes)
 
     const { data: txsMes } = await admin
       .from('transactions')
       .select('id, fecha, monto, tipo, comercio, descripcion')
       .eq('user_id', userId)
       .gte('fecha', mesStart)
-      .lte('fecha', mesEnd + 'T23:59:59Z')
+      .lte('fecha', mesEnd)
 
     if (!txsMes?.length) continue
 

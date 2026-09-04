@@ -4,6 +4,7 @@ import { extractTransaction } from '@/lib/services/emailPipeline'
 import { deduplicateUber, matchUberAgainstPersisted } from '@/lib/utils/deduplicateUber'
 import { generateAuditId } from '@/lib/utils/auditId'
 import { reassignCalendarMonths } from '@/lib/services/mesContableService'
+import { toColombiaDate } from '@/lib/utils/mesContable'
 import { createAdminClient } from '@/lib/supabase/server'
 import type { EmailMessage } from '@/lib/email/types'
 import type { Banco } from '@/lib/types'
@@ -146,7 +147,7 @@ export async function processForwardedEmail(payload: ForwardedEmailPayload, admi
         monto: extracted.monto, fecha: fecha.toISOString(),
         descripcion: extracted.descripcion, flags: extracted.flags,
       }).eq('id', match.persistedId)
-      await reassignCalendarMonths(admin, userId, [fecha.toISOString().slice(0, 7)])
+      await reassignCalendarMonths(admin, userId, [toColombiaDate(fecha.toISOString()).slice(0, 7)])
     }
     return { processed: match.updatePersisted, reason: match.updatePersisted ? 'uber_cross_match_updated' : 'uber_preauth_late' }
   }
