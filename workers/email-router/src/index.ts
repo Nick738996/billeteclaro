@@ -51,8 +51,11 @@ export default {
         headers,
         body: JSON.stringify(payload),
       })
+      const text = await res.text()
       if (!res.ok) {
-        console.error('[email-router] ingest falló:', res.status, await res.text())
+        console.error('[email-router] ingest falló:', res.status, text)
+      } else {
+        console.log('[email-router] ingest ok:', text)
       }
     } catch (err) {
       console.error('[email-router] error llamando a la ruta de ingesta:', err)

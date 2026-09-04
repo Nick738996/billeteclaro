@@ -82,6 +82,7 @@ function detectBankFromForwardedBody(body: string): Banco {
 export interface ProcessResult {
   processed: boolean
   reason: string
+  debug?: string
 }
 
 export async function processForwardedEmail(payload: ForwardedEmailPayload, admin: Admin): Promise<ProcessResult> {
@@ -120,7 +121,9 @@ export async function processForwardedEmail(payload: ForwardedEmailPayload, admi
   }
 
   const extracted = await extractTransaction(email, banco)
-  if (!extracted) return { processed: false, reason: 'extraction_failed' }
+  if (!extracted) {
+    return { processed: false, reason: 'extraction_failed', debug: `banco=${banco} body(0-1000)=${email.body.slice(0, 1000)}` }
+  }
 
   // Dedup de Uber (pre-auth vs. cobro final) contra el historial ya persistido
   // — mismo patrón que syncService.ts FASE 2, pero para un solo item.
