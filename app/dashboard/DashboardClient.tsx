@@ -26,7 +26,7 @@ import styles from './DashboardClient.module.css'
 const FEATURE_AI_ADVISOR = false
 
 interface Props {
-  user: { name: string }
+  user: { id: string; name: string }
   transactions: Transaction[]
   monthLabel: string
   currentMonth: string
@@ -91,6 +91,32 @@ export default function DashboardClient({
   // (ver deleteTransaction), para forzar el refetch de SavingsOverview.
   const [savingsRefresh, setSavingsRefresh] = useState(0)
   const bumpSavingsRefresh = useCallback(() => setSavingsRefresh(v => v + 1), [])
+
+  // Las transacciones llegan solas por reenvío (push, no pull) — sin esto el
+  // usuario tendría que recargar la página a mano para verlas. Se suscribe a
+  // cambios en tiempo real en `transactions` para este usuario; si la fila
+  // pertenece al mes que se está viendo, refresca y muestra un aviso breve.
+  const [justUpdated, setJustUpdated] = useState(false)
+  useEffect(() => {
+    const channel = supabase
+      .channel(`transactions-${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'transactions', filter: `user_id=eq.${user.id}` },
+        (payload) => {
+          const row = (payload.new ?? payload.old) as { mes_contable?: string } | null
+          if (row?.mes_contable !== month) return
+          loadMonth(month)
+          bumpContext()
+          setJustUpdated(true)
+          setTimeout(() => setJustUpdated(false), 4000)
+        }
+      )
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user.id, month])
 
   const tour = useTour()
 
@@ -201,12 +227,32 @@ export default function DashboardClient({
               <ChevronLeft size={18} />
             </button>
 
-            <h1
-              className={styles.monthTitle}
-              aria-live="polite"
-            >
-              {label}
-            </h1>
+            <div className="flex items-center justify-center gap-2" style={{ flex: 1, minWidth: 0 }}>
+              <h1
+                className={styles.monthTitle}
+                aria-live="polite"
+              >
+                {label}
+              </h1>
+
+              {justUpdated && (
+                <span
+                  aria-live="polite"
+                  style={{
+                    fontSize: 'var(--text-xs)',
+                    fontWeight: 600,
+                    color: 'var(--green)',
+                    background: 'var(--green-soft)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--radius-pill)',
+                    padding: '3px 10px',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  Nueva transacción
+                </span>
+              )}
+            </div>
 
             <button
               onClick={() => navigate(nextMonth)}

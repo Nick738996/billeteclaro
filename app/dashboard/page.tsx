@@ -56,11 +56,14 @@ export default async function DashboardPage({ searchParams }: Props) {
 
   return (
     <DashboardClient
-      user={{ name: (() => {
-        const raw = user.user_metadata?.full_name ?? user.user_metadata?.name ?? ''
-        if (!raw || raw.includes('@')) return 'Usuario'
-        return raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase()
-      })() }}
+      user={{
+        id: user.id,
+        name: (() => {
+          const raw = user.user_metadata?.full_name ?? user.user_metadata?.name ?? ''
+          if (!raw || raw.includes('@')) return 'Usuario'
+          return raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase()
+        })(),
+      }}
       transactions={txs}
       monthLabel={monthLabel}
       currentMonth={monthParam}
