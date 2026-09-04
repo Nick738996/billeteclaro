@@ -346,12 +346,34 @@ export async function getInsights(
   return { insights, cached: false }
 }
 
+// Groq (100k tokens/día) es una cuota compartida entre TODOS los usuarios —
+// sin límite, un usuario chateando en bucle puede agotarla para el resto.
+// Arranca conservador mientras el producto es chico; subir cuando haga sentido.
+const DAILY_CHAT_LIMIT = 5
+
 export async function sendChatMessage(
   supabase: SupabaseClient,
   userId: string,
   mes: string,
   message: string
 ): Promise<string> {
+  const todayStart = new Date()
+  todayStart.setUTCHours(0, 0, 0, 0)
+
+  const { count: messagesHoy } = await supabase
+    .from('chat_messages')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .eq('role', 'user')
+    .gte('created_at', todayStart.toISOString())
+
+  if ((messagesHoy ?? 0) >= DAILY_CHAT_LIMIT) {
+    throw Object.assign(
+      new Error(`Llegaste al límite de ${DAILY_CHAT_LIMIT} mensajes diarios con el asesor. Vuelve mañana.`),
+      { status: 429 }
+    )
+  }
+
   const [{ transactions, budgets }, { data: cachedInsights }, { data: history }] = await Promise.all([
     fetchMonthContext(supabase, userId, mes),
     supabase.from('ai_insights').select('insights').eq('user_id', userId).eq('mes', mes).single(),

@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useTheme } from 'next-themes'
-import { RefreshCw, Check, AlertCircle, Trash2, Sun, Moon, LogOut, MoreHorizontal, HelpCircle } from 'lucide-react'
+import { RefreshCw, Check, AlertCircle, Trash2, Sun, Moon, LogOut, MoreHorizontal, HelpCircle, MailX } from 'lucide-react'
 import { TEST_IDS } from '@/lib/testIds'
 import styles from './HeaderPill.module.css'
 
@@ -15,8 +15,9 @@ interface Props {
   onHelp:         () => void
 }
 
-type SyncState  = 'idle' | 'syncing' | 'done'  | 'error'
-type ResetState = 'idle' | 'confirm' | 'resetting' | 'done'
+type SyncState       = 'idle' | 'syncing' | 'done'  | 'error'
+type ResetState      = 'idle' | 'confirm' | 'resetting' | 'done'
+type DisconnectState = 'idle' | 'confirm' | 'disconnecting'
 
 export default function HeaderPill({ onSyncComplete, onSignOut, onHelp }: Props) {
   const { theme, setTheme } = useTheme()
@@ -26,6 +27,7 @@ export default function HeaderPill({ onSyncComplete, onSignOut, onHelp }: Props)
 
   const [syncState,   setSyncState]  = useState<SyncState>('idle')
   const [resetState,  setResetState] = useState<ResetState>('idle')
+  const [disconnectState, setDisconnectState] = useState<DisconnectState>('idle')
   const [syncResult,  setSyncResult] = useState<{ transacciones_nuevas: number } | null>(null)
   const [syncError,   setSyncError]  = useState<string | null>(null)
   const [menuOpen,    setMenuOpen]   = useState(false)
@@ -88,7 +90,26 @@ export default function HeaderPill({ onSyncComplete, onSignOut, onHelp }: Props)
     }
   }
 
-  const isBusy = syncState === 'syncing' || resetState === 'resetting'
+  /* ── Desconectar correo ───────────────────────────── */
+  const handleDisconnect = async () => {
+    if (disconnectState === 'idle') {
+      setDisconnectState('confirm')
+      setTimeout(() => setDisconnectState(s => s === 'confirm' ? 'idle' : s), 4000)
+      return
+    }
+    if (disconnectState === 'confirm') {
+      setDisconnectState('disconnecting')
+      try {
+        const res = await fetch('/api/auth/disconnect', { method: 'POST' })
+        if (!res.ok) throw new Error('Error al desconectar')
+        window.location.href = '/onboarding'
+      } catch {
+        setDisconnectState('idle')
+      }
+    }
+  }
+
+  const isBusy = syncState === 'syncing' || resetState === 'resetting' || disconnectState === 'disconnecting'
 
   /* ── Icon / color helpers ───────────────────────── */
   const syncIcon = syncState === 'syncing'  ? <RefreshCw size={14} className="animate-spin"/>
@@ -106,6 +127,7 @@ export default function HeaderPill({ onSyncComplete, onSignOut, onHelp }: Props)
     : 'Sincronizar'
 
   const resetLabel = resetState === 'confirm' ? '¿Confirmar borrado?' : 'Borrar todos los datos'
+  const disconnectLabel = disconnectState === 'confirm' ? '¿Confirmar desconexión?' : 'Desconectar correo'
 
   return (
     <div className={styles.pill}>
@@ -166,6 +188,17 @@ export default function HeaderPill({ onSyncComplete, onSignOut, onHelp }: Props)
               Cerrar sesión
             </button>
             <div className={styles.menuDivider} />
+            <button
+              role="menuitem"
+              className={`${styles.menuItem} ${styles.menuItemDanger}`}
+              onClick={handleDisconnect}
+              disabled={isBusy}
+              title="Revoca el acceso a tu correo y borra los tokens guardados"
+              data-testid={TEST_IDS.DASHBOARD_DISCONNECT_BUTTON}
+            >
+              {disconnectState === 'disconnecting' ? <RefreshCw size={14} className="animate-spin"/> : <MailX size={14}/>}
+              {disconnectLabel}
+            </button>
             <button
               role="menuitem"
               className={`${styles.menuItem} ${styles.menuItemDanger}`}

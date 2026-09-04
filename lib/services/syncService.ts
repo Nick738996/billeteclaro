@@ -51,22 +51,38 @@ export async function runSync(userId: string, admin: Admin): Promise<SyncResult>
 
   if (lastLog) {
     const elapsedMs = Date.now() - new Date(lastLog.started_at).getTime()
-    if (lastLog.status === 'RUNNING' && elapsedMs < STALE_RUNNING_MS) {
-      throw Object.assign(new Error('Ya hay una sincronización en curso. Espera a que termine.'), { status: 429 })
-    }
-    if (elapsedMs < SYNC_COOLDOWN_MS) {
+    if (lastLog.status === 'RUNNING') {
+      if (elapsedMs < STALE_RUNNING_MS) {
+        throw Object.assign(new Error('Ya hay una sincronización en curso. Espera a que termine.'), { status: 429 })
+      }
+      // RUNNING viejo = proceso caído a mitad. Lo cerramos para no chocar con
+      // el índice único (un solo RUNNING por usuario) al insertar el nuevo.
+      await admin.from('sync_log').update({
+        status: 'ERROR', finished_at: new Date().toISOString(), errores: ['Sync abandonado (timeout)'],
+      }).eq('user_id', userId).eq('status', 'RUNNING')
+    } else if (elapsedMs < SYNC_COOLDOWN_MS) {
       const waitSec = Math.ceil((SYNC_COOLDOWN_MS - elapsedMs) / 1000)
       throw Object.assign(new Error(`Espera ${waitSec}s antes de sincronizar de nuevo.`), { status: 429 })
     }
   }
 
-  // 2. Sync log
-  const { data: syncLog } = await admin
+  // 2. Sync log — el índice único `sync_log_one_running_per_user` (migración 012)
+  // es la barrera real contra la carrera: si dos requests llegan casi al mismo
+  // tiempo y ambas pasan el chequeo de arriba, solo uno de estos inserts gana;
+  // el otro falla con 23505 (unique_violation) y lo traducimos a 429.
+  const { data: syncLog, error: syncLogError } = await admin
     .from('sync_log')
     .insert({ user_id: userId, status: 'RUNNING' })
     .select('id')
     .single()
-  const syncId = syncLog?.id
+
+  if (syncLogError) {
+    if (syncLogError.code === '23505') {
+      throw Object.assign(new Error('Ya hay una sincronización en curso. Espera a que termine.'), { status: 429 })
+    }
+    throw syncLogError
+  }
+  const syncId = syncLog.id
 
   try {
     // 3. Construir providers disponibles

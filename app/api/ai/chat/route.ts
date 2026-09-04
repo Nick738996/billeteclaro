@@ -13,6 +13,8 @@ export const POST = withAuth(async (req, user, supabase) => {
     const response = await sendChatMessage(supabase, user.id, mes, message.trim())
     return ok({ response })
   } catch (e) {
+    const status = e instanceof Error ? (e as Error & { status?: number }).status : undefined
+    if (status === 429) return err(e instanceof Error ? e.message : 'Demasiados mensajes', 429)
     console.error('[POST /api/ai/chat]', { userId: user.id, mes }, e)
     return err('Error generando respuesta')
   }
