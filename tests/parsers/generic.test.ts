@@ -89,3 +89,59 @@ describe('tryGenericParser — casos sin certeza suficiente', () => {
     expect(result).toBeNull()
   })
 })
+
+describe('tryGenericParser — inglés (bancos extranjeros)', () => {
+  it('parses a purchase notification in English, amount in US format', () => {
+    const body = 'A purchase was made using your debit card.\n\nAmount: $1,234.56\nMerchant: STARBUCKS STORE #4521\nDate: September 4, 2026 11:58 AM'
+    const result = tryGenericParser({ ...BASE_EMAIL, subject: 'Your purchase with Bank of America', body }, 'OTRO')
+    expect(result).not.toBeNull()
+    expect(result!.tipo).toBe('COMPRA')
+    expect(result!.monto).toBe(1234.56)
+    expect(result!.moneda).toBe('USD')
+    expect(result!.monto_usd).toBe(1234.56)
+    expect(result!.comercio).toBe('Starbucks Store #4521')
+    expect(result!.flags).toContain('parser_generico')
+  })
+
+  it('parses a transfer sent notification in English', () => {
+    const body = 'You sent a transfer of $500.00 to John Smith on August 20, 2026.'
+    const result = tryGenericParser({ ...BASE_EMAIL, subject: 'Transfer sent', body }, 'OTRO')
+    expect(result!.tipo).toBe('TRANSFERENCIA_ENVIADA')
+    expect(result!.monto).toBe(500)
+    expect(result!.moneda).toBe('USD')
+  })
+
+  it('parses a transfer received notification in English', () => {
+    const body = 'You received a transfer of $2,000.00 from Jane Doe.'
+    const result = tryGenericParser({ ...BASE_EMAIL, subject: 'Transfer received', body }, 'OTRO')
+    expect(result!.tipo).toBe('TRANSFERENCIA_RECIBIDA')
+    expect(result!.monto).toBe(2000)
+  })
+
+  it('parses a withdrawal notification in English', () => {
+    const body = 'A cash withdrawal of $100.00 was made from your account.'
+    const result = tryGenericParser({ ...BASE_EMAIL, subject: 'ATM withdrawal', body }, 'OTRO')
+    expect(result!.tipo).toBe('RETIRO')
+    expect(result!.monto).toBe(100)
+  })
+
+  it('does not mistake a card payment confirmation for a purchase (English)', () => {
+    const body = 'We received your payment of $300.00 to your account.'
+    const result = tryGenericParser({ ...BASE_EMAIL, subject: 'Payment received', body }, 'OTRO')
+    expect(result!.tipo).toBe('ABONO_DEUDA')
+  })
+
+  it('returns null for an English email with no recognizable tipo', () => {
+    const body = 'Your monthly statement is now available online. Current balance: $1,200.00'
+    const result = tryGenericParser({ ...BASE_EMAIL, subject: 'Statement available', body }, 'OTRO')
+    expect(result).toBeNull()
+  })
+
+  it('prefers the Spanish match over English when both could apply', () => {
+    // Texto en español real — no debe intentar el camino inglés ni confundir el monto.
+    const body = 'Realizaste una compra por valor de $85.000 en Exito.'
+    const result = tryGenericParser({ ...BASE_EMAIL, subject: 'Compra', body }, 'BBVA')
+    expect(result!.moneda).toBe('COP')
+    expect(result!.monto).toBe(85000)
+  })
+})

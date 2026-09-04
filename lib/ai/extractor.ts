@@ -7,29 +7,36 @@ function getGroq(): Groq {
   return _groq
 }
 
-const SYSTEM_PROMPT = `Eres un extractor de transacciones bancarias colombianas.
-Tu única función: extraer datos estructurados de correos de notificación bancaria.
+const SYSTEM_PROMPT = `Eres un extractor de transacciones bancarias. Tu única función:
+extraer datos estructurados de correos de notificación bancaria — de cualquier
+banco, país o idioma. No asumas que el correo es de un banco colombiano.
 
-BANCOS COLOMBIANOS QUE PUEDES ENCONTRAR:
+ALGUNOS BANCOS COLOMBIANOS CONOCIDOS (lista de referencia, no exhaustiva —
+el correo puede ser de cualquier otro banco, colombiano o extranjero):
 Bancolombia, Davivienda, BBVA, Scotiabank Colpatria, Banco de Bogotá,
 Banco Popular, Itaú, Falabella, Nu Colombia, Lulo Bank, Nequi,
 RappiCard, RappiPay, Banco Caja Social, Banco Agrario, Citibank Colombia.
 
 CAMPOS A EXTRAER:
-- monto: número entero en COP sin decimales ni puntos (ej: 45000, no $45.000)
-- comercio: nombre del establecimiento en Title Case (ej: "Uber", "Éxito", "Netflix")
+- monto: número positivo en la moneda real de la transacción.
+  Para COP: entero sin decimales (ej: $45.000,00 → 45000).
+  Para otras monedas (USD, EUR, etc.): hasta 2 decimales (ej: $45.50 → 45.5).
+- moneda: código ISO de la moneda real detectada (COP, USD, EUR, etc.).
+  NUNCA asumas COP por defecto — infiérela del símbolo, código de moneda
+  explícito, idioma del correo y dominio del remitente.
+- comercio: nombre del establecimiento en Title Case (ej: "Uber", "Éxito", "Netflix", "Starbucks")
   Si es una transferencia, usar el nombre de la persona o "Transferencia"
   Si es un pago de servicio, usar el nombre del servicio (ej: "Acueducto", "Gas Natural")
 - tipo: uno de COMPRA | TRANSFERENCIA_ENVIADA | TRANSFERENCIA_RECIBIDA |
          PAGO_SERVICIO | RETIRO | ABONO_DEUDA | INGRESO
 - fecha: ISO 8601 con hora si está disponible (ej: "2026-06-13T14:05:00")
   Si no hay hora en el correo, usar "2026-06-13T00:00:00"
-- banco: nombre del banco en mayúsculas (ej: "BANCOLOMBIA", "RAPPICARD")
-- descripcion: texto corto descriptivo opcional
+- descripcion: texto corto descriptivo opcional — si identificas el nombre real
+  de la entidad/banco (aunque no esté en la lista de referencia), inclúyelo aquí.
 
 REGLAS CRÍTICAS:
-1. monto SIEMPRE es entero positivo en COP. Sin decimales.
-   $45.000,00 → 45000 | $1.200.000 → 1200000 | $6.790,50 → 6790
+1. Detecta la moneda real — nunca conviertas ni asumas COP para un correo en
+   otro idioma o de un banco no colombiano.
 2. Si el correo NO es una notificación de transacción bancaria → {"error": "not_a_transaction"}
 3. Si no puedes extraer monto o fecha con certeza → {"error": "not_a_transaction"}
 4. NUNCA inventes datos que no estén en el correo
@@ -68,6 +75,14 @@ ${params.body.slice(0, 1000)}`
     if (parsed.error === 'not_a_transaction') return null
     if (!parsed.monto || parsed.monto <= 0) return null
 
+    const moneda = (parsed.moneda ?? 'COP').toUpperCase()
+    const flags = Array.isArray(parsed.flags) ? [...parsed.flags] : []
+    // banco === 'OTRO' se mantiene tal cual (el nombre real que infiera la IA
+    // no encaja en el enum de `banco` que valida la DB) — el nombre real, si
+    // lo identificó, queda en `descripcion` para que el usuario lo vea igual.
+    // La conversión a COP (si moneda !== 'COP') pasa en un solo lugar —
+    // ver lib/services/emailPipeline.ts::normalizeCurrency.
+
     return {
       fecha: parsed.fecha ?? params.date,
       monto: Number(parsed.monto),
@@ -77,9 +92,9 @@ ${params.body.slice(0, 1000)}`
       tipo: parsed.tipo ?? 'COMPRA',
       categoria: parsed.categoria ?? 'OTRO',
       subcategoria: parsed.subcategoria ?? null,
-      moneda: parsed.moneda ?? 'COP',
-      monto_usd: parsed.monto_usd ?? null,
-      flags: Array.isArray(parsed.flags) ? parsed.flags : [],
+      moneda,
+      monto_usd: moneda === 'USD' ? Number(parsed.monto) : (parsed.monto_usd ?? null),
+      flags,
     }
   } catch (err) {
     console.error('Groq extraction error:', err)

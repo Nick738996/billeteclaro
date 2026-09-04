@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseCOPAmount, parseSpanishDate, toTitleCase, parseISOLikeDate } from '../../lib/parsers/utils'
+import { parseCOPAmount, parseSpanishDate, toTitleCase, parseISOLikeDate, parseUSAmount, parseEnglishDate } from '../../lib/parsers/utils'
 
 describe('parseCOPAmount', () => {
   it('parses amount with thousands dots only', () => {
@@ -96,6 +96,57 @@ describe('toTitleCase', () => {
 
   it('returns empty string unchanged', () => {
     expect(toTitleCase('')).toBe('')
+  })
+})
+
+describe('parseUSAmount', () => {
+  it('parses amount with thousands comma and decimal point', () => {
+    expect(parseUSAmount('1,200.50')).toBe(1200.5)
+    expect(parseUSAmount('45.67')).toBe(45.67)
+  })
+
+  it('parses amount with no decimals', () => {
+    expect(parseUSAmount('1,200')).toBe(1200)
+    expect(parseUSAmount('45')).toBe(45)
+  })
+
+  it('parses large amounts with multiple thousand separators', () => {
+    expect(parseUSAmount('10,254,616.00')).toBe(10254616)
+  })
+
+  it('trims whitespace', () => {
+    expect(parseUSAmount('  45.67  ')).toBe(45.67)
+  })
+})
+
+describe('parseEnglishDate', () => {
+  it('parses "Month d, yyyy"', () => {
+    const result = parseEnglishDate('September 4, 2026')
+    expect(result).not.toBeNull()
+    expect(result!).toContain('2026-09-04')
+  })
+
+  it('parses abbreviated month with time', () => {
+    const result = parseEnglishDate('Sep 4, 2026', '11:58 AM')
+    expect(result).not.toBeNull()
+    const d = new Date(result!)
+    expect(d.getUTCFullYear()).toBe(2026)
+    expect(d.getUTCMonth()).toBe(8) // September = 8
+    expect(d.getUTCDate()).toBe(4)
+    expect(d.getUTCHours()).toBe(11)
+    expect(d.getUTCMinutes()).toBe(58)
+  })
+
+  it('converts 12h pm time correctly — sin desplazamiento de zona horaria', () => {
+    const result = parseEnglishDate('September 4, 2026', '3:18 PM')
+    expect(result).not.toBeNull()
+    const d = new Date(result!)
+    expect(d.getUTCHours()).toBe(15) // no se resta/suma huso horario
+    expect(d.getUTCMinutes()).toBe(18)
+  })
+
+  it('returns null for invalid input', () => {
+    expect(parseEnglishDate('not a date')).toBeNull()
   })
 })
 
