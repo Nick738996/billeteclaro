@@ -155,6 +155,22 @@ export async function processForwardedEmail(payload: ForwardedEmailPayload, admi
   if (remaining.length === 0) return { processed: false, reason: 'uber_dedup' }
 
   const fecha = extracted.fecha ? new Date(extracted.fecha) : new Date()
+
+  // Reenviar el mismo correo original dos veces (a mano, o porque el
+  // usuario recuperó una transacción borrada reenviándola de nuevo) produce
+  // dos correos con Message-ID distinto — el `onConflict` de más abajo no
+  // los detecta como duplicados porque el id es distinto. Acá comparamos
+  // por contenido (mismo banco/tipo/monto/fecha exacta) antes de insertar.
+  const { data: possibleDup } = await admin
+    .from('transactions')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('banco', extracted.banco)
+    .eq('tipo', extracted.tipo)
+    .eq('monto', extracted.monto)
+    .eq('fecha', fecha.toISOString())
+    .maybeSingle()
+  if (possibleDup) return { processed: false, reason: 'duplicate_content' }
   const { error: insertError, data: inserted } = await admin
     .from('transactions')
     .upsert({
@@ -176,6 +192,6 @@ export async function processForwardedEmail(payload: ForwardedEmailPayload, admi
   }
   if (!inserted || inserted.length === 0) return { processed: false, reason: 'already_processed' }
 
-  await reassignCalendarMonths(admin, userId, [fecha.toISOString().slice(0, 7)])
+  await reassignCalendarMonths(admin, userId, [toColombiaDate(fecha.toISOString()).slice(0, 7)])
   return { processed: true, reason: 'inserted' }
 }
