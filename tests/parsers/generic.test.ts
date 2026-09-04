@@ -189,3 +189,16 @@ Netflix 32900 2025/03/06`
     expect(result).toBeNull()
   })
 })
+
+describe('tryGenericParser — fecha numérica dd/mm/yyyy', () => {
+  it('usa la fecha real de la transacción, no la fecha del correo', () => {
+    const body = 'Compraste $6.790,00 en UBER *TRIP con tu T.Deb *1754, el 18/04/2025 a las 14:05.'
+    const result = tryGenericParser(
+      { ...BASE_EMAIL, subject: 'Compra', body, date: '2026-09-04T16:47:00Z' },
+      'OTRO'
+    )
+    expect(result!.monto).toBe(6790)
+    expect(result!.fecha).not.toBeNull()
+    expect(result!.fecha!.startsWith('2025-04-18')).toBe(true)
+  })
+})

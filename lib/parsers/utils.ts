@@ -77,6 +77,38 @@ export function toTitleCase(str: string): string {
     .join(' ')
 }
 
+// Parses "18/04/2025" (día/mes/año — convención colombiana) with optional
+// time "14:05" or "2:05 pm". A diferencia de un ISO con guiones, este
+// formato numérico con "/" es el que usan varios bancos colombianos en
+// notificaciones de texto plano (ej. Bancolombia: "el 18/04/2025 a las
+// 14:05") y no lo cubre ningún otro parser de fecha — sin esto, un banco sin
+// parser específico que use este formato termina con la fecha del correo
+// (cuándo se reenvió) en vez de la fecha real de la transacción.
+export function parseNumericDate(dateStr: string, timeStr?: string): string | null {
+  const dm = dateStr.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/)
+  if (!dm) return null
+
+  const day = parseInt(dm[1])
+  const month = parseInt(dm[2])
+  const year = parseInt(dm[3])
+  if (isNaN(day) || isNaN(month) || isNaN(year)) return null
+
+  let hours = 0
+  let minutes = 0
+  if (timeStr) {
+    const tm = timeStr.match(/(\d{1,2}):(\d{2})\s*(am|pm)?/i)
+    if (tm) {
+      hours = parseInt(tm[1])
+      minutes = parseInt(tm[2])
+      const suffix = tm[3]?.toLowerCase()
+      if (suffix === 'pm' && hours !== 12) hours += 12
+      if (suffix === 'am' && hours === 12) hours = 0
+    }
+  }
+
+  return bogotaDateToUTC(year, month - 1, day, hours, minutes)
+}
+
 // Parses "2026-06-07 12:25:21" or "2026-06-07" — hora de Bogotá, sin zona
 export function parseISOLikeDate(s: string): string | null {
   const m = s.match(/(\d{4})-(\d{2})-(\d{2})(?:[\sT](\d{2}):(\d{2})(?::(\d{2}))?)?/)

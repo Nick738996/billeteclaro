@@ -12,7 +12,7 @@ import type { Banco, Categoria, TipoTransaccion } from '@/lib/types'
 import type { EmailInput, ParseResult } from './types'
 import {
   parseCOPAmount, parseUSAmount,
-  parseSpanishDate, parseEnglishDate, parseISOLikeDate,
+  parseSpanishDate, parseEnglishDate, parseISOLikeDate, parseNumericDate,
   toTitleCase, bogotaDateToUTC,
 } from './utils'
 import { guessCategoria } from './commerceCategories'
@@ -68,6 +68,13 @@ function extractFecha(text: string, emailDate: string, idioma: Idioma): string |
     if (spanishMatch) {
       const timeMatch = text.match(/(\d{1,2}:\d{2}\s*(?:am|pm)?)/i)
       const parsed = parseSpanishDate(spanishMatch[1], timeMatch?.[1])
+      if (parsed) return parsed
+    }
+
+    const numericMatch = text.match(/(\d{1,2}\/\d{1,2}\/\d{4})/)
+    if (numericMatch) {
+      const timeMatch = text.match(/(\d{1,2}:\d{2}\s*(?:am|pm)?)/i)
+      const parsed = parseNumericDate(numericMatch[1], timeMatch?.[1])
       if (parsed) return parsed
     }
   } else {

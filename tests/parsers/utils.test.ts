@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseCOPAmount, parseSpanishDate, toTitleCase, parseISOLikeDate, parseUSAmount, parseEnglishDate } from '../../lib/parsers/utils'
+import { parseCOPAmount, parseSpanishDate, toTitleCase, parseISOLikeDate, parseUSAmount, parseEnglishDate, parseNumericDate } from '../../lib/parsers/utils'
 
 describe('parseCOPAmount', () => {
   it('parses amount with thousands dots only', () => {
@@ -72,6 +72,38 @@ describe('parseSpanishDate', () => {
 
   it('returns null for invalid input', () => {
     expect(parseSpanishDate('not a date')).toBeNull()
+  })
+})
+
+describe('parseNumericDate', () => {
+  it('parses "dd/mm/yyyy" (caso real: Bancolombia)', () => {
+    // "el 18/04/2025 a las 14:05" — hora Bogotá 24h
+    const result = parseNumericDate('18/04/2025', '14:05')
+    expect(result).not.toBeNull()
+    const d = new Date(result!)
+    expect(d.getUTCFullYear()).toBe(2025)
+    expect(d.getUTCMonth()).toBe(3)   // Abril = 3
+    expect(d.getUTCDate()).toBe(18)
+    expect(d.getUTCHours()).toBe(19)  // 14:05 Bogotá = 19:05 UTC
+    expect(d.getUTCMinutes()).toBe(5)
+  })
+
+  it('sin hora, usa medianoche Bogotá', () => {
+    const result = parseNumericDate('06/03/2025')
+    expect(result).not.toBeNull()
+    const d = new Date(result!)
+    expect(d.getUTCDate()).toBe(6)
+    expect(d.getUTCHours()).toBe(5)  // medianoche Bogotá = 05h UTC
+  })
+
+  it('convierte hora 12h pm correctamente', () => {
+    const result = parseNumericDate('06/03/2025', '2:05 pm')
+    const d = new Date(result!)
+    expect(d.getUTCHours()).toBe(19)
+  })
+
+  it('returns null for invalid input', () => {
+    expect(parseNumericDate('not a date')).toBeNull()
   })
 })
 

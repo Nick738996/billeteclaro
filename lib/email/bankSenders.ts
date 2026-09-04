@@ -53,6 +53,28 @@ export function detectBank(fromHeader: string): Banco {
   return BANK_SENDERS[email] ?? 'OTRO'
 }
 
+// El reenvío llega sin el remitente bancario en el header `From` (ese ahora
+// es quien reenvió) — buscamos el email más cercano después de cada "De:"/
+// "From:" de los bloques de reenvío citados para recuperar el remitente
+// original. Dos cuidados:
+// 1. Un correo puede reenviarse más de una vez (alguien le reenvía al
+//    usuario un correo que ya venía reenviado) — la primera línea "De:"
+//    encontrada es la del reenvío más reciente, no necesariamente la del
+//    banco, así que se prueban todas y se usa la primera que resuelva a un
+//    banco conocido.
+// 2. Un cliente de correo puede cortar la línea "De: Nombre <email>" justo
+//    entre "<" y el email (línea muy larga) — por eso la búsqueda del email
+//    no se limita a la misma línea de "De:"/"From:", sino a una ventana de
+//    caracteres después (que sí puede cruzar un salto de línea).
+export function detectBankFromForwardedBody(body: string): Banco {
+  const EMAIL_AFTER_LABEL_RE = /(?:^|\n)(?:De|From):[\s\S]{0,150}?([a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,})/gim
+  for (const match of body.matchAll(EMAIL_AFTER_LABEL_RE)) {
+    const banco = detectBank(match[1])
+    if (banco !== 'OTRO') return banco
+  }
+  return 'OTRO'
+}
+
 export function stripHtml(html: string): string {
   return html
     .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
