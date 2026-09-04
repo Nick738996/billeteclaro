@@ -31,6 +31,5 @@ export const TEST_IDS = {
   AUTH_LOGOUT_BUTTON:       'auth-logout-button',
   DASHBOARD_MONTH_PROGRESS: 'dashboard-month-progress',
   DASHBOARD_HELP_BUTTON:    'dashboard-help-button',
-  DASHBOARD_DISCONNECT_BUTTON: 'dashboard-disconnect-button',
   DASHBOARD_FORWARDING_BUTTON: 'dashboard-forwarding-button',
 } as const
