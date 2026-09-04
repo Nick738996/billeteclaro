@@ -89,7 +89,7 @@ export default function UIPreviewPage() {
     <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
       <div style={{ maxWidth: '32rem', margin: '0 auto', padding: '24px 16px', display: 'flex', flexDirection: 'column', gap: 24 }}>
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-          <HeaderPill onSyncComplete={() => {}} onSignOut={() => {}} onHelp={() => {}} />
+          <HeaderPill onSignOut={() => {}} onHelp={() => {}} />
         </div>
 
         <MonthHero

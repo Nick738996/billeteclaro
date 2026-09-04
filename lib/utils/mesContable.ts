@@ -7,8 +7,22 @@ const VENTANA_DIAS = 5
 // Colombia es UTC-5 sin horario de verano
 const COLOMBIA_OFFSET_MS = 5 * 60 * 60 * 1000
 
-function toColombiaDate(fecha: string): string {
+export function toColombiaDate(fecha: string): string {
   return new Date(new Date(fecha).getTime() - COLOMBIA_OFFSET_MS).toISOString().slice(0, 10)
+}
+
+/**
+ * Rango UTC [inicio, fin] que cubre un mes calendario completo en hora
+ * Colombia (UTC-5) — ej. '2026-09' → 2026-09-01T05:00:00Z .. 2026-10-01T04:59:59Z.
+ * Necesario para consultar la DB (que guarda `fecha` en UTC) sin perder
+ * transacciones nocturnas cuyo UTC ya cruzó al mes/día siguiente
+ * (ej. 31 ago 19:45 COL = 1 sep 00:45 UTC — sigue siendo agosto en Colombia).
+ */
+export function colombiaMonthRangeUTC(mes: string): { start: string; end: string } {
+  const [y, m] = mes.split('-').map(Number)
+  const start = new Date(Date.UTC(y, m - 1, 1, 5, 0, 0)).toISOString()
+  const end = new Date(Date.UTC(y, m, 1, 4, 59, 59, 999)).toISOString()
+  return { start, end }
 }
 
 type TxBase = {

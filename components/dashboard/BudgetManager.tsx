@@ -139,7 +139,7 @@ export default function BudgetManager({ mes, gastosPorCategoria, ingresos = 0, i
     } catch {
       // Bug corregido: el fetch no tenía catch — un fallo de red o del servidor
       // quedaba silencioso. Ahora se muestra en la barra flotante con "Reintentar".
-      setSaveError('Error al guardar — revisa tu conexión')
+      setSaveError('Error al guardar, revisa tu conexión')
     } finally {
       setSaving(false)
     }

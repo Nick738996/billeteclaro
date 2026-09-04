@@ -4,6 +4,7 @@ import { extractTransaction } from '@/lib/services/emailPipeline'
 import { generateAuditId } from '@/lib/utils/auditId'
 import { deduplicateUber, matchUberAgainstPersisted } from '@/lib/utils/deduplicateUber'
 import { reassignCalendarMonths } from '@/lib/services/mesContableService'
+import { toColombiaDate } from '@/lib/utils/mesContable'
 import { createAdminClient } from '@/lib/supabase/server'
 import { decryptToken } from '@/lib/utils/tokenCrypto'
 import type { EmailProvider } from '@/lib/email/types'
@@ -241,11 +242,11 @@ export async function runSync(userId: string, admin: Admin): Promise<SyncResult>
     //    de la pre-auth original)
     const mesesUpdates = updates.map(m => {
       const fecha = allTransactions.find(t => t.id === m.newTxId)!.extracted.fecha
-      return (fecha ? new Date(fecha) : new Date()).toISOString().slice(0, 7)
+      return toColombiaDate((fecha ? new Date(fecha) : new Date()).toISOString()).slice(0, 7)
     })
     const mesesAfectados = [...new Set([
       ...deduped.map(({ extracted }) =>
-        (extracted.fecha ? new Date(extracted.fecha) : new Date()).toISOString().slice(0, 7)
+        toColombiaDate((extracted.fecha ? new Date(extracted.fecha) : new Date()).toISOString()).slice(0, 7)
       ),
       ...mesesUpdates,
     ])]

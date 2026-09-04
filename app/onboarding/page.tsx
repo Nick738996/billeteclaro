@@ -28,7 +28,7 @@ export default function OnboardingStep1() {
           {name ? `¡Hola, ${name}!` : '¡Hola!'}
         </h1>
         <p style={{ fontSize: 'var(--text-base)', color: 'var(--text-muted)', lineHeight: 1.6 }}>
-          Vamos a configurar BilleteClaro en 2 minutos. Sin llenar formularios, sin datos manuales.
+          Vamos a configurar BilleteClaro en 2 minutos. Nunca te pedimos acceso a tu correo.
         </p>
       </div>
 
@@ -44,7 +44,7 @@ export default function OnboardingStep1() {
         }}
       >
         {[
-          'Sincronizamos tus correos de banco',
+          'Reenvías tus correos de banco (tú decides cuáles)',
           'Tú decides cuánto quieres gastar',
           'Ya tienes tu dashboard listo',
         ].map((text, i) => (

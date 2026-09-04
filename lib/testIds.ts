@@ -1,5 +1,4 @@
 export const TEST_IDS = {
-  DASHBOARD_SYNC_BUTTON:    'dashboard-sync-button',
   DASHBOARD_RESET_BUTTON:   'dashboard-reset-button',
   DASHBOARD_MONTH_PREV:     'dashboard-month-prev',
   DASHBOARD_MONTH_NEXT:     'dashboard-month-next',
@@ -25,12 +24,13 @@ export const TEST_IDS = {
   BUDGET_CATEGORY_INPUT:    'budget-category-input',
   BUDGET_SAVE_BUTTON:       'budget-save-button',
   ONBOARDING_STEP1_CTA:     'onboarding-step1-cta',
-  ONBOARDING_STEP2_SYNC:    'onboarding-step2-sync',
-  ONBOARDING_STEP2_STATUS:  'onboarding-step2-status',
+  FORWARDING_WIZARD_DONE_CONTINUE: 'forwarding-wizard-done-continue',
+  FORWARDING_WIZARD_FILTER_DONE:   'forwarding-wizard-filter-done',
   ONBOARDING_STEP3_CONTINUE:'onboarding-step3-continue',
   AUTH_GOOGLE_BUTTON:       'auth-google-button',
   AUTH_LOGOUT_BUTTON:       'auth-logout-button',
   DASHBOARD_MONTH_PROGRESS: 'dashboard-month-progress',
   DASHBOARD_HELP_BUTTON:    'dashboard-help-button',
   DASHBOARD_DISCONNECT_BUTTON: 'dashboard-disconnect-button',
+  DASHBOARD_FORWARDING_BUTTON: 'dashboard-forwarding-button',
 } as const

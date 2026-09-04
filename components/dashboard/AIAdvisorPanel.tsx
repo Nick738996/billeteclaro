@@ -48,7 +48,7 @@ function InsightCard({ insight }: { insight: Insight }) {
     <div
       data-testid={TEST_IDS.ADVISOR_INSIGHT_CARD}
       role="article"
-      aria-label={`${c.label}${insight.categoria ? ` — ${CATEGORIA_LABELS[insight.categoria as keyof typeof CATEGORIA_LABELS] ?? insight.categoria}` : ''}`}
+      aria-label={`${c.label}${insight.categoria ? `, ${CATEGORIA_LABELS[insight.categoria as keyof typeof CATEGORIA_LABELS] ?? insight.categoria}` : ''}`}
       style={{
         background: 'var(--surface)',
         border: '1px solid var(--border-soft)',
@@ -194,7 +194,7 @@ export default function AIAdvisorPanel({ mes, budgetCount, txCount, contextVersi
       if (currentMesRef.current !== fetchMes) return
       if (!res.ok) {
         throw new Error(res.status === 429
-          ? (data?.error ?? 'Límite diario de IA alcanzado — vuelve en unos minutos')
+          ? (data?.error ?? 'Límite diario de IA alcanzado, vuelve en unos minutos')
           : 'No se pudieron cargar los insights. Intenta de nuevo.')
       }
       setInsights(data.insights ?? [])

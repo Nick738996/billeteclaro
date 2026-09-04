@@ -4,6 +4,7 @@ import { extractTransaction } from '@/lib/services/emailPipeline'
 import { deduplicateUber, matchUberAgainstPersisted } from '@/lib/utils/deduplicateUber'
 import { generateAuditId } from '@/lib/utils/auditId'
 import { reassignCalendarMonths } from '@/lib/services/mesContableService'
+import { toColombiaDate } from '@/lib/utils/mesContable'
 import { createAdminClient } from '@/lib/supabase/server'
 import type { EmailMessage } from '@/lib/email/types'
 import type { Banco } from '@/lib/types'
@@ -44,11 +45,13 @@ export async function getOrCreateForwardingAddress(admin: Admin, userId: string)
 }
 
 // ── Confirmación de reenvío (Gmail/Outlook) ─────────────────────────────────
-// No hay callback de éxito para el link de confirmación — tratamos el envío
-// exitoso del GET como confirmación (mismo comportamiento observado en
-// Finvot: "Reenvío confirmado" aparece casi inmediatamente tras agregar la
-// dirección). Si el fetch falla, el link queda guardado para que el wizard
-// ofrezca un botón de confirmación manual.
+// Probado en vivo: un GET servidor-a-servidor al link de confirmación
+// devuelve 200 pero Google NO lo cuenta como confirmación real (el reenvío
+// sigue en "Verificar" en la configuración de Gmail) — necesita una visita
+// real de navegador. Por eso no confiamos en el resultado del fetch: solo lo
+// intentamos como best-effort, y siempre guardamos el link para que el
+// wizard lo abra en el navegador del usuario (ver ForwardingWizard.tsx) o el
+// usuario confirme manualmente que ya lo verificó (POST /api/forwarding/confirm).
 const CONFIRMATION_SENDER_RE = /forwarding-noreply@google\.com|no-?reply@.*outlook\.com|postmaster@.*microsoft\.com/i
 const CONFIRMATION_LINK_RE = /https?:\/\/[^\s"'<>]*\/mail\/vf-[^\s"'<>]+/i
 
@@ -58,15 +61,9 @@ async function tryAutoConfirm(admin: Admin, userId: string, body: string): Promi
   const confirmUrl = match[0]
 
   try {
-    const res = await fetch(confirmUrl, { method: 'GET' })
-    if (res.ok) {
-      await admin.from('forwarding_addresses')
-        .update({ confirmed_at: new Date().toISOString(), pending_confirm_url: null })
-        .eq('user_id', userId)
-      return true
-    }
+    await fetch(confirmUrl, { method: 'GET' })
   } catch (err) {
-    console.error('[forwardingService] auto-confirm fetch falló:', err)
+    console.error('[forwardingService] auto-confirm fetch falló (no bloqueante):', err)
   }
 
   await admin.from('forwarding_addresses').update({ pending_confirm_url: confirmUrl }).eq('user_id', userId)
@@ -150,7 +147,7 @@ export async function processForwardedEmail(payload: ForwardedEmailPayload, admi
         monto: extracted.monto, fecha: fecha.toISOString(),
         descripcion: extracted.descripcion, flags: extracted.flags,
       }).eq('id', match.persistedId)
-      await reassignCalendarMonths(admin, userId, [fecha.toISOString().slice(0, 7)])
+      await reassignCalendarMonths(admin, userId, [toColombiaDate(fecha.toISOString()).slice(0, 7)])
     }
     return { processed: match.updatePersisted, reason: match.updatePersisted ? 'uber_cross_match_updated' : 'uber_preauth_late' }
   }
@@ -158,6 +155,22 @@ export async function processForwardedEmail(payload: ForwardedEmailPayload, admi
   if (remaining.length === 0) return { processed: false, reason: 'uber_dedup' }
 
   const fecha = extracted.fecha ? new Date(extracted.fecha) : new Date()
+
+  // Reenviar el mismo correo original dos veces (a mano, o porque el
+  // usuario recuperó una transacción borrada reenviándola de nuevo) produce
+  // dos correos con Message-ID distinto — el `onConflict` de más abajo no
+  // los detecta como duplicados porque el id es distinto. Acá comparamos
+  // por contenido (mismo banco/tipo/monto/fecha exacta) antes de insertar.
+  const { data: possibleDup } = await admin
+    .from('transactions')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('banco', extracted.banco)
+    .eq('tipo', extracted.tipo)
+    .eq('monto', extracted.monto)
+    .eq('fecha', fecha.toISOString())
+    .maybeSingle()
+  if (possibleDup) return { processed: false, reason: 'duplicate_content' }
   const { error: insertError, data: inserted } = await admin
     .from('transactions')
     .upsert({
@@ -179,6 +192,6 @@ export async function processForwardedEmail(payload: ForwardedEmailPayload, admi
   }
   if (!inserted || inserted.length === 0) return { processed: false, reason: 'already_processed' }
 
-  await reassignCalendarMonths(admin, userId, [fecha.toISOString().slice(0, 7)])
+  await reassignCalendarMonths(admin, userId, [toColombiaDate(fecha.toISOString()).slice(0, 7)])
   return { processed: true, reason: 'inserted' }
 }
