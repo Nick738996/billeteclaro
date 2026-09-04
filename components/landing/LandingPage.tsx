@@ -1,8 +1,9 @@
 'use client'
 
 import { createClient } from '@/lib/supabase/client'
-import { Lock, Mail, BarChart2 } from 'lucide-react'
+import { ScanSearch, Mail, BarChart2 } from 'lucide-react'
 import ThemeToggle from '@/components/ui/ThemeToggle'
+import Logo from '@/components/ui/Logo'
 import { TEST_IDS } from '@/lib/testIds'
 
 const GoogleIcon = () => (
@@ -23,31 +24,16 @@ const OutlookIcon = () => (
   </svg>
 )
 
-const Logo = () => (
-  <div className="flex items-center gap-2">
-    <svg viewBox="0 0 100 100" width="40" height="40" aria-hidden="true" style={{ color: 'var(--text)' }}>
-      <rect width="100" height="100" rx="17" style={{ fill: 'var(--surface)' }}/>
-      <line x1="30" y1="18" x2="30" y2="82" stroke="currentColor" strokeWidth="6" strokeLinecap="round"/>
-      <path d="M30,18 Q70,18 70,34 Q70,50 30,50" stroke="currentColor" strokeWidth="6" fill="none" strokeLinecap="round"/>
-      <path d="M30,50 Q78,50 78,66 Q78,82 30,82" stroke="var(--green)" strokeWidth="6" fill="none" strokeLinecap="round"/>
-    </svg>
-    <span style={{ fontSize: 'var(--text-lg)', letterSpacing: '-0.02em' }}>
-      <span style={{ fontWeight: 400, color: 'var(--text)' }}>Billete</span>
-      <span style={{ fontWeight: 700, color: 'var(--green)' }}>Claro</span>
-    </span>
-  </div>
-)
-
 const STEPS = [
   {
-    Icon: Lock,
-    titulo: 'Conectas tu cuenta de correo',
-    descripcion: 'Gmail u Outlook. Solo leemos correos de banco, nada más.',
+    Icon: Mail,
+    titulo: 'Reenvías los correos de tu banco',
+    descripcion: 'Tú decides qué reenviar — nunca te pedimos acceso a tu correo.',
   },
   {
-    Icon: Mail,
+    Icon: ScanSearch,
     titulo: 'Detectamos tus movimientos',
-    descripcion: 'Bancolombia, Davivienda y RappiCard. Más bancos próximamente.',
+    descripcion: 'Bancolombia, Nequi, Nu, Davivienda y varios bancos más — o cualquier otro, con nuestro lector genérico.',
   },
   {
     Icon: BarChart2,
@@ -59,11 +45,10 @@ const STEPS = [
 export default function LandingPage() {
   const supabase = createClient()
 
-  // Login = solo identidad. El permiso de lectura de correo (gmail.readonly /
-  // Mail.Read) se pide después, como acción explícita y separada, cuando el
-  // usuario decide conectar su correo para sincronizar (ver gmail-connect /
-  // outlook-connect) — así el primer login nunca muestra un consentimiento
-  // de "esta app quiere leer tu Gmail".
+  // Login = solo identidad, nunca pide acceso al correo — la app no lee
+  // Gmail/Outlook en ningún momento. La ingesta de transacciones es 100%
+  // por reenvío: el usuario configura su propio filtro para reenviar los
+  // correos de su banco (ver ForwardingWizard.tsx / forwardingService.ts).
   const handleLoginGmail = async () => {
     await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -107,7 +92,7 @@ export default function LandingPage() {
             <span style={{ color: 'var(--green)' }}>clara.</span>
           </h1>
           <p style={{ fontSize: 'var(--text-base)', color: 'var(--text-muted)', lineHeight: 1.6, maxWidth: 320, margin: '0 auto 32px' }}>
-            Conecta tu correo y BilleteClaro detecta automáticamente tus movimientos bancarios. Sin ingresar nada a mano.
+            Reenvía los correos de tu banco y BilleteClaro detecta automáticamente tus movimientos. Sin ingresar nada a mano.
           </p>
           <div className="flex flex-col gap-3">
             <button
@@ -211,7 +196,7 @@ export default function LandingPage() {
             🔒 ¿Es seguro?
           </p>
           <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', lineHeight: 1.6 }}>
-            Solo pedimos permiso de <strong style={{ color: 'var(--text)' }}>lectura</strong>. Nunca escribimos ni enviamos nada en tu nombre. Tus datos se guardan cifrados en servidores de Supabase (AWS us-east-1).
+            <strong style={{ color: 'var(--text)' }}>Nunca te pedimos acceso a tu correo.</strong> Tú decides qué reenviar, correo por correo. Tus datos se guardan cifrados en servidores de Supabase (AWS us-east-1).
           </p>
         </section>
 

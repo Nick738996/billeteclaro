@@ -104,8 +104,10 @@
 .centerLabel { font-size: 10px; color: var(--text-subtle); }
 .centerValue { font-variant-numeric: tabular-nums; font-weight: 700; font-size: 14px; color: var(--clr); }
 
-.legend { flex: 1; display: flex; flex-direction: column; gap: 10px; overflow: hidden; }
-.legendRow { cursor: pointer; }
+.legend { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+/* padding vertical en vez del gap del contenedor — el objetivo táctil real
+   de la fila (44px) crece sin agrandar el contenido visible */
+.legendRow { cursor: pointer; padding: 11px 0; }
 .legendHeader { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
 .legendNameGroup { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .legendDot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: var(--clr); }

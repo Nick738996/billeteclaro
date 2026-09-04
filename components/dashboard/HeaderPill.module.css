@@ -4,18 +4,20 @@
   background: var(--pill-bg);
   border: 1px solid var(--border);
   border-radius: var(--radius-pill);
-  padding: 0 6px;
-  gap: 2px;
-  height: 34px;
+  padding: 0 4px;
+  gap: 0;
+  height: 44px;
   flex-shrink: 0;
 }
 
+/* 44px — mismo estándar de objetivo táctil que .navBtn en
+   DashboardClient.module.css (MEJORA ⑤). Antes era 34×30px. */
 .btn {
   background: none;
   border: none;
   cursor: pointer;
-  width: 34px;
-  height: 30px;
+  width: 44px;
+  height: 44px;
   border-radius: var(--radius-badge);
   flex-shrink: 0;
   display: flex;
@@ -24,17 +26,6 @@
   color: var(--clr);
   opacity: 1;
   transition: opacity 0.15s, color 0.15s;
-}
-
-.btnDisabled {
-  cursor: default;
-  opacity: 0.3;
-}
-
-.helpIcon {
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1;
 }
 
 .divider {

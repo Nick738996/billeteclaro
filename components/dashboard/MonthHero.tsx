@@ -8,7 +8,6 @@ import styles from './MonthHero.module.css'
 interface Props {
   gastos: number
   ingresos: number
-  ahorros: number
   transacciones: number
   mes: string
   budgetTotal: number
@@ -30,7 +29,7 @@ function monthPulse(pctTiempo: number, pctPresupuesto: number | null): { texto: 
   return { texto: 'Vas al ritmo esperado este mes', color: 'var(--text-muted)' }
 }
 
-export default function MonthHero({ gastos, ingresos, ahorros: _ahorros, transacciones, mes, budgetTotal }: Props) {
+export default function MonthHero({ gastos, ingresos, transacciones, mes, budgetTotal }: Props) {
   const ref = parseISO(`${mes}-01`)
   const today = new Date()
   const isCurrentMonth =

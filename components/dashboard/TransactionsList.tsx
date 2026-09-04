@@ -12,9 +12,9 @@ const BOGOTA_TZ = 'America/Bogota'
 const format = (date: Date | number, fmt: string, opts?: { locale?: Locale }) =>
   formatInTimeZone(date, BOGOTA_TZ, fmt, opts)
 import {
-  Search, RefreshCw, X, Trash2, Plus, Check, ChevronDown, Pencil,
-  Home, Car, Utensils, HeartPulse, Package, ShoppingBag, TrendingUp, PiggyBank,
-  Landmark, CreditCard, Gift, GraduationCap, RotateCcw, ArrowLeftRight, ArrowDown, Tag,
+  Search, RefreshCw, X, Trash2, Plus, ChevronDown, Pencil,
+  Home, Car, Utensils, HeartPulse, Repeat, ShoppingBag, TrendingUp, PiggyBank,
+  Landmark, CreditCard, Gift, GraduationCap, HandCoins, ArrowLeftRight, ArrowDownToLine, CircleEllipsis,
   type LucideIcon,
 } from 'lucide-react'
 import {
@@ -32,6 +32,7 @@ import {
   SUBCATEGORIA_APORTE_AHORROS,
 } from '@/lib/types'
 import { TEST_IDS } from '@/lib/testIds'
+import FloatingSaveBar from '@/components/ui/FloatingSaveBar'
 import styles from './TransactionsList.module.css'
 
 // MEJORA ③: rows simplificados (divulgación progresiva)
@@ -76,7 +77,7 @@ const CATEGORIA_ICON: Record<Categoria, LucideIcon> = {
   TRANSPORTE: Car,
   SALIDAS: Utensils,
   SALUD: HeartPulse,
-  SUSCRIPCIONES: Package,
+  SUSCRIPCIONES: Repeat,
   COMPRAS_ONLINE: ShoppingBag,
   INVERSION: TrendingUp,
   AHORROS: PiggyBank,
@@ -84,14 +85,14 @@ const CATEGORIA_ICON: Record<Categoria, LucideIcon> = {
   DEUDA: CreditCard,
   DONACIONES: Gift,
   EDUCACION: GraduationCap,
-  REEMBOLSABLE: RotateCcw,
+  REEMBOLSABLE: HandCoins,
   TRANSFERENCIA: ArrowLeftRight,
-  INGRESO: ArrowDown,
-  OTRO: Tag,
+  INGRESO: ArrowDownToLine,
+  OTRO: CircleEllipsis,
 }
 
 function getCategoryIcon(cat: string): LucideIcon {
-  return CATEGORIA_ICON[cat as Categoria] ?? Tag
+  return CATEGORIA_ICON[cat as Categoria] ?? CircleEllipsis
 }
 
 type FilterKey = Categoria | 'TODOS' | `BANCO:${Banco}` | 'RETIRO_AHORRO'
@@ -645,7 +646,7 @@ function TransactionRow({ t, pendingCat, onCategoryClick, onDelete, onRenameClic
   return (
     <div className={`tx-row ${styles.row}`}>
       <div className={styles.catPlate} style={{ '--plate-bg': isDirty ? 'var(--yellow-soft)' : theme.bg, '--plate-clr': isDirty ? 'var(--yellow)' : theme.color } as React.CSSProperties}>
-        <CatIcon size={13} />
+        <CatIcon size={17} />
       </div>
 
       <div className={styles.rowLeft}>
@@ -726,10 +727,11 @@ interface Props {
   onCategoryChange?: () => void
   onTransactionDeleted?: () => void
   onAdd?: () => void
+  addOpen?: boolean
   budgets?: Record<string, number>
 }
 
-export default function TransactionsList({ transactions, activeFilter, onFilterChange, onCategoryChange, onTransactionDeleted, onAdd, budgets }: Props) {
+export default function TransactionsList({ transactions, activeFilter, onFilterChange, onCategoryChange, onTransactionDeleted, onAdd, addOpen, budgets }: Props) {
   const [search,      setSearch]      = useState('')
   const [pendingCats, setPendingCats] = useState<Record<string, Categoria>>({})
   const [isSaving,    setIsSaving]    = useState(false)
@@ -843,6 +845,7 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
           <button
             onClick={onAdd}
             aria-label="Agregar transacción"
+            aria-expanded={addOpen ?? false}
             className={styles.addBtn}
           >
             +
@@ -927,35 +930,14 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
     </div>
 
     {/* Barra flotante de cambios pendientes */}
-    {pendingCount > 0 && typeof document !== 'undefined' && createPortal(
-      <div className={styles.pendingBarWrap}>
-        <div className={styles.pendingBar}>
-          <span className={styles.pendingLabel}>
-            {pendingCount} cambio{pendingCount !== 1 ? 's' : ''} sin guardar
-          </span>
-          <div className={styles.pendingActions}>
-            <button
-              onClick={() => setPendingCats({})}
-              className={styles.discardBtn}
-            >
-              Descartar
-            </button>
-            <button
-              onClick={saveCategories}
-              disabled={isSaving}
-              className={`${styles.saveBtn} ${isSaving ? styles.saveBtnSaving : savedOk ? styles.saveBtnSaved : styles.saveBtnNormal}`}
-            >
-              {isSaving
-                ? <><RefreshCw size={11} className="animate-spin" /> Guardando…</>
-                : savedOk
-                ? <><Check size={11} /> Guardado</>
-                : 'Guardar'
-              }
-            </button>
-          </div>
-        </div>
-      </div>,
-      document.body
+    {pendingCount > 0 && (
+      <FloatingSaveBar
+        label={`${pendingCount} cambio${pendingCount !== 1 ? 's' : ''} sin guardar`}
+        state={isSaving ? 'saving' : savedOk ? 'saved' : 'idle'}
+        onDiscard={() => setPendingCats({})}
+        onSave={saveCategories}
+        saveAriaLabel={isSaving ? 'Guardando cambios' : 'Guardar cambios de categoría'}
+      />
     )}
 
     {pickerTx && (

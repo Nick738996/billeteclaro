@@ -1,6 +1,7 @@
 'use client'
 
 import { X } from 'lucide-react'
+import { FEATURE_AI_ADVISOR } from '@/lib/features'
 
 interface Props {
   onClose: () => void
@@ -19,12 +20,13 @@ const SECTIONS = [
   {
     titulo: 'Asesor financiero',
     desc: 'Análisis automático de tus patrones de gasto y chat con IA para hacerle preguntas sobre tu plata.',
+    requiresFeature: true,
   },
   {
     titulo: 'Transacciones',
     desc: 'Detectadas automáticamente desde tu correo. Podés buscar, filtrar por categoría o agregar una manualmente.',
   },
-]
+].filter(s => !s.requiresFeature || FEATURE_AI_ADVISOR)
 
 export default function HelpModal({ onClose, onStartTour }: Props) {
   return (
@@ -36,6 +38,9 @@ export default function HelpModal({ onClose, onStartTour }: Props) {
     >
       {/* Sheet / Modal */}
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Cómo funciona BilleteClaro"
         className="w-full sm:max-w-sm sm:mx-4 rounded-t-2xl sm:rounded-2xl"
         style={{
           background: 'var(--surface)',

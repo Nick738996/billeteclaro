@@ -1,10 +1,10 @@
 'use client'
 
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { createPortal } from 'react-dom'
-import { Check, RefreshCw, ChevronRight, Plus, Trash2, Copy, ArrowLeft } from 'lucide-react'
+import { Check, ChevronRight, Plus, Trash2, Copy, ArrowLeft } from 'lucide-react'
 import { CATEGORIA_LABELS, catLabel, normalizeCatKey, getCategoryColor, formatCOP, formatCOPCompact, PRESUPUESTO_CATS, type Categoria, type BudgetEntry, type BudgetSubcat } from '@/lib/types'
 import { TEST_IDS } from '@/lib/testIds'
+import FloatingSaveBar from '@/components/ui/FloatingSaveBar'
 import styles from './BudgetManager.module.css'
 
 function pctColor(pct: number) {
@@ -426,34 +426,15 @@ export default function BudgetManager({ mes, gastosPorCategoria, ingresos = 0, i
     </div>
 
     {/* Floating save bar */}
-    {isDirty && loaded && typeof document !== 'undefined' && createPortal(
-      <div className={styles.saveBarWrap}>
-        <div className={`${styles.saveBar} ${saveError ? styles.saveBarError : ''}`}>
-          <span className={saveError ? styles.saveBarLabelError : styles.saveBarLabel}>
-            {saveError ?? 'Cambios sin guardar'}
-          </span>
-          <div className={styles.saveBarActions}>
-            <button
-              onClick={() => { setDraft(saved); setSaveError(null); onBudgetsChange?.(totals(saved)) }}
-              className={styles.discardBtn}
-            >
-              Descartar
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              data-testid={TEST_IDS.BUDGET_SAVE_BUTTON}
-              aria-label={saving ? 'Guardando presupuesto' : saveError ? 'Reintentar guardado' : 'Guardar presupuesto'}
-              className={`${styles.saveBtn} ${savedOk ? styles.saveBtnOk : saveError ? styles.saveBtnError : styles.saveBtnNormal}`}
-            >
-              {saving   ? <><RefreshCw size={11} className="animate-spin" /> Guardando…</> :
-               savedOk  ? <><Check size={11} /> Guardado</> :
-               saveError ? 'Reintentar' : 'Guardar'}
-            </button>
-          </div>
-        </div>
-      </div>,
-      document.body
+    {isDirty && loaded && (
+      <FloatingSaveBar
+        label={saveError ?? 'Cambios sin guardar'}
+        state={saving ? 'saving' : savedOk ? 'saved' : saveError ? 'error' : 'idle'}
+        onDiscard={() => { setDraft(saved); setSaveError(null); onBudgetsChange?.(totals(saved)) }}
+        onSave={handleSave}
+        saveTestId={TEST_IDS.BUDGET_SAVE_BUTTON}
+        saveAriaLabel={saving ? 'Guardando presupuesto' : saveError ? 'Reintentar guardado' : 'Guardar presupuesto'}
+      />
     )}
     </>
   )

@@ -60,8 +60,13 @@
   --border:       rgba(0, 0, 0, 0.09);
   --border-soft:  rgba(0, 0, 0, 0.05);
   --text:         #0F1117;
-  --text-muted:   #6B7280;
-  --text-subtle:  #9CA3AF;
+  /* Oscurecidos respecto al original (#6B7280 / #9CA3AF) — ambos fallaban
+     WCAG AA (4.5:1) contra --surface-2, y --text-subtle fallaba incluso
+     contra fondo blanco (~2.5:1). Verificado con luminancia relativa WCAG:
+     --text-muted ahora da ~7.6:1 (blanco) / ~6.6:1 (surface-2);
+     --text-subtle da ~5.3:1 (blanco) / ~4.6:1 (surface-2). */
+  --text-muted:   #4B5563;
+  --text-subtle:  #606D79;
 
   --green:        #16A34A;
   --green-soft:   #DCFCE7;
