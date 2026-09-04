@@ -1,6 +1,7 @@
 import { google } from 'googleapis'
 import type { Banco } from '@/lib/types'
 import type { EmailMessage, EmailProvider } from './types'
+import { isAuthenticatedSender } from './authResults'
 
 export const BANK_SENDERS: Record<string, Banco> = {
   // Rappi
@@ -113,6 +114,7 @@ export class GmailProvider implements EmailProvider {
       date: getHeader('Date'),
       body: extractBody(msg.payload).slice(0, 8000),
       provider: 'gmail',
+      authenticated: isAuthenticatedSender(getHeader('Authentication-Results'), getHeader('From')),
     }
   }
 

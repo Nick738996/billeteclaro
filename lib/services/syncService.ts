@@ -5,6 +5,7 @@ import { generateAuditId } from '@/lib/utils/auditId'
 import { deduplicateUber, matchUberAgainstPersisted } from '@/lib/utils/deduplicateUber'
 import { reassignCalendarMonths } from '@/lib/services/mesContableService'
 import { createAdminClient } from '@/lib/supabase/server'
+import { decryptToken } from '@/lib/utils/tokenCrypto'
 import type { EmailProvider } from '@/lib/email/types'
 import type { ExtractedTransaction } from '@/lib/types'
 
@@ -14,6 +15,12 @@ const MAX_EMAILS  = 2000
 const BATCH_SIZE  = 10
 // Sincronizar desde esta fecha en adelante
 const SYNC_FROM   = new Date('2026-05-01')
+// Evita que un usuario dispare syncs en bucle y agote la cuota diaria de Groq
+// (compartida entre todos los usuarios) o sature las APIs de Gmail/Outlook.
+const SYNC_COOLDOWN_MS = 30_000
+// Un sync 'RUNNING' más viejo que esto se asume abandonado (proceso caído a mitad)
+// y no debe bloquear syncs nuevos indefinidamente.
+const STALE_RUNNING_MS = 5 * 60_000
 
 export interface SyncResult {
   correos_revisados:    number
@@ -33,22 +40,58 @@ export async function runSync(userId: string, admin: Admin): Promise<SyncResult>
     throw Object.assign(new Error('No hay cuenta de correo conectada. Por favor conecta Gmail u Outlook.'), { status: 400 })
   }
 
-  // 2. Sync log
-  const { data: syncLog } = await admin
+  // 1.5 Rate limit: un sync reciente (o en curso) bloquea uno nuevo por un rato.
+  const { data: lastLog } = await admin
+    .from('sync_log')
+    .select('started_at, status')
+    .eq('user_id', userId)
+    .order('started_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (lastLog) {
+    const elapsedMs = Date.now() - new Date(lastLog.started_at).getTime()
+    if (lastLog.status === 'RUNNING') {
+      if (elapsedMs < STALE_RUNNING_MS) {
+        throw Object.assign(new Error('Ya hay una sincronización en curso. Espera a que termine.'), { status: 429 })
+      }
+      // RUNNING viejo = proceso caído a mitad. Lo cerramos para no chocar con
+      // el índice único (un solo RUNNING por usuario) al insertar el nuevo.
+      await admin.from('sync_log').update({
+        status: 'ERROR', finished_at: new Date().toISOString(), errores: ['Sync abandonado (timeout)'],
+      }).eq('user_id', userId).eq('status', 'RUNNING')
+    } else if (elapsedMs < SYNC_COOLDOWN_MS) {
+      const waitSec = Math.ceil((SYNC_COOLDOWN_MS - elapsedMs) / 1000)
+      throw Object.assign(new Error(`Espera ${waitSec}s antes de sincronizar de nuevo.`), { status: 429 })
+    }
+  }
+
+  // 2. Sync log — el índice único `sync_log_one_running_per_user` (migración 012)
+  // es la barrera real contra la carrera: si dos requests llegan casi al mismo
+  // tiempo y ambas pasan el chequeo de arriba, solo uno de estos inserts gana;
+  // el otro falla con 23505 (unique_violation) y lo traducimos a 429.
+  const { data: syncLog, error: syncLogError } = await admin
     .from('sync_log')
     .insert({ user_id: userId, status: 'RUNNING' })
     .select('id')
     .single()
-  const syncId = syncLog?.id
+
+  if (syncLogError) {
+    if (syncLogError.code === '23505') {
+      throw Object.assign(new Error('Ya hay una sincronización en curso. Espera a que termine.'), { status: 429 })
+    }
+    throw syncLogError
+  }
+  const syncId = syncLog.id
 
   try {
     // 3. Construir providers disponibles
     const providers: EmailProvider[] = []
     if (tokenRow.gmail_refresh_token) {
-      providers.push(new GmailProvider(tokenRow.gmail_refresh_token))
+      providers.push(new GmailProvider(decryptToken(tokenRow.gmail_refresh_token)))
     }
     if (tokenRow.outlook_refresh_token) {
-      providers.push(new OutlookProvider(tokenRow.outlook_refresh_token))
+      providers.push(new OutlookProvider(decryptToken(tokenRow.outlook_refresh_token)))
     }
 
     // 4. IDs ya procesados (transactions + todos los skipped_ids de sync_log)
@@ -80,6 +123,7 @@ export async function runSync(userId: string, admin: Admin): Promise<SyncResult>
     let parserCount = 0, omitidosCount = 0
     const allTransactions: Array<{ id: string; extracted: ExtractedTransaction }> = []
     const bancoCount: Record<string, number> = {}
+    const unauthenticatedIds: string[] = []
 
     // 6. FASE 1 — parsers específicos (sin fallback IA)
     for (let i = 0; i < newIds.length; i += BATCH_SIZE) {
@@ -95,6 +139,18 @@ export async function runSync(userId: string, admin: Admin): Promise<SyncResult>
         if (result.status === 'rejected') { errores.push(`Fetch error: ${result.reason}`); continue }
         const email = result.value
         const banco = detectBank(email.from)
+
+        // El header `From` es falsificable — exigimos que el correo haya pasado
+        // SPF o DKIM (según lo reporta Gmail/Outlook) antes de confiar en que
+        // realmente vino del banco. Sin esto, un correo spoofeado que evada el
+        // filtro de spam podría insertarse como transacción real.
+        if (banco !== 'OTRO' && !email.authenticated) {
+          console.warn(`[sync] correo NO autenticado (sin SPF/DKIM pass) de supuesto ${banco} — omitido por seguridad: "${email.subject}"`)
+          unauthenticatedIds.push(email.id)
+          omitidosCount++
+          continue
+        }
+
         bancoCount[banco] = (bancoCount[banco] ?? 0) + 1
         if (banco === 'RAPPIPAY' || banco === 'RAPPICARD') {
           console.log(`[scan] ${banco} — "${email.subject}" | body[0:120]=${JSON.stringify(email.body.slice(0, 120))}`)
@@ -132,7 +188,7 @@ export async function runSync(userId: string, admin: Admin): Promise<SyncResult>
       dedupedBatch,
       (persistedUber ?? []).map(t => ({ id: t.id, fecha: t.fecha, monto: t.monto })),
     )
-    const preauthIds = [...batchPreauthIds, ...crossSyncMatches.map(m => m.newTxId)]
+    const preauthIds = [...batchPreauthIds, ...crossSyncMatches.map(m => m.newTxId), ...unauthenticatedIds]
 
     // Actualiza las filas ya persistidas cuyo cobro final llegó en este sync
     // (monto/fecha estimados en la pre-auth → monto/fecha reales del cobro)
@@ -204,7 +260,7 @@ export async function runSync(userId: string, admin: Admin): Promise<SyncResult>
     }
 
     const providerNames = providers.map(p => p.name).join('+')
-    console.log(`[sync] ${providerNames} — ${newIds.length} emails — ${parserCount} parser | ${omitidosCount} omitidos | ${preauthIds.length} Uber preauth | ${errores.length} errores`)
+    console.log(`[sync] ${providerNames} — ${newIds.length} emails — ${parserCount} parser | ${omitidosCount} omitidos (${unauthenticatedIds.length} sin SPF/DKIM) | ${batchPreauthIds.length + crossSyncMatches.length} Uber preauth | ${errores.length} errores`)
     console.log(`[sync] por banco:`, bancoCount)
 
     await admin.from('sync_log').update({

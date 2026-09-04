@@ -10,8 +10,9 @@ export const POST = withAuth(async (_req, user) => {
     const result = await runSync(user.id, admin)
     return ok(result)
   } catch (e: unknown) {
-    if (e instanceof Error && (e as Error & { status?: number }).status === 400) {
-      return err(e.message, 400)
+    const status = e instanceof Error ? (e as Error & { status?: number }).status : undefined
+    if (status === 400 || status === 429) {
+      return err(e instanceof Error ? e.message : 'Error en la sincronización', status)
     }
     console.error('[POST /api/sync]', { userId: user.id }, e)
     return err('Error en la sincronización')

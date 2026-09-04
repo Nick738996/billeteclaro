@@ -5,6 +5,8 @@ export type EmailMessage = {
   date: string
   body: string
   provider: 'gmail' | 'outlook'
+  /** true si el correo pasó SPF o DKIM según el proveedor — el header `From` por sí solo es falsificable. */
+  authenticated: boolean
 }
 
 export type EmailProvider = {
