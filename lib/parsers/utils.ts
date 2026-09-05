@@ -68,8 +68,11 @@ export function toTitleCase(str: string): string {
   if (!str) return str
   // Skip handles and email addresses
   if (str.startsWith('@') || str.includes('@')) return str
-  // Skip already mixed-case (camelCase, PascalCase)
-  if (str !== str.toUpperCase() && str !== str.toLowerCase()) return str
+  // Solo se preserva el mixed-case si es una sola palabra (PascalCase real,
+  // ej. "RappiCard") — un nombre de comercio con espacios y mayúsculas
+  // inconsistentes por palabra (ej. "UBER RIDES Bogota CO", común en datos
+  // crudos de comercios) sí se normaliza completo, no se deja a medias.
+  if (!str.includes(' ') && str !== str.toUpperCase() && str !== str.toLowerCase()) return str
   return str
     .toLowerCase()
     .split(' ')

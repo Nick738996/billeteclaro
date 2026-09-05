@@ -18,12 +18,11 @@ import SavingsOverview from '@/components/dashboard/SavingsOverview'
 import ManualTransactions from '@/components/dashboard/ManualTransactions'
 import TourTooltip from '@/components/tour/TourTooltip'
 import HelpModal from '@/components/tour/HelpModal'
+import Logo from '@/components/ui/Logo'
 import { useTour } from '@/hooks/useTour'
 import { TOUR_STEPS } from '@/lib/tour/tourSteps'
+import { FEATURE_AI_ADVISOR } from '@/lib/features'
 import styles from './DashboardClient.module.css'
-
-// Deshabilitado temporalmente — el asesor necesita más trabajo antes de estar listo
-const FEATURE_AI_ADVISOR = false
 
 interface Props {
   user: { id: string; name: string }
@@ -183,26 +182,7 @@ export default function DashboardClient({
       {/* Header */}
       <header className={styles.header}>
         <div className={styles.headerInner}>
-          {/* Logo lockup — Variante A (La B)
-               stroke="currentColor" + color:var(--text) = adapta auto en light/dark */}
-          <div className={styles.logoGroup}>
-            <svg
-              viewBox="0 0 100 100" width="45" height="45"
-              aria-hidden="true"
-              className={styles.logoSvg}
-            >
-              <line x1="30" y1="18" x2="30" y2="82"
-                stroke="currentColor" strokeWidth="6" strokeLinecap="round"/>
-              <path d="M30,18 Q70,18 70,34 Q70,50 30,50"
-                stroke="currentColor" strokeWidth="6" fill="none" strokeLinecap="round"/>
-              <path d="M30,50 Q78,50 78,66 Q78,82 30,82"
-                stroke="var(--green)" strokeWidth="6" fill="none" strokeLinecap="round"/>
-            </svg>
-            <span className={styles.logoText}>
-              <span className={styles.logoWordLight}>Billete</span>
-              <span className={styles.logoWordBold}>Claro</span>
-            </span>
-          </div>
+          <Logo size={45} withBackground={false} />
           <div className={styles.headerActions}>
             <HeaderPill onSignOut={handleSignOut} onHelp={handleHelp}/>
           </div>
@@ -270,9 +250,6 @@ export default function DashboardClient({
 
         <MonthHero
           gastos={stats.gastos}
-          ingresos={stats.ingresos}
-          ahorros={stats.ahorros}
-          transacciones={stats.transacciones}
           mes={month}
           budgetTotal={Object.values(budgets).reduce((s, v) => s + (v || 0), 0)}
         />
@@ -321,6 +298,7 @@ export default function DashboardClient({
             onCategoryChange={() => loadMonth(month)}
             onTransactionDeleted={() => { loadMonth(month); bumpContext(); bumpSavingsRefresh() }}
             onAdd={() => setManualOpen(v => !v)}
+            addOpen={manualOpen}
             budgets={budgets}
           />
         </div>

@@ -108,21 +108,21 @@ export default function HeaderPill({ onSignOut, onHelp }: Props) {
             <button
               role="menuitem"
               className={styles.menuItem}
-              onClick={() => { setMenuOpen(false); onSignOut() }}
-              data-testid={TEST_IDS.AUTH_LOGOUT_BUTTON}
-            >
-              <LogOut size={14}/>
-              Cerrar sesión
-            </button>
-            <button
-              role="menuitem"
-              className={styles.menuItem}
               onClick={() => { setMenuOpen(false); router.push('/dashboard/forwarding') }}
               data-testid={TEST_IDS.DASHBOARD_FORWARDING_BUTTON}
             >
               <Mail size={14}/>
               Reenvío de correo
             </button>
+            <button
+              role="menuitem"
+              className={styles.menuItem}
+              onClick={() => { setMenuOpen(false); onSignOut() }}
+              data-testid={TEST_IDS.AUTH_LOGOUT_BUTTON}
+            >
+              <LogOut size={14}/>
+              Cerrar sesión
+            </button>            
             <div className={styles.menuDivider} />
             <button
               role="menuitem"

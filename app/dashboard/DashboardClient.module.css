@@ -24,30 +24,6 @@
   justify-content: space-between;
 }
 
-.logoGroup {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.logoSvg {
-  color: var(--text);
-}
-
-.logoText {
-  font-size: var(--text-lg);
-  letter-spacing: -0.02em;
-}
-
-.logoWordLight {
-  font-weight: 400;
-  color: var(--text);
-}
-
-.logoWordBold {
-  font-weight: 700;
-  color: var(--green);
-}
 
 .headerActions {
   display: flex;

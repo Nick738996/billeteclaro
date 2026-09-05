@@ -117,6 +117,13 @@ describe('toTitleCase', () => {
     expect(toTitleCase('RappiCard')).toBe('RappiCard')
   })
 
+  it('normaliza nombres con mayúsculas inconsistentes por palabra (caso real: Uber)', () => {
+    // A diferencia de "RappiCard" (una sola palabra, PascalCase real), acá
+    // cada palabra viene con su propia mayúscula/minúscula inconsistente —
+    // sí se normaliza completo en vez de dejarlo a medias.
+    expect(toTitleCase('UBER RIDES Bogota CO')).toBe('Uber Rides Bogota Co')
+  })
+
   it('leaves @handles unchanged', () => {
     expect(toTitleCase('@juanperez')).toBe('@juanperez')
   })

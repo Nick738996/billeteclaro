@@ -7,9 +7,6 @@ import styles from './MonthHero.module.css'
 
 interface Props {
   gastos: number
-  ingresos: number
-  ahorros: number
-  transacciones: number
   mes: string
   budgetTotal: number
 }
@@ -30,7 +27,7 @@ function monthPulse(pctTiempo: number, pctPresupuesto: number | null): { texto: 
   return { texto: 'Vas al ritmo esperado este mes', color: 'var(--text-muted)' }
 }
 
-export default function MonthHero({ gastos, ingresos, ahorros: _ahorros, transacciones, mes, budgetTotal }: Props) {
+export default function MonthHero({ gastos, mes, budgetTotal }: Props) {
   const ref = parseISO(`${mes}-01`)
   const today = new Date()
   const isCurrentMonth =
@@ -38,47 +35,43 @@ export default function MonthHero({ gastos, ingresos, ahorros: _ahorros, transac
   const diasEnMes    = getDaysInMonth(ref)
   const diasRestantes = isCurrentMonth ? diasEnMes - today.getDate() : 0
 
-  const hasIncome = ingresos > 0
-  const pct        = hasIncome ? (gastos / ingresos) * 100 : 0
-  const over       = hasIncome && gastos > ingresos
-  const disponible = ingresos - gastos
+  // Todo el hero usa el presupuesto como única base de comparación — antes el
+  // monto/barra/disponible comparaban contra ingresos, mientras que el
+  // mensaje de ritmo comparaba contra presupuesto. Dos bases distintas en el
+  // mismo bloque hacían que la barra desapareciera los días en que el sueldo
+  // aún no había llegado (ingresos = 0), aunque el presupuesto ya existiera.
+  const hasBudget   = budgetTotal > 0
+  const pct         = hasBudget ? (gastos / budgetTotal) * 100 : 0
+  const over        = hasBudget && gastos > budgetTotal
+  const disponible  = budgetTotal - gastos
 
-  // Solo los valores computados dinámicamente permanecen inline
   const barColor = over ? 'var(--red)' : pct >= 80 ? 'var(--yellow)' : 'var(--green)'
-  const pctColor = over ? 'var(--red)' : pct >= 80 ? 'var(--yellow)' : 'var(--green)'
 
-  const pctTiempo       = (today.getDate() / diasEnMes) * 100
-  const pctPresupuesto  = budgetTotal > 0 ? (gastos / budgetTotal) * 100 : null
-  const pulse = isCurrentMonth ? monthPulse(pctTiempo, pctPresupuesto) : null
+  const pctTiempo = (today.getDate() / diasEnMes) * 100
+  const pulse = isCurrentMonth ? monthPulse(pctTiempo, hasBudget ? pct : null) : null
 
   return (
     <div data-testid={TEST_IDS.DASHBOARD_MONTH_PROGRESS} className={styles.hero}>
 
       {/* Amount row */}
-      <div className={styles.amountRow} style={{ marginBottom: hasIncome ? 12 : 8 }}>
+      <div className={styles.amountRow} style={{ marginBottom: hasBudget ? 12 : 8 }}>
         <div>
           <p className={styles.label}>Gastado este mes</p>
           <div className="flex items-baseline gap-2">
             <span className={`tabular-nums ${styles.amount}`}>
               {formatCOPCompact(gastos)}
             </span>
-            {hasIncome && (
-              <span className={styles.incomeSuffix}>
-                de {formatCOPCompact(ingresos)}
+            {hasBudget && (
+              <span className={styles.budgetSuffix}>
+                de {formatCOPCompact(budgetTotal)}
               </span>
             )}
           </div>
         </div>
-
-        {hasIncome && (
-          <span className={`tabular-nums ${styles.badge}`} style={{ color: pctColor }}>
-            {Math.round(pct)}%
-          </span>
-        )}
       </div>
 
       {/* Progress bar */}
-      {hasIncome && (
+      {hasBudget && (
         <div className={styles.barTrack}>
           <div
             className={styles.barFill}
@@ -93,7 +86,7 @@ export default function MonthHero({ gastos, ingresos, ahorros: _ahorros, transac
 
       {/* Subtext */}
       <div className={styles.footer}>
-        {hasIncome && (
+        {hasBudget && (
           <p className={over ? styles.disponibleOver : styles.disponibleOk}>
             {over
               ? `${formatCOPCompact(Math.abs(disponible))} sobre el límite`
@@ -103,7 +96,6 @@ export default function MonthHero({ gastos, ingresos, ahorros: _ahorros, transac
         {isCurrentMonth && diasRestantes > 0 && (
           <p className={styles.meta}>{diasRestantes}d restantes</p>
         )}
-        <p className={styles.meta}>{transacciones} mov.</p>
       </div>
     </div>
   )

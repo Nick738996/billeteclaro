@@ -12,10 +12,7 @@ const BOGOTA_TZ = 'America/Bogota'
 const format = (date: Date | number, fmt: string, opts?: { locale?: Locale }) =>
   formatInTimeZone(date, BOGOTA_TZ, fmt, opts)
 import {
-  Search, RefreshCw, X, Trash2, Plus, Check, ChevronDown, Pencil,
-  Home, Car, Utensils, HeartPulse, Package, ShoppingBag, TrendingUp, PiggyBank,
-  Landmark, CreditCard, Gift, GraduationCap, RotateCcw, ArrowLeftRight, ArrowDown, Tag,
-  type LucideIcon,
+  Search, RefreshCw, X, Trash2, Plus, ChevronDown, Pencil,
 } from 'lucide-react'
 import {
   type Transaction,
@@ -31,7 +28,9 @@ import {
   SUBCATEGORIA_RETIRO_AHORROS,
   SUBCATEGORIA_APORTE_AHORROS,
 } from '@/lib/types'
+import { getCategoryIcon } from '@/lib/categoryIcons'
 import { TEST_IDS } from '@/lib/testIds'
+import FloatingSaveBar from '@/components/ui/FloatingSaveBar'
 import styles from './TransactionsList.module.css'
 
 // MEJORA ③: rows simplificados (divulgación progresiva)
@@ -69,30 +68,6 @@ const BANCO_LABEL: Record<Banco, { label: string; color: string; bg: string }> =
   OTRO:                 { label: 'Otro',         color: 'var(--text-muted)', bg: 'var(--surface-2)' },
 }
 
-// Ícono por categoría — placa cuadrada 26×26 en TransactionRow, para escanear
-// la lista sin depender solo del color.
-const CATEGORIA_ICON: Record<Categoria, LucideIcon> = {
-  HOGAR: Home,
-  TRANSPORTE: Car,
-  SALIDAS: Utensils,
-  SALUD: HeartPulse,
-  SUSCRIPCIONES: Package,
-  COMPRAS_ONLINE: ShoppingBag,
-  INVERSION: TrendingUp,
-  AHORROS: PiggyBank,
-  PRESTAMO: Landmark,
-  DEUDA: CreditCard,
-  DONACIONES: Gift,
-  EDUCACION: GraduationCap,
-  REEMBOLSABLE: RotateCcw,
-  TRANSFERENCIA: ArrowLeftRight,
-  INGRESO: ArrowDown,
-  OTRO: Tag,
-}
-
-function getCategoryIcon(cat: string): LucideIcon {
-  return CATEGORIA_ICON[cat as Categoria] ?? Tag
-}
 
 type FilterKey = Categoria | 'TODOS' | `BANCO:${Banco}` | 'RETIRO_AHORRO'
 
@@ -206,14 +181,13 @@ function groupByDate(txs: Transaction[]): Array<{ dateLabel: string; items: Tran
 // ── FilterSheet (fuente + categoría combinados) ───────────────────────────────
 
 function CatFilterBtn({ cat, active, onChange }: { cat: string; active: FilterKey; onChange: (k: FilterKey) => void }) {
-  const on    = active === cat
-  const theme = catTheme(cat)
+  const on = active === cat
   return (
     <button
       key={cat}
       onClick={() => onChange(cat as FilterKey)}
+      aria-pressed={on}
       className={`${styles.catBtn} ${on ? styles.catBtnOn : styles.catBtnOff}`}
-      style={{ '--cat-clr': theme.color, '--cat-bg': theme.bg } as React.CSSProperties}
     >
       {catLabel(cat)}
     </button>
@@ -235,7 +209,6 @@ function BancoFilterBtn({ banco, active, onChange, testId }: {
       data-testid={testId}
       aria-pressed={on}
       className={`${styles.catBtn} ${on ? styles.catBtnOn : styles.catBtnOff}`}
-      style={{ '--cat-clr': info.color, '--cat-bg': info.bg } as React.CSSProperties}
     >
       {info.label}
     </button>
@@ -244,13 +217,11 @@ function BancoFilterBtn({ banco, active, onChange, testId }: {
 
 function RetiroFilterBtn({ active, onChange }: { active: FilterKey; onChange: (k: FilterKey) => void }) {
   const on = active === 'RETIRO_AHORRO'
-  const color = getCategoryColor('AHORROS')
   return (
     <button
       onClick={() => onChange('RETIRO_AHORRO')}
       aria-pressed={on}
       className={`${styles.catBtn} ${on ? styles.catBtnOn : styles.catBtnOff}`}
-      style={{ '--cat-clr': color, '--cat-bg': `${color}26` } as React.CSSProperties}
     >
       Retiros de ahorro
     </button>
@@ -290,9 +261,14 @@ function FilterSheet({
         onKeyDown={e => { if (e.key === 'Escape') onClose() }}
       >
         <div className={styles.sheetHandle} />
-        <p className={styles.sheetTitle}>
-          Filtros
-        </p>
+        <div className={styles.sheetHeader}>
+          <p className={styles.sheetTitle}>
+            Filtros
+          </p>
+          <button onClick={onClose} aria-label="Cerrar filtros" className={styles.pickerCloseBtn}>
+            <X size={16} />
+          </button>
+        </div>
 
         {availableBancos.length > 0 && (
           <>
@@ -370,8 +346,8 @@ function FilterChips({
 }) {
   const [sheetOpen, setSheetOpen] = useState(false)
   const isRetiroActive = active === 'RETIRO_AHORRO'
-  const isCatActive    = active !== 'TODOS' && !isRetiroActive && !active.startsWith('BANCO:')
   const isBancoActive  = active.startsWith('BANCO:')
+  const isCatActive    = active !== 'TODOS' && !isRetiroActive && !isBancoActive
   const activeBanco    = isBancoActive ? (active.slice(6) as Banco) : null
 
   const activeLabel = isRetiroActive ? 'Retiros de ahorro' : isCatActive ? catLabel(active) : activeBanco ? BANCO_LABEL[activeBanco].label : null
@@ -644,8 +620,8 @@ function TransactionRow({ t, pendingCat, onCategoryClick, onDelete, onRenameClic
 
   return (
     <div className={`tx-row ${styles.row}`}>
-      <div className={styles.catPlate} style={{ '--plate-bg': isDirty ? 'var(--yellow-soft)' : theme.bg, '--plate-clr': isDirty ? 'var(--yellow)' : theme.color } as React.CSSProperties}>
-        <CatIcon size={13} />
+      <div className={styles.catPlate} style={{ '--plate-clr': isDirty ? 'var(--yellow)' : theme.color } as React.CSSProperties}>
+        <CatIcon size={20} />
       </div>
 
       <div className={styles.rowLeft}>
@@ -726,10 +702,11 @@ interface Props {
   onCategoryChange?: () => void
   onTransactionDeleted?: () => void
   onAdd?: () => void
+  addOpen?: boolean
   budgets?: Record<string, number>
 }
 
-export default function TransactionsList({ transactions, activeFilter, onFilterChange, onCategoryChange, onTransactionDeleted, onAdd, budgets }: Props) {
+export default function TransactionsList({ transactions, activeFilter, onFilterChange, onCategoryChange, onTransactionDeleted, onAdd, addOpen, budgets }: Props) {
   const [search,      setSearch]      = useState('')
   const [pendingCats, setPendingCats] = useState<Record<string, Categoria>>({})
   const [isSaving,    setIsSaving]    = useState(false)
@@ -843,6 +820,7 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
           <button
             onClick={onAdd}
             aria-label="Agregar transacción"
+            aria-expanded={addOpen ?? false}
             className={styles.addBtn}
           >
             +
@@ -927,35 +905,14 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
     </div>
 
     {/* Barra flotante de cambios pendientes */}
-    {pendingCount > 0 && typeof document !== 'undefined' && createPortal(
-      <div className={styles.pendingBarWrap}>
-        <div className={styles.pendingBar}>
-          <span className={styles.pendingLabel}>
-            {pendingCount} cambio{pendingCount !== 1 ? 's' : ''} sin guardar
-          </span>
-          <div className={styles.pendingActions}>
-            <button
-              onClick={() => setPendingCats({})}
-              className={styles.discardBtn}
-            >
-              Descartar
-            </button>
-            <button
-              onClick={saveCategories}
-              disabled={isSaving}
-              className={`${styles.saveBtn} ${isSaving ? styles.saveBtnSaving : savedOk ? styles.saveBtnSaved : styles.saveBtnNormal}`}
-            >
-              {isSaving
-                ? <><RefreshCw size={11} className="animate-spin" /> Guardando…</>
-                : savedOk
-                ? <><Check size={11} /> Guardado</>
-                : 'Guardar'
-              }
-            </button>
-          </div>
-        </div>
-      </div>,
-      document.body
+    {pendingCount > 0 && (
+      <FloatingSaveBar
+        label={`${pendingCount} cambio${pendingCount !== 1 ? 's' : ''} sin guardar`}
+        state={isSaving ? 'saving' : savedOk ? 'saved' : 'idle'}
+        onDiscard={() => setPendingCats({})}
+        onSave={saveCategories}
+        saveAriaLabel={isSaving ? 'Guardando cambios' : 'Guardar cambios de categoría'}
+      />
     )}
 
     {pickerTx && (

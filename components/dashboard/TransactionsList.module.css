@@ -1,21 +1,27 @@
 /* ─── Shared category pill button (CatFilterBtn & CatPickerBtn) ────────────── */
 
+/* Chips de filtro — un solo estilo neutro para todos (banco, categoría,
+   ahorros), en vez de un color por categoría — se sentía "confeti" y
+   cambiaba de un tema a otro sin control. La identidad de cada categoría ya
+   la da su ícono en la lista de transacciones, acá solo hace falta
+   distinguir seleccionado/no seleccionado. */
 .catBtn {
   padding: 7px 14px;
-  border: none;
+  border: 1px solid var(--border);
   border-radius: 9999px;
   font-size: var(--text-xs);
   cursor: pointer;
 }
 .catBtnOff {
-  background: var(--cat-bg);
-  color: var(--cat-clr);
+  background: var(--surface);
+  color: var(--text-muted);
   font-weight: 400;
 }
 .catBtnOn {
-  background: var(--cat-clr);
+  background: var(--text);
   color: var(--bg);
   font-weight: 600;
+  border-color: var(--text);
 }
 
 /* ─── Shared chip group layouts ──────────────────────────────────────────────── */
@@ -57,11 +63,16 @@
   background: var(--border);
   margin: 0 auto 16px;
 }
+.sheetHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
 .sheetTitle {
   font-size: var(--text-sm);
   font-weight: 600;
   color: var(--text);
-  margin-bottom: 12px;
 }
 .sectionLabel {
   font-size: 10px;
@@ -79,13 +90,23 @@
   gap: 12px;
   min-width: 0;
 }
+/* position:relative + ::after expande el objetivo táctil real a 44px de
+   alto sin agrandar el texto ni empujar los chips vecinos en la fila */
 .filterBtn {
+  position: relative;
   flex-shrink: 0;
   background: none;
   border: none;
   padding: 4px 0;
   font-size: var(--text-sm);
   cursor: pointer;
+}
+.filterBtn::after {
+  content: '';
+  position: absolute;
+  top: 50%; left: 0; right: 0;
+  height: 44px;
+  transform: translateY(-50%);
 }
 .filterBtnActive {
   color: var(--text);
@@ -203,11 +224,9 @@
   border-bottom: 1px solid var(--border-soft);
 }
 .catPlate {
-  width: 26px;
-  height: 26px;
+  width: 34px;
+  height: 34px;
   flex-shrink: 0;
-  border-radius: 8px;
-  background: var(--plate-bg);
   color: var(--plate-clr);
   display: flex;
   align-items: center;
@@ -450,45 +469,11 @@
   font-weight: 500;
 }
 
-/* ─── Pending changes floating bar ──────────────────────────────────────────── */
+/* ─── Botón de guardar inline (modal de renombrar) ──────────────────────────── */
+/* Nota: la barra flotante de cambios pendientes ahora vive en el componente
+   compartido components/ui/FloatingSaveBar.tsx — este .saveBtn es el botón
+   inline junto al input de renombrar, un contexto visual distinto. */
 
-.pendingBarWrap {
-  position: fixed;
-  bottom: 24px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 60;
-  width: calc(100% - 32px);
-  max-width: 480px;
-}
-.pendingBar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: var(--surface-2);
-  border: 1px solid var(--text-subtle);
-  border-radius: var(--radius-pill);
-  padding: 10px 10px 10px 18px;
-}
-.pendingLabel {
-  font-size: var(--text-xs);
-  color: var(--text-muted);
-  font-weight: 500;
-}
-.pendingActions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.discardBtn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: var(--text-xs);
-  color: var(--text-muted);
-  font-weight: 500;
-  padding: 6px 10px;
-}
 .saveBtn {
   display: flex;
   align-items: center;
@@ -502,10 +487,6 @@
 }
 .saveBtnNormal {
   background: var(--text);
-  cursor: pointer;
-}
-.saveBtnSaved {
-  background: var(--green);
   cursor: pointer;
 }
 .saveBtnSaving {

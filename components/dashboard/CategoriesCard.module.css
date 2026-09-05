@@ -50,22 +50,25 @@
 .emptyInline { font-size: var(--text-sm); color: var(--text-muted); text-align: center; padding: 24px 16px; }
 
 /* ── Vista Presupuesto: filas por categoría ─────────────────────────────────── */
-.row { padding: 9px 16px; }
+.row { padding: 13px 16px; }
 .rowBorder { border-bottom: 1px solid var(--border-soft); }
-.rowMeta { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
-.dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; background: var(--dot-color); }
+.rowMeta { display: flex; align-items: center; gap: 10px; margin-bottom: 5px; }
+/* filas sin barra de progreso debajo (solo dinero + %) — sin el margen que
+   normalmente deja espacio para la barra */
+.rowMetaTight { margin-bottom: 0; }
+.rowIcon { width: 26px; height: 26px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
 .catName {
   flex: 1; min-width: 0;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  font-size: var(--text-sm); color: var(--text); font-weight: 600;
+  font-size: var(--text-base); color: var(--text); font-weight: 600;
 }
-.amounts { font-variant-numeric: tabular-nums; flex-shrink: 0; font-size: var(--text-xs); }
+.amounts { font-variant-numeric: tabular-nums; flex-shrink: 0; font-size: var(--text-sm); }
 .spent { color: var(--text-muted); }
 .limit { color: var(--text-subtle); }
 .pct {
   font-variant-numeric: tabular-nums; flex-shrink: 0;
-  font-size: 12px; font-weight: 700; color: var(--pct-color);
-  min-width: 40px; text-align: right;
+  font-size: 14px; font-weight: 700; color: var(--pct-color);
+  min-width: 44px; text-align: right;
   display: flex; justify-content: flex-end; align-items: center;
 }
 .barTrack { height: 3px; background: var(--border); border-radius: 99px; overflow: hidden; }
@@ -76,8 +79,8 @@
 .section { padding: 14px 16px 6px; border-top: 1px solid var(--border-soft); }
 .sectionLabel { font-size: var(--text-xs); color: var(--text-subtle); }
 .infoIcon { display: inline-flex; align-items: center; color: var(--text-subtle); cursor: help; }
-.amountOnly { font-variant-numeric: tabular-nums; flex-shrink: 0; font-size: var(--text-xs); color: var(--text-muted); }
-.dash { font-size: 12px; color: var(--text-subtle); min-width: 40px; text-align: right; }
+.amountOnly { font-variant-numeric: tabular-nums; flex-shrink: 0; font-size: var(--text-sm); color: var(--text-muted); }
+.dash { font-size: 14px; color: var(--text-subtle); min-width: 44px; text-align: right; }
 
 /* "+ Definir" — pill verde para categorías presupuestables sin límite asignado */
 .defineBtn {
@@ -90,9 +93,65 @@
 .defineBtn:hover { opacity: 0.8; }
 
 /* ── Vista Participación: dona + leyenda ────────────────────────────────────── */
-.body { display: flex; gap: 16px; align-items: center; padding: 16px; }
+.chartTitle { padding: 14px 16px 0; }
+.chartTitleRow { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.chartTitleMain { font-size: var(--text-sm); font-weight: 600; color: var(--text); margin-bottom: 2px; }
+.chartTitleSub { font-size: var(--text-xs); color: var(--text-muted); }
+/* Gráfico arriba, categorías abajo a todo el ancho — mejor que lado a lado
+   (esto era originalmente solo el fallback angosto, ahora es el layout fijo
+   para cualquier tamaño de pantalla). */
+.body { display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 16px; }
 
-.donutWrap { flex-shrink: 0; position: relative; width: 168px; height: 168px; }
+/* Toggle chico dona/barras — mismo lenguaje visual que .viewToggle, más chico */
+.chartModeToggle {
+  display: flex; align-items: center; gap: 2px; flex-shrink: 0;
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: var(--radius-pill); padding: 2px;
+}
+.chartModeBtn {
+  display: flex; background: none; border: none; cursor: pointer;
+  border-radius: var(--radius-badge); color: var(--text-subtle);
+  padding: 6px; transition: background 0.15s, color 0.15s;
+}
+.chartModeBtn:hover { color: var(--text-muted); }
+.chartModeBtnActive { background: var(--surface); color: var(--text); }
+
+/* Gráfico de barras — mismo ancho que la dona (200px) para que la columna
+   de categorías a la derecha no se corra al cambiar de modo. Barras
+   totalmente unidas (sin gap), rectangulares (sin esquinas redondeadas),
+   separadas por un borde grueso entre columnas. Sin nombre/ícono/% en cada
+   barra, esos datos ya los da la leyenda. */
+.barsCol {
+  flex-shrink: 0; width: 200px;
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+}
+.barsTotal {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  max-width: 100%;
+}
+.barsTotalLabel {
+  font-size: 11px; color: var(--text-subtle); text-align: center;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%;
+}
+.barsTotalValue { font-variant-numeric: tabular-nums; font-weight: 700; font-size: 18px; color: var(--clr); text-align: center; }
+.barsWrap {
+  width: 200px; height: 200px;
+  display: flex; align-items: flex-end; gap: 0;
+}
+.barCol {
+  flex: 1; min-width: 0; height: 100%;
+  display: flex; align-items: flex-end; cursor: pointer;
+}
+/* El outline global de [role="button"]:focus-visible (app/globals.css) redondea
+   y cubre la altura completa de la columna — sobre una barra angosta se ve
+   como una cápsula gigante. Se apaga acá y se reaplica solo sobre el tramo
+   de color real de la barra, del tamaño que le corresponde. */
+.barCol:focus-visible { outline: none; }
+.barCol:focus-visible .barColFill { outline: 2px solid var(--text-muted); outline-offset: 2px; }
+.barColFill { width: 100%; border-radius: 0; border-right: 3px solid var(--bg); transition: opacity 0.15s; }
+.barCol:last-child .barColFill { border-right: none; }
+
+.donutWrap { flex-shrink: 0; position: relative; width: 200px; height: 200px; }
 .slice { cursor: pointer; transition: opacity 0.15s; }
 
 .center {
@@ -104,13 +163,26 @@
 .centerLabel { font-size: 10px; color: var(--text-subtle); }
 .centerValue { font-variant-numeric: tabular-nums; font-weight: 700; font-size: 14px; color: var(--clr); }
 
-.legend { flex: 1; display: flex; flex-direction: column; gap: 10px; overflow: hidden; }
-.legendRow { cursor: pointer; }
+/* Los datos ya vienen acotados a 10 categorías como máximo (buildChartData),
+   así que un máximo de 480px alcanza para verlas todas sin scroll. El
+   overflow-y queda solo de respaldo (nombres largos, zoom, fuente más
+   grande) — no debería activarse en el caso normal. */
+.legend {
+  width: 100%;
+  display: flex; flex-direction: column; max-height: 600px; overflow-y: auto; overflow-x: hidden;
+}
+/* padding vertical en vez del gap del contenedor — el objetivo táctil real
+   de la fila crece sin agrandar el contenido visible. A todo el ancho de la
+   tarjeta ahora hay espacio de sobra, así que las filas van más grandes. */
+.legendRow { cursor: pointer; padding: 12px 0; }
 .legendHeader { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
-.legendNameGroup { display: flex; align-items: center; gap: 6px; min-width: 0; }
-.legendDot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: var(--clr); }
+.legendNameGroup { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.legendIconDot {
+  width: 28px; height: 28px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+}
 .legendName {
-  font-size: var(--text-xs); color: var(--text);
+  font-size: var(--text-sm); font-weight: 500; color: var(--text);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.legendPct { font-variant-numeric: tabular-nums; flex-shrink: 0; margin-left: 8px; font-size: var(--text-xs); color: var(--text-muted); }
+.legendPct { font-variant-numeric: tabular-nums; flex-shrink: 0; margin-left: 8px; font-size: var(--text-sm); font-weight: 600; color: var(--text-muted); }

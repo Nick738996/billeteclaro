@@ -27,9 +27,19 @@ const TIPOS: { value: TipoTransaccion; label: string }[] = [
 ]
 
 const BANCOS: { value: Banco; label: string }[] = [
-  { value: 'RAPPICARD', label: 'RappiCard' },
-  { value: 'RAPPIPAY',  label: 'RappiPay' },
-  { value: 'OTRO',      label: 'Otro banco' },
+  { value: 'RAPPICARD',            label: 'RappiCard' },
+  { value: 'RAPPIPAY',             label: 'RappiPay' },
+  { value: 'BANCOLOMBIA',          label: 'Bancolombia' },
+  { value: 'DAVIVIENDA',           label: 'Davivienda' },
+  { value: 'BBVA',                 label: 'BBVA' },
+  { value: 'SCOTIABANK_COLPATRIA', label: 'Scotiabank Colpatria' },
+  { value: 'BANCO_DE_BOGOTA',      label: 'Banco de Bogotá' },
+  { value: 'NU',                   label: 'Nu' },
+  { value: 'NEQUI',                label: 'Nequi' },
+  { value: 'LULO_BANK',            label: 'Lulo Bank' },
+  { value: 'ITAU',                 label: 'Itaú' },
+  { value: 'FALABELLA',            label: 'Falabella' },
+  { value: 'OTRO',                 label: 'Otro banco' },
 ]
 
 const today = () => {

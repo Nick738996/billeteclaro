@@ -157,9 +157,9 @@ export const CATEGORIA_COLORS: Record<Categoria, string> = {
   TRANSPORTE: '#f59e0b',  // amber    — movilidad
   SALIDAS: '#f43f5e',     // rose     — restaurantes/ocio
   SALUD: '#10b981',       // emerald  — salud
-  SUSCRIPCIONES: '#d946ef', // fuchsia — Netflix/Spotify
+  SUSCRIPCIONES: '#db2777', // pink   — Netflix/Spotify (antes fuchsia #d946ef, casi indistinguible de Compras Online para daltonismo — ΔE 1.8, validado con dataviz/validate_palette.js)
   COMPRAS_ONLINE: '#0ea5e9', // sky   — compras digitales
-  INVERSION: '#14b8a6',   // teal     — inversión
+  INVERSION: '#0b8e7e',   // teal oscuro — inversión (antes #14b8a6, casi indistinguible de Ahorros incluso con visión normal — ΔE 7.1)
   AHORROS: '#06b6d4',     // cyan     — ahorros
   PRESTAMO: '#a78bfa',    // violet   — préstamos
   DEUDA: '#ef4444',       // red      — deudas/créditos

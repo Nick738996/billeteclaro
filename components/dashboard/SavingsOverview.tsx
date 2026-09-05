@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Pencil, ChevronDown, ArrowDownLeft, ArrowUpRight, RefreshCw } from 'lucide-react'
+import { Pencil, ChevronDown, Minus, Plus, RefreshCw } from 'lucide-react'
 import { formatCOPCompact } from '@/lib/types'
 import SavingsManager from './SavingsManager'
 import type { SavingsAccount } from '@/lib/services/savingsService'
@@ -198,9 +198,9 @@ export default function SavingsOverview({ onTransaction, refreshSignal }: Props)
                 onClick={() => isActingOnThis && action?.mode === 'deposit' ? closeAction() : openAction(account.id, 'deposit')}
                 aria-label={`Aportar a ${account.nombre}`}
                 aria-expanded={isActingOnThis && action?.mode === 'deposit'}
-                className={styles.actionIconBtn}
+                className={`${styles.actionIconBtn} ${styles.actionIconBtnDeposit}`}
               >
-                <ArrowUpRight size={14} />
+                <Plus size={14} strokeWidth={2.5} />
               </button>
               {account.saldo > 0 && (
                 <button
@@ -209,7 +209,7 @@ export default function SavingsOverview({ onTransaction, refreshSignal }: Props)
                   aria-expanded={isActingOnThis && action?.mode === 'withdraw'}
                   className={styles.actionIconBtn}
                 >
-                  <ArrowDownLeft size={14} />
+                  <Minus size={14} strokeWidth={2.5} />
                 </button>
               )}
             </div>

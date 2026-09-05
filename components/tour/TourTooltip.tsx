@@ -119,7 +119,6 @@ export default function TourTooltip({ step, stepIndex, onNext, onPrev, onSkip, o
           padding: '16px 18px 18px',
           zIndex: 1000,
           boxSizing: 'border-box',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.28)',
         }}
       >
         {/* Header: contador + cerrar */}

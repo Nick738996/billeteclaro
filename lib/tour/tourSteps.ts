@@ -1,3 +1,5 @@
+import { FEATURE_AI_ADVISOR } from '@/lib/features'
+
 export type TourStep = {
   id: string
   targetTestId: string
@@ -6,7 +8,10 @@ export type TourStep = {
   posicion: 'top' | 'bottom' | 'left' | 'right'
 }
 
-export const TOUR_STEPS: TourStep[] = [
+// El paso "advisor" solo se incluye si el panel realmente se renderiza (ver
+// FEATURE_AI_ADVISOR en DashboardClient.tsx) — si no, TourTooltip no
+// encuentra el target y el tour completo desaparece a mitad de camino.
+const ALL_STEPS: Array<TourStep & { requiresFeature?: boolean }> = [
   {
     id: 'progress',
     targetTestId: 'dashboard-month-progress',
@@ -27,6 +32,7 @@ export const TOUR_STEPS: TourStep[] = [
     titulo: 'Tu asesor financiero',
     descripcion: 'Una IA que analiza tus gastos y te da consejos personalizados. Toca "Hablar con mi asesor" para hacerle preguntas.',
     posicion: 'top',
+    requiresFeature: true,
   },
   {
     id: 'transactions',
@@ -35,11 +41,6 @@ export const TOUR_STEPS: TourStep[] = [
     descripcion: 'Todas tus compras y pagos detectados automáticamente desde tu correo. Busca, filtra por categoría o agrega una manualmente.',
     posicion: 'top',
   },
-  {
-    id: 'sync',
-    targetTestId: 'dashboard-sync-button',
-    titulo: 'Sincronizar',
-    descripcion: 'Toca aquí para traer las últimas transacciones de tu correo. BilleteClaro lo detecta automáticamente cada vez que llega un correo de tu banco.',
-    posicion: 'bottom',
-  },
 ]
+
+export const TOUR_STEPS: TourStep[] = ALL_STEPS.filter(s => !s.requiresFeature || FEATURE_AI_ADVISOR)
