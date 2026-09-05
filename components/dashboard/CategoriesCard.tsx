@@ -10,6 +10,7 @@ import { Pencil, Plus, Check, Info } from 'lucide-react'
 import {
   getCategoryColor,
   catLabel,
+  formatCOP,
   formatCOPCompact,
   isGasto,
   isIngreso,
@@ -20,6 +21,7 @@ import {
   type BudgetEntry,
 } from '@/lib/types'
 import BudgetManager from './BudgetManager'
+import { getCategoryIcon } from '@/lib/categoryIcons'
 import { TEST_IDS } from '@/lib/testIds'
 import styles from './CategoriesCard.module.css'
 
@@ -253,8 +255,8 @@ export default function CategoriesCard({
                   <span className={styles.dot} style={{ '--dot-color': getCategoryColor(cat) } as React.CSSProperties} />
                   <span className={styles.catName}>{catLabel(cat)}</span>
                   <span className={styles.amounts}>
-                    <span className={styles.spent}>{formatCOPCompact(gasto)}</span>
-                    <span className={styles.limit}> / {formatCOPCompact(limite)}</span>
+                    <span className={styles.spent}>{formatCOP(gasto)}</span>
+                    <span className={styles.limit}> / {formatCOP(limite)}</span>
                   </span>
                   <span className={styles.pct} style={{ '--pct-color': color } as React.CSSProperties}>
                     {pct >= 110 ? `+${Math.round(pct - 100)}%` : pct >= 100 ? <Check size={13} strokeWidth={2.5} /> : `${Math.round(pct)}%`}
@@ -292,7 +294,7 @@ export default function CategoriesCard({
                       <Info size={10} />
                     </span>
                   )}
-                  <span className={styles.amountOnly}>{formatCOPCompact(gasto)}</span>
+                  <span className={styles.amountOnly}>{formatCOP(gasto)}</span>
                   {canDefine ? (
                     <button onClick={() => setEditing(true)} className={styles.defineBtn}>
                       <Plus size={11} strokeWidth={2.5} />
@@ -373,7 +375,9 @@ export default function CategoriesCard({
             </div>
 
             <div className={styles.legend}>
-              {chartData.map((entry, i) => (
+              {chartData.map((entry, i) => {
+                const LegendIcon = getCategoryIcon(entry.categoria)
+                return (
                 <div
                   key={i}
                   role="button"
@@ -391,7 +395,9 @@ export default function CategoriesCard({
                 >
                   <div className={styles.legendHeader}>
                     <div className={styles.legendNameGroup}>
-                      <div className={styles.legendDot} style={{ '--clr': entry.fill } as React.CSSProperties} />
+                      <div className={styles.legendIconDot} style={{ background: `${entry.fill}26`, color: entry.fill }}>
+                        <LegendIcon size={10} />
+                      </div>
                       <span className={styles.legendName}>{entry.name}</span>
                     </div>
                     <span className={styles.legendPct}>{Math.round(entry.pct * 100)}%</span>
@@ -403,7 +409,8 @@ export default function CategoriesCard({
                     />
                   </div>
                 </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         ) : (

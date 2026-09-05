@@ -173,7 +173,10 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* position:relative + ::after expande el objetivo táctil real a 44px sin
+   agrandar el ícono visible ni empujar los demás elementos de la fila */
 .actionIconBtn {
+  position: relative;
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -185,8 +188,25 @@
   transition: color 0.15s;
 }
 
+.actionIconBtnDeposit {
+  color: var(--green);
+}
+
+.actionIconBtn::after {
+  content: '';
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 44px; height: 44px;
+  transform: translate(-50%, -50%);
+}
+
 .actionIconBtn:hover {
   color: var(--text);
+}
+
+.actionIconBtnDeposit:hover {
+  color: var(--green);
+  opacity: 0.8;
 }
 
 /* Formulario inline de retiro */

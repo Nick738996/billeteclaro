@@ -1,21 +1,27 @@
 /* ─── Shared category pill button (CatFilterBtn & CatPickerBtn) ────────────── */
 
+/* Chips de filtro — un solo estilo neutro para todos (banco, categoría,
+   ahorros), en vez de un color por categoría — se sentía "confeti" y
+   cambiaba de un tema a otro sin control. La identidad de cada categoría ya
+   la da su ícono en la lista de transacciones, acá solo hace falta
+   distinguir seleccionado/no seleccionado. */
 .catBtn {
   padding: 7px 14px;
-  border: none;
+  border: 1px solid var(--border);
   border-radius: 9999px;
   font-size: var(--text-xs);
   cursor: pointer;
 }
 .catBtnOff {
-  background: var(--cat-bg);
-  color: var(--cat-clr);
+  background: var(--surface);
+  color: var(--text-muted);
   font-weight: 400;
 }
 .catBtnOn {
-  background: var(--cat-clr);
+  background: var(--text);
   color: var(--bg);
   font-weight: 600;
+  border-color: var(--text);
 }
 
 /* ─── Shared chip group layouts ──────────────────────────────────────────────── */
@@ -57,11 +63,16 @@
   background: var(--border);
   margin: 0 auto 16px;
 }
+.sheetHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
 .sheetTitle {
   font-size: var(--text-sm);
   font-weight: 600;
   color: var(--text);
-  margin-bottom: 12px;
 }
 .sectionLabel {
   font-size: 10px;

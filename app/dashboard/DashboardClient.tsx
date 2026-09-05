@@ -250,8 +250,6 @@ export default function DashboardClient({
 
         <MonthHero
           gastos={stats.gastos}
-          ingresos={stats.ingresos}
-          transacciones={stats.transacciones}
           mes={month}
           budgetTotal={Object.values(budgets).reduce((s, v) => s + (v || 0), 0)}
         />

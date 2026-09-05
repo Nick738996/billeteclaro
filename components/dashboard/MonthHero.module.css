@@ -23,16 +23,9 @@
   line-height: 1;
 }
 
-.incomeSuffix {
+.budgetSuffix {
   font-size: var(--text-sm);
   color: var(--text-muted);
-}
-
-/* Badge — solo texto coloreado, sin fondo */
-.badge {
-  font-size: var(--text-sm);
-  font-weight: 700;
-  margin-bottom: 2px;
 }
 
 .barTrack {

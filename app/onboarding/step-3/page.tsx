@@ -2,24 +2,24 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ChevronRight, Car, Utensils, Home, Repeat, type LucideIcon } from 'lucide-react'
+import { ChevronRight } from 'lucide-react'
 import { format } from 'date-fns'
 import { createClient } from '@/lib/supabase/client'
 import { formatCOPCompact, getCategoryColor, isGasto, type Categoria, type Transaction } from '@/lib/types'
+import { getCategoryIcon } from '@/lib/categoryIcons'
 import { TEST_IDS } from '@/lib/testIds'
 
-// Mismos íconos por categoría que TransactionsList.tsx — antes esta pantalla
-// era el único lugar de la app que usaba emoji en vez del sistema de íconos.
+// Mismos íconos por categoría que el resto de la app (lib/categoryIcons.ts)
+// — antes esta pantalla era el único lugar que usaba emoji.
 const CATS: {
   key: Categoria
   label: string
-  Icon: LucideIcon
   presets: number[]
 }[] = [
-  { key: 'TRANSPORTE',    label: 'Transporte',    Icon: Car,      presets: [100_000, 200_000, 350_000, 500_000] },
-  { key: 'SALIDAS',       label: 'Salidas',       Icon: Utensils, presets: [200_000, 400_000, 600_000, 1_000_000] },
-  { key: 'HOGAR',         label: 'Hogar',         Icon: Home,     presets: [500_000, 800_000, 1_200_000, 2_000_000] },
-  { key: 'SUSCRIPCIONES', label: 'Suscripciones', Icon: Repeat,   presets: [50_000, 100_000, 150_000, 200_000] },
+  { key: 'TRANSPORTE',    label: 'Transporte',    presets: [100_000, 200_000, 350_000, 500_000] },
+  { key: 'SALIDAS',       label: 'Salidas',       presets: [200_000, 400_000, 600_000, 1_000_000] },
+  { key: 'HOGAR',         label: 'Hogar',         presets: [500_000, 800_000, 1_200_000, 2_000_000] },
+  { key: 'SUSCRIPCIONES', label: 'Suscripciones', presets: [50_000, 100_000, 150_000, 200_000] },
 ]
 
 function formatInput(raw: string): string {
@@ -104,9 +104,10 @@ export default function OnboardingStep3() {
 
       {/* Category cards */}
       <div className="flex flex-col gap-3">
-        {CATS.map(({ key, label, Icon, presets }) => {
+        {CATS.map(({ key, label, presets }) => {
           const selected = parseInput(values[key] ?? '')
           const spent    = spending[key]
+          const Icon     = getCategoryIcon(key)
 
           return (
             <div

@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Check, ChevronRight, Plus, Trash2, Copy, ArrowLeft } from 'lucide-react'
-import { CATEGORIA_LABELS, catLabel, normalizeCatKey, getCategoryColor, formatCOP, formatCOPCompact, PRESUPUESTO_CATS, type Categoria, type BudgetEntry, type BudgetSubcat } from '@/lib/types'
+import { CATEGORIA_LABELS, catLabel, normalizeCatKey, getCategoryColor, formatCOP, PRESUPUESTO_CATS, type Categoria, type BudgetEntry, type BudgetSubcat } from '@/lib/types'
+import { getCategoryIcon } from '@/lib/categoryIcons'
 import { TEST_IDS } from '@/lib/testIds'
 import FloatingSaveBar from '@/components/ui/FloatingSaveBar'
 import styles from './BudgetManager.module.css'
@@ -16,6 +17,29 @@ function pctBg(pct: number) {
   if (pct >= 110) return 'var(--red-soft)'
   if (pct >= 80 && pct < 100) return 'var(--yellow-soft)'
   return 'var(--green-soft)'
+}
+
+// AHORROS/INVERSION no son límites de gasto — son metas a alcanzar o superar.
+// Con la semántica de arriba, superar la "meta" de ahorro se veía en rojo,
+// como si ahorrar de más fuera un error. Acá el 100% es el piso, no el techo:
+// alcanzarlo o superarlo es bueno (verde); no haber llegado todavía es
+// simplemente progreso, sin urgencia (azul, no naranja/rojo).
+const GOAL_CATEGORIES = new Set(['AHORROS', 'INVERSION'])
+function pctColorGoal(pct: number) {
+  return pct >= 100 ? 'var(--green)' : 'var(--blue)'
+}
+function pctBgGoal(pct: number) {
+  return pct >= 100 ? 'var(--green-soft)' : 'var(--blue-soft)'
+}
+
+// Agrupa visualmente por el mismo rank que ya ordena la lista (catRank, más
+// abajo) — le da al ojo puntos de anclaje en vez de 12 filas idénticas que
+// hay que escanear una por una para encontrar qué necesita atención.
+function sectionLabel(rank: number): string {
+  if (rank <= 1) return 'Necesitan atención'
+  if (rank === 2) return 'Van bien'
+  if (rank === 3) return 'Sin gastos este mes'
+  return 'Sin presupuesto'
 }
 
 type DraftMap = Record<string, BudgetEntry>
@@ -161,6 +185,10 @@ export default function BudgetManager({ mes, gastosPorCategoria, ingresos = 0, i
     const gasto  = gastosPorCategoria[cat] ?? 0
     const limite = draftMap[cat]?.monto ?? 0
     if (limite > 0) {
+      // AHORROS/INVERSION son metas, no límites de gasto — superarlas es
+      // bueno, así que nunca deberían ordenarse como "excedida" (rank 0,
+      // el mismo lugar que un gasto real fuera de control).
+      if (GOAL_CATEGORIES.has(cat)) return gasto > 0 ? 2 : 3
       const pct = (gasto / limite) * 100
       if (pct >= 100) return 0
       if (pct >= 80) return 1
@@ -198,6 +226,14 @@ export default function BudgetManager({ mes, gastosPorCategoria, ingresos = 0, i
     () => PRESUPUESTO_CATS.filter(cat => !activeCats.includes(cat)),
     [activeCats]
   )
+
+  // Resumen rápido arriba de la lista — para no tener que leer las 12 filas
+  // solo para saber si hay algo urgente.
+  const excedidas    = activeCats.filter(cat => catRank(cat, draft) === 0).length
+  const cercaLimite  = activeCats.filter(cat => catRank(cat, draft) === 1).length
+  const attentionParts: string[] = []
+  if (excedidas > 0)   attentionParts.push(`${excedidas} excedida${excedidas !== 1 ? 's' : ''}`)
+  if (cercaLimite > 0) attentionParts.push(`${cercaLimite} cerca del límite`)
 
   const addCategory = (cat: string) => {
     const nextDraft = { ...draft, [cat]: draft[cat] ?? { monto: 0, subcategorias: [] } }
@@ -272,7 +308,7 @@ export default function BudgetManager({ mes, gastosPorCategoria, ingresos = 0, i
         {activeCats.length > 0 && (
           <div className={styles.headerSub} style={{ paddingLeft: onClose ? 23 : 0 }}>
             <p className={styles.headerHint}>
-              Toca ▸ para desglosar
+              Toca ▸ para editar el límite o desglosar
             </p>
             <button
               onClick={copyFromPrev}
@@ -286,6 +322,15 @@ export default function BudgetManager({ mes, gastosPorCategoria, ingresos = 0, i
           </div>
         )}
       </div>
+
+      {/* Resumen rápido — cuántas categorías necesitan atención, sin tener
+          que leer la lista completa */}
+      {attentionParts.length > 0 && (
+        <div className={styles.attentionSummary}>
+          <span className={styles.attentionDot} />
+          {attentionParts.join(' · ')}
+        </div>
+      )}
 
       {/* Estado vacío — mes sin categorías */}
       {activeCats.length === 0 && !showPicker && (
@@ -305,14 +350,18 @@ export default function BudgetManager({ mes, gastosPorCategoria, ingresos = 0, i
         </div>
       )}
 
-      {/* Categorías activas — las sin presupuesto siempre van al final, marcadas aparte */}
+      {/* Categorías activas agrupadas por estado — necesitan atención / van
+          bien / sin gastos / sin presupuesto, en ese orden (mismo rank que
+          ya las ordena) */}
       {activeCats.map((cat, i) => {
-        const isFirstUnbudgeted = catRank(cat, draft) >= 4 && (i === 0 || catRank(activeCats[i - 1], draft) < 4)
+        const label = sectionLabel(catRank(cat, draft))
+        const prevLabel = i > 0 ? sectionLabel(catRank(activeCats[i - 1], draft)) : null
+        const showDivider = label !== prevLabel
         return (
           <div key={cat}>
-            {isFirstUnbudgeted && (
+            {showDivider && (
               <div className={styles.sectionDivider}>
-                <p className={styles.sectionDividerLabel}>Sin presupuesto</p>
+                <p className={styles.sectionDividerLabel}>{label}</p>
               </div>
             )}
             <CategoryRow
@@ -455,21 +504,13 @@ function CategoryRow({ cat, entry, savedEntry, gasto, isExpanded, onToggle, onCh
   const limite   = entry.monto
   const hasSubs  = entry.subcategorias.length > 0
   const pct      = limite > 0 ? (gasto / limite) * 100 : 0
-  const over     = limite > 0 && gasto > limite
-  const barFill  = limite > 0 ? pctColor(pct) : 'var(--border)'
-  const color    = limite > 0 ? pctColor(pct) : 'var(--text-muted)'
-  const bgColor  = limite > 0 ? pctBg(pct) : 'transparent'
+  const isGoal   = GOAL_CATEGORIES.has(cat)
+  const over     = limite > 0 && !isGoal && gasto > limite
+  const barFill  = limite > 0 ? (isGoal ? pctColorGoal(pct) : pctColor(pct)) : 'var(--border)'
+  const color    = limite > 0 ? (isGoal ? pctColorGoal(pct) : pctColor(pct)) : 'var(--text-muted)'
+  const bgColor  = limite > 0 ? (isGoal ? pctBgGoal(pct) : pctBg(pct)) : 'transparent'
   const isDirty  = JSON.stringify(entry) !== JSON.stringify(savedEntry)
-
-  const [quickSet,   setQuickSet]   = useState(false)
-  const [quickValue, setQuickValue] = useState('')
-
-  const confirmQuickSet = () => {
-    const monto = parseInt(quickValue, 10) || 0
-    if (monto > 0) onChange({ monto, subcategorias: [] })
-    setQuickSet(false)
-    setQuickValue('')
-  }
+  const CatIcon  = getCategoryIcon(cat)
 
   const updateSubcat = (idx: number, field: keyof BudgetSubcat, value: string | number) => {
     const subs = entry.subcategorias.map((s, i) =>
@@ -516,7 +557,12 @@ function CategoryRow({ cat, entry, savedEntry, gasto, isExpanded, onToggle, onCh
 
         {/* Nombre + dot de cambio */}
         <div className={styles.catNameGroup}>
-          <span className={styles.catDot} style={{ background: getCategoryColor(cat) }} />
+          <span
+            className={styles.catIconDot}
+            style={{ background: `${getCategoryColor(cat)}26`, color: getCategoryColor(cat) }}
+          >
+            <CatIcon size={11} />
+          </span>
           <span className={styles.catName}>
             {catLabel(cat)}
           </span>
@@ -525,7 +571,7 @@ function CategoryRow({ cat, entry, savedEntry, gasto, isExpanded, onToggle, onCh
           )}
           {hasSubs && (
             <span className={styles.subcatCount}>
-              {entry.subcategorias.length} ítems
+              {entry.subcategorias.length} ítem{entry.subcategorias.length !== 1 ? 's' : ''}
             </span>
           )}
         </div>
@@ -542,37 +588,14 @@ function CategoryRow({ cat, entry, savedEntry, gasto, isExpanded, onToggle, onCh
             >
               {pct >= 110 ? `+${Math.round(pct - 100)}%` : pct >= 100 ? <Check size={12} strokeWidth={2.5} /> : `${Math.round(pct)}%`}
             </span>
-          ) : quickSet ? (
-            <div className={styles.quickSetGroup} onClick={e => e.stopPropagation()}>
-              <span className={styles.quickSetSign}>$</span>
-              <input
-                autoFocus
-                className={styles.quickSetInput}
-                value={quickValue}
-                onChange={e => setQuickValue(e.target.value.replace(/\D/g, ''))}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') confirmQuickSet()
-                  if (e.key === 'Escape') { setQuickSet(false); setQuickValue('') }
-                }}
-                placeholder="0"
-                aria-label={`Definir presupuesto de ${catLabel(cat)}`}
-              />
-              <button
-                onClick={confirmQuickSet}
-                aria-label="Confirmar presupuesto"
-                className={styles.quickSetConfirm}
-              >
-                <Check size={12} strokeWidth={2.5} />
-              </button>
-            </div>
           ) : (
-            <button
-              onClick={e => { e.stopPropagation(); setQuickSet(true) }}
-              className={styles.defineBtn}
-            >
+            // Ya no es un botón separado — un solo camino para definir el
+            // límite: tocar la fila (onToggle en catRowMain) abre el panel
+            // con el campo "Límite directo". Esto es solo el hint visual.
+            <span className={styles.defineHint}>
               <Plus size={11} strokeWidth={2.5} />
               Definir
-            </button>
+            </span>
           )}
           {onRemove && (
             <button
@@ -625,11 +648,12 @@ function CategoryRow({ cat, entry, savedEntry, gasto, isExpanded, onToggle, onCh
                 />
               ))}
 
-              {/* Total sumado */}
+              {/* Total sumado — "presupuestado", no "gastado" (ese ya se ve
+                  en la fila colapsada) para no confundir los dos números */}
               <div className={styles.subcatTotal}>
-                <span className={styles.subcatTotalLabel}>Total {catLabel(cat)}</span>
+                <span className={styles.subcatTotalLabel}>Total presupuestado</span>
                 <span className={styles.subcatTotalValue}>
-                  {formatCOPCompact(limite)}
+                  {formatCOP(limite)}
                 </span>
               </div>
             </>
@@ -695,16 +719,22 @@ function SubcatRow({ sub, onNameChange, onMontoChange, onRemove }: {
 // ── DirectInput ───────────────────────────────────────────────────────────────
 
 function DirectInput({ value, onChange }: { value: number; onChange: (v: string) => void }) {
-  const [local, setLocal] = useState(value > 0 ? String(value) : '')
-  const ref = useRef<HTMLInputElement>(null)
+  // Antes mostraba los dígitos crudos tal cual se escribían ("1382000"),
+  // distinto del resto de inputs de monto en esta misma pantalla (subcats)
+  // que sí formatean con separador de miles al escribir.
+  const [local, setLocal] = useState(value > 0 ? value.toLocaleString('es-CO') : '')
 
   return (
     <input
       className={`input-field ${styles.directInputField}`}
-      ref={ref}
       value={local}
-      onChange={e => { setLocal(e.target.value); onChange(e.target.value) }}
+      onChange={e => {
+        const digits = e.target.value.replace(/\D/g, '')
+        setLocal(digits ? Number(digits).toLocaleString('es-CO') : '')
+        onChange(digits)
+      }}
       placeholder="0"
+      inputMode="numeric"
       data-testid={TEST_IDS.BUDGET_CATEGORY_INPUT}
       aria-label="Monto del presupuesto"
     />
