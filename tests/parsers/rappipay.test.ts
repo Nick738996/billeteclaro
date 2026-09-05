@@ -225,7 +225,7 @@ Hora de la transacción
     expect(result).not.toBeNull()
     expect(result!.tipo).toBe('COMPRA')
     expect(result!.monto).toBe(22450)
-    expect(result!.comercio).toBe('Empresa de Telecomunicaciones de Bogota S. A. E.s.p')
+    expect(result!.comercio).toBe('Empresa de Telecomunicaciones…')
     expect(result!.banco).toBe('RAPPIPAY')
   })
 

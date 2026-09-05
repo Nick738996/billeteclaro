@@ -1,5 +1,5 @@
 import type { EmailInput, ParseResult } from './types'
-import { toTitleCase, bogotaDateToUTC } from './utils'
+import { cleanComercio, bogotaDateToUTC } from './utils'
 import { guessCategoria } from './commerceCategories'
 
 // ── Monto ──────────────────────────────────────────────────────────────────────
@@ -68,7 +68,7 @@ export function parseBancolombia(email: EmailInput): ParseResult {
   if (compraMatch) {
     const monto = parseMontoBancolombia(compraMatch[1])
     if (monto > 0) {
-      const comercio = toTitleCase(compraMatch[2].replace(/\*/g, '').trim())
+      const comercio = cleanComercio(compraMatch[2].replace(/\*/g, '').trim())
       return {
         fecha:        parseFecha(compraMatch[3], compraMatch[4], compraMatch[5], compraMatch[6]),
         monto,
@@ -118,7 +118,7 @@ export function parseBancolombia(email: EmailInput): ParseResult {
   if (recibisteMatch) {
     const monto = parseMontoBancolombia(recibisteMatch[1])
     if (monto > 0) {
-      const comercio = toTitleCase(recibisteMatch[2].trim())
+      const comercio = cleanComercio(recibisteMatch[2].trim())
       return {
         fecha:        parseFecha(recibisteMatch[3], recibisteMatch[4], recibisteMatch[5], recibisteMatch[6]),
         monto,

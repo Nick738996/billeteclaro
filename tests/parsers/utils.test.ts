@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseCOPAmount, parseSpanishDate, toTitleCase, parseISOLikeDate, parseUSAmount, parseEnglishDate, parseNumericDate } from '../../lib/parsers/utils'
+import { parseCOPAmount, parseSpanishDate, toTitleCase, cleanComercio, parseISOLikeDate, parseUSAmount, parseEnglishDate, parseNumericDate } from '../../lib/parsers/utils'
 
 describe('parseCOPAmount', () => {
   it('parses amount with thousands dots only', () => {
@@ -135,6 +135,40 @@ describe('toTitleCase', () => {
 
   it('returns empty string unchanged', () => {
     expect(toTitleCase('')).toBe('')
+  })
+})
+
+describe('cleanComercio', () => {
+  it('strips a payment-processor prefix pegado al nombre', () => {
+    expect(cleanComercio('DL*DIDI RIDES CO')).toBe('Didi Rides Co')
+    expect(cleanComercio('SQ *CAFE BOGOTA')).toBe('Cafe Bogota')
+  })
+
+  it('strips a trailing store/reference code', () => {
+    expect(cleanComercio('STARBUCKS STORE #4521')).toBe('Starbucks Store')
+    expect(cleanComercio('SUPERMERCADO XYZ 123456')).toBe('Supermercado Xyz')
+  })
+
+  it('strips razón social (S.A.S, LTDA) al final', () => {
+    expect(cleanComercio('ALMACENES EXITO S.A.S')).toBe('Almacenes Exito')
+    expect(cleanComercio('ALMACENES EXITO S.A.S.')).toBe('Almacenes Exito')
+    expect(cleanComercio('DROGAS LA REBAJA LTDA')).toBe('Drogas la Rebaja')
+  })
+
+  it('strips más de un sufijo de razón social encadenado (ej: S.A. E.S.P)', () => {
+    expect(cleanComercio('EMPRESA DE TELECOMUNICACIONES DE BOGOTA S.A. E.S.P'))
+      .toBe('Empresa de Telecomunicaciones…')
+  })
+
+  it('deja nombres cortos normales sin cambios', () => {
+    expect(cleanComercio('Uber')).toBe('Uber')
+    expect(cleanComercio('Netflix')).toBe('Netflix')
+  })
+
+  it('trunca nombres largos en un espacio, sin cortar palabras a la mitad', () => {
+    const result = cleanComercio('RESTAURANTE EL BUEN SABOR DE LA CASA COLOMBIANA S.A.S')
+    expect(result).toBe('Restaurante el Buen Sabor de la…')
+    expect(result.length).toBeLessThanOrEqual(33) // 32 + elipsis
   })
 })
 

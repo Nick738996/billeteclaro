@@ -1,5 +1,6 @@
 import Groq from 'groq-sdk'
 import type { Banco, ExtractedTransaction } from '@/lib/types'
+import { cleanComercio } from '@/lib/parsers/utils'
 
 let _groq: Groq | null = null
 function getGroq(): Groq {
@@ -24,7 +25,11 @@ CAMPOS A EXTRAER:
 - moneda: código ISO de la moneda real detectada (COP, USD, EUR, etc.).
   NUNCA asumas COP por defecto — infiérela del símbolo, código de moneda
   explícito, idioma del correo y dominio del remitente.
-- comercio: nombre del establecimiento en Title Case (ej: "Uber", "Éxito", "Netflix", "Starbucks")
+- comercio: nombre corto y reconocible del establecimiento en Title Case
+  (ej: "Uber", "Éxito", "Netflix", "Starbucks"), máximo ~30 caracteres.
+  NUNCA incluyas razón social (S.A.S, LTDA, S.A., E.S.P.), códigos de
+  sucursal/referencia, ni prefijos de procesador de pago (ej. "DL*") — solo
+  el nombre comercial que reconocería el usuario.
   Si es una transferencia, usar el nombre de la persona o "Transferencia"
   Si es un pago de servicio, usar el nombre del servicio (ej: "Acueducto", "Gas Natural")
 - tipo: uno de COMPRA | TRANSFERENCIA_ENVIADA | TRANSFERENCIA_RECIBIDA |
@@ -86,7 +91,7 @@ ${params.body.slice(0, 4000)}`
     return {
       fecha: parsed.fecha ?? params.date,
       monto: Number(parsed.monto),
-      comercio: parsed.comercio ?? null,
+      comercio: parsed.comercio ? cleanComercio(parsed.comercio) : null,
       descripcion: parsed.descripcion ?? null,
       banco: params.banco,
       tipo: parsed.tipo ?? 'COMPRA',

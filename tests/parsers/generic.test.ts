@@ -99,7 +99,7 @@ describe('tryGenericParser — inglés (bancos extranjeros)', () => {
     expect(result!.monto).toBe(1234.56)
     expect(result!.moneda).toBe('USD')
     expect(result!.monto_usd).toBe(1234.56)
-    expect(result!.comercio).toBe('Starbucks Store #4521')
+    expect(result!.comercio).toBe('Starbucks Store')
     expect(result!.flags).toContain('parser_generico')
   })
 
@@ -161,7 +161,7 @@ Si requieres más información, contáctanos en nuestros canales de atención`
     expect(result).not.toBeNull()
     expect(result!.tipo).toBe('COMPRA')
     expect(result!.monto).toBe(9200)
-    expect(result!.comercio).toBe('Dl*didi Rides Co')
+    expect(result!.comercio).toBe('Didi Rides Co')
     expect(result!.moneda).toBe('COP')
     expect(result!.flags).toContain('parser_tabla')
     expect(result!.fecha).toBe(new Date(Date.UTC(2025, 2, 6, 23, 9, 9)).toISOString())

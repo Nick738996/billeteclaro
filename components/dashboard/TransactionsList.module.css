@@ -205,6 +205,11 @@
   color: var(--text-muted);
   margin-bottom: 12px;
 }
+.renameError {
+  font-size: var(--text-xs);
+  color: var(--red);
+  margin: -4px 0 12px;
+}
 .renameRow {
   display: flex;
   gap: 8px;

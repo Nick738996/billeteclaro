@@ -1,5 +1,5 @@
 import type { EmailInput, ParseResult } from './types'
-import { parseCOPAmount, parseSpanishDate, toTitleCase } from './utils'
+import { parseCOPAmount, parseSpanishDate, cleanComercio } from './utils'
 import { guessCategoria } from './commerceCategories'
 
 export function parseRappiPay(email: EmailInput): ParseResult {
@@ -77,8 +77,8 @@ function parseTransferenciaRecibida(email: EmailInput): ParseResult {
   // Lookahead para no capturar el número de transacción que sigue (en HTML todo queda en una línea)
   const contactoMatch = body.match(/Nombre de tu contacto\s+([^\n]{1,80}?)(?=\s+(?:No\.|Nro\.|Fecha|Hora|¿|$))/i)
   const origen = bancoMatch
-    ? toTitleCase(bancoMatch[1].trim())
-    : contactoMatch ? toTitleCase(contactoMatch[1].trim()) : null
+    ? cleanComercio(bancoMatch[1].trim())
+    : contactoMatch ? cleanComercio(contactoMatch[1].trim()) : null
 
   return {
     fecha: extractFechaHora(body, email.date),
@@ -109,7 +109,7 @@ function parseTransferenciaEnviada(email: EmailInput): ParseResult {
   // contraparte_id para que el usuario le pueda asignar un alias.
   const llaveMatch = body.match(/Llave destino\s+(@?\S+)/i)
   const bancoDestinoMatch = body.match(/\bBanco\s+([^\n$]{1,80}?)(?=\s+(?:No\.|Nro|Fecha|Costo|¿|$))/i)
-  const bancoDestino = bancoDestinoMatch ? toTitleCase(bancoDestinoMatch[1].trim()) : null
+  const bancoDestino = bancoDestinoMatch ? cleanComercio(bancoDestinoMatch[1].trim()) : null
 
   return {
     fecha: extractFechaHora(body, email.date),
@@ -138,7 +138,7 @@ function parseIngresoBancario(email: EmailInput): ParseResult {
 
   // "Banco\nBANCO CITIBANK COLOMBIA\nNo. de transacción"
   const bancoMatch = body.match(/\bBanco\s+([^\n$]{1,80}?)(?=\s+(?:No\.|Nro|Fecha|¿|$))/i)
-  const origen = bancoMatch ? toTitleCase(bancoMatch[1].trim()) : null
+  const origen = bancoMatch ? cleanComercio(bancoMatch[1].trim()) : null
 
   return {
     fecha: extractFechaHora(body, email.date),
@@ -167,7 +167,7 @@ function parsePagoServicio(email: EmailInput): ParseResult {
 
   // "Convenio\nENEL\nReferencia"
   const convenioMatch = body.match(/\bConvenio\s+([^\n$]{1,60}?)(?=\s+(?:Referencia|M[eé]todo|Monto|$))/i)
-  const comercio = convenioMatch ? toTitleCase(convenioMatch[1].trim()) : null
+  const comercio = convenioMatch ? cleanComercio(convenioMatch[1].trim()) : null
 
   // Formato especial: "Fecha y hora\n19:36 hrs, 27 Abr. 2026"
   const fechaHoraMatch = body.match(/Fecha y hora\s+(\d{2}:\d{2})\s*hrs?,?\s+(\d{1,2}\s+\w+\.?\s+\d{4})/i)
@@ -202,7 +202,7 @@ function parsePSECompra(email: EmailInput): ParseResult {
   if (!monto || monto <= 0) return null
 
   const comercioMatch = body.match(/Comercio\s+([^\n]{1,120})/i)
-  const comercio = comercioMatch ? toTitleCase(comercioMatch[1].trim()) : null
+  const comercio = comercioMatch ? cleanComercio(comercioMatch[1].trim()) : null
 
   return {
     fecha: extractFechaHora(body, email.date),
@@ -232,7 +232,7 @@ function parseCompra(email: EmailInput): ParseResult {
   // después del "*" (descriptor de red de tarjeta: sucursal/ciudad/país)
   const comercioMatch = body.match(/\bComercio\s+([^\n$]{1,120}?)(?=\s+(?:Fecha|¿|Escr|$))/i)
   const comercioRaw = comercioMatch ? comercioMatch[1].trim().split('*')[0].trim() : null
-  const comercio = comercioRaw ? toTitleCase(comercioRaw) : null
+  const comercio = comercioRaw ? cleanComercio(comercioRaw) : null
 
   return {
     fecha: extractFechaHora(body, email.date),

@@ -73,7 +73,6 @@
 }
 .barTrack { height: 3px; background: var(--border); border-radius: 99px; overflow: hidden; }
 .barFill { height: 100%; border-radius: 99px; transition: width 0.3s ease; width: var(--bar-w); background: var(--bar-color); }
-.barFillGray { height: 100%; border-radius: 99px; transition: width 0.3s ease; width: var(--bar-w); background: var(--text-subtle); }
 
 /* Sección "Sin presupuesto" */
 .section { padding: 14px 16px 6px; border-top: 1px solid var(--border-soft); }
