@@ -346,8 +346,8 @@ function FilterChips({
 }) {
   const [sheetOpen, setSheetOpen] = useState(false)
   const isRetiroActive = active === 'RETIRO_AHORRO'
-  const isCatActive    = active !== 'TODOS' && !isRetiroActive && !active.startsWith('BANCO:')
   const isBancoActive  = active.startsWith('BANCO:')
+  const isCatActive    = active !== 'TODOS' && !isRetiroActive && !isBancoActive
   const activeBanco    = isBancoActive ? (active.slice(6) as Banco) : null
 
   const activeLabel = isRetiroActive ? 'Retiros de ahorro' : isCatActive ? catLabel(active) : activeBanco ? BANCO_LABEL[activeBanco].label : null
@@ -620,8 +620,8 @@ function TransactionRow({ t, pendingCat, onCategoryClick, onDelete, onRenameClic
 
   return (
     <div className={`tx-row ${styles.row}`}>
-      <div className={styles.catPlate} style={{ '--plate-bg': isDirty ? 'var(--yellow-soft)' : theme.bg, '--plate-clr': isDirty ? 'var(--yellow)' : theme.color } as React.CSSProperties}>
-        <CatIcon size={17} />
+      <div className={styles.catPlate} style={{ '--plate-clr': isDirty ? 'var(--yellow)' : theme.color } as React.CSSProperties}>
+        <CatIcon size={20} />
       </div>
 
       <div className={styles.rowLeft}>

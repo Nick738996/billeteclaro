@@ -32,16 +32,6 @@ function pctBgGoal(pct: number) {
   return pct >= 100 ? 'var(--green-soft)' : 'var(--blue-soft)'
 }
 
-// Agrupa visualmente por el mismo rank que ya ordena la lista (catRank, más
-// abajo) — le da al ojo puntos de anclaje en vez de 12 filas idénticas que
-// hay que escanear una por una para encontrar qué necesita atención.
-function sectionLabel(rank: number): string {
-  if (rank <= 1) return 'Necesitan atención'
-  if (rank === 2) return 'Van bien'
-  if (rank === 3) return 'Sin gastos este mes'
-  return 'Sin presupuesto'
-}
-
 type DraftMap = Record<string, BudgetEntry>
 
 interface Props {
@@ -227,14 +217,6 @@ export default function BudgetManager({ mes, gastosPorCategoria, ingresos = 0, i
     [activeCats]
   )
 
-  // Resumen rápido arriba de la lista — para no tener que leer las 12 filas
-  // solo para saber si hay algo urgente.
-  const excedidas    = activeCats.filter(cat => catRank(cat, draft) === 0).length
-  const cercaLimite  = activeCats.filter(cat => catRank(cat, draft) === 1).length
-  const attentionParts: string[] = []
-  if (excedidas > 0)   attentionParts.push(`${excedidas} excedida${excedidas !== 1 ? 's' : ''}`)
-  if (cercaLimite > 0) attentionParts.push(`${cercaLimite} cerca del límite`)
-
   const addCategory = (cat: string) => {
     const nextDraft = { ...draft, [cat]: draft[cat] ?? { monto: 0, subcategorias: [] } }
     setDraft(nextDraft)
@@ -323,15 +305,6 @@ export default function BudgetManager({ mes, gastosPorCategoria, ingresos = 0, i
         )}
       </div>
 
-      {/* Resumen rápido — cuántas categorías necesitan atención, sin tener
-          que leer la lista completa */}
-      {attentionParts.length > 0 && (
-        <div className={styles.attentionSummary}>
-          <span className={styles.attentionDot} />
-          {attentionParts.join(' · ')}
-        </div>
-      )}
-
       {/* Estado vacío — mes sin categorías */}
       {activeCats.length === 0 && !showPicker && (
         <div className={styles.emptyState}>
@@ -350,33 +323,23 @@ export default function BudgetManager({ mes, gastosPorCategoria, ingresos = 0, i
         </div>
       )}
 
-      {/* Categorías activas agrupadas por estado — necesitan atención / van
-          bien / sin gastos / sin presupuesto, en ese orden (mismo rank que
-          ya las ordena) */}
-      {activeCats.map((cat, i) => {
-        const label = sectionLabel(catRank(cat, draft))
-        const prevLabel = i > 0 ? sectionLabel(catRank(activeCats[i - 1], draft)) : null
-        const showDivider = label !== prevLabel
-        return (
-          <div key={cat}>
-            {showDivider && (
-              <div className={styles.sectionDivider}>
-                <p className={styles.sectionDividerLabel}>{label}</p>
-              </div>
-            )}
-            <CategoryRow
-              cat={cat}
-              entry={draft[cat] ?? { monto: 0, subcategorias: [] }}
-              savedEntry={saved[cat] ?? { monto: 0, subcategorias: [] }}
-              gasto={gastosPorCategoria[cat] ?? 0}
-              isExpanded={expanded === cat}
-              onToggle={() => setExpanded(prev => prev === cat ? null : cat)}
-              onChange={entry => updateEntry(cat, entry)}
-              onRemove={(gastosPorCategoria[cat] ?? 0) === 0 ? () => removeCategory(cat) : undefined}
-            />
-          </div>
-        )
-      })}
+      {/* Categorías activas — ordenadas por urgencia real (catRank), sin
+          títulos de sección: una vez el presupuesto ya está armado, separar
+          "necesitan atención / van bien / etc." no aporta — el orden solo
+          ya comunica lo mismo. */}
+      {activeCats.map(cat => (
+        <CategoryRow
+          key={cat}
+          cat={cat}
+          entry={draft[cat] ?? { monto: 0, subcategorias: [] }}
+          savedEntry={saved[cat] ?? { monto: 0, subcategorias: [] }}
+          gasto={gastosPorCategoria[cat] ?? 0}
+          isExpanded={expanded === cat}
+          onToggle={() => setExpanded(prev => prev === cat ? null : cat)}
+          onChange={entry => updateEntry(cat, entry)}
+          onRemove={() => removeCategory(cat)}
+        />
+      ))}
 
       {/* Agregar categoría */}
       {(activeCats.length > 0 || showPicker) && (
@@ -499,14 +462,13 @@ function CategoryRow({ cat, entry, savedEntry, gasto, isExpanded, onToggle, onCh
   isExpanded: boolean
   onToggle: () => void
   onChange: (e: BudgetEntry) => void
-  onRemove?: () => void
+  onRemove: () => void
 }) {
   const limite   = entry.monto
   const hasSubs  = entry.subcategorias.length > 0
   const pct      = limite > 0 ? (gasto / limite) * 100 : 0
   const isGoal   = GOAL_CATEGORIES.has(cat)
   const over     = limite > 0 && !isGoal && gasto > limite
-  const barFill  = limite > 0 ? (isGoal ? pctColorGoal(pct) : pctColor(pct)) : 'var(--border)'
   const color    = limite > 0 ? (isGoal ? pctColorGoal(pct) : pctColor(pct)) : 'var(--text-muted)'
   const bgColor  = limite > 0 ? (isGoal ? pctBgGoal(pct) : pctBg(pct)) : 'transparent'
   const isDirty  = JSON.stringify(entry) !== JSON.stringify(savedEntry)
@@ -559,9 +521,9 @@ function CategoryRow({ cat, entry, savedEntry, gasto, isExpanded, onToggle, onCh
         <div className={styles.catNameGroup}>
           <span
             className={styles.catIconDot}
-            style={{ background: `${getCategoryColor(cat)}26`, color: getCategoryColor(cat) }}
+            style={{ color: getCategoryColor(cat) }}
           >
-            <CatIcon size={11} />
+            <CatIcon size={19} />
           </span>
           <span className={styles.catName}>
             {catLabel(cat)}
@@ -576,10 +538,13 @@ function CategoryRow({ cat, entry, savedEntry, gasto, isExpanded, onToggle, onCh
           )}
         </div>
 
-        {/* Gasto real + badge % + quitar */}
+        {/* Presupuestado + badge % — esta pantalla es para configurar
+            límites, no para revisar gasto (eso ya lo hace la vista
+            compacta con la barra), así que el número que importa acá es
+            el límite que le pusiste a la categoría. */}
         <div className={styles.catRight}>
-          <span className={styles.catGasto}>
-            {formatCOP(gasto)}
+          <span className={styles.catLimite}>
+            {formatCOP(limite)}
           </span>
           {limite > 0 ? (
             <span
@@ -597,43 +562,24 @@ function CategoryRow({ cat, entry, savedEntry, gasto, isExpanded, onToggle, onCh
               Definir
             </span>
           )}
-          {onRemove && (
-            <button
-              onClick={e => { e.stopPropagation(); onRemove() }}
-              aria-label={`Quitar ${catLabel(cat)} del presupuesto`}
-              className={styles.removeBtn}
-            >
-              ×
-            </button>
-          )}
         </div>
       </div>
-
-      {/* Barra de progreso */}
-      {limite > 0 && (
-        <div className={styles.progressTrack}>
-          <div
-            className={styles.progressFill}
-            style={{ width: `${Math.min(pct, 100)}%`, '--fill-clr': barFill } as React.CSSProperties}
-          />
-        </div>
-      )}
 
       {/* Panel expandido */}
       {isExpanded && (
         <div className={styles.expandPanel}>
 
-          {/* Borrar presupuesto — solo si hay algo configurado */}
-          {(limite > 0 || hasSubs) && (
-            <div className={styles.deleteRow}>
-              <button
-                onClick={() => onChange({ monto: 0, subcategorias: [] })}
-                className={styles.deleteBtn}
-              >
-                <Trash2 size={11} /> Borrar presupuesto
-              </button>
-            </div>
-          )}
+          {/* Borrar categoría — un solo camino (antes también había una "×"
+              suelta en la fila colapsada, redundante y fácil de tocar sin
+              querer). Quita la categoría del todo, no solo el monto. */}
+          <div className={styles.deleteRow}>
+            <button
+              onClick={onRemove}
+              className={styles.deleteBtn}
+            >
+              <Trash2 size={11} /> Quitar categoría
+            </button>
+          </div>
 
           {hasSubs ? (
             <>

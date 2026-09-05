@@ -227,8 +227,6 @@
   width: 34px;
   height: 34px;
   flex-shrink: 0;
-  border-radius: 10px;
-  background: var(--plate-bg);
   color: var(--plate-clr);
   display: flex;
   align-items: center;

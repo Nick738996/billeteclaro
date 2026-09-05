@@ -44,6 +44,7 @@ const CUSTOM_ICON_KEYWORDS: Array<{ pattern: RegExp; Icon: LucideIcon }> = [
   { pattern: /ROPA|VESTIMENTA|CALZADO/,       Icon: Shirt },
   { pattern: /BELLEZA|SPA|CUIDADO_PERSONAL/,  Icon: Sparkles },
   { pattern: /TECNOLOG|CELULAR|TECH/,         Icon: Smartphone },
+  { pattern: /DOMICILIO/,                     Icon: Smartphone },
   { pattern: /NIÑO|HIJO|BEBE/,                Icon: Baby },
   { pattern: /JUEGO|GAMING|VIDEOJUEGO/,       Icon: Gamepad2 },
   { pattern: /LIBRO|LECTURA/,                 Icon: BookOpen },
