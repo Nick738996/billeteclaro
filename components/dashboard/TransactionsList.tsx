@@ -518,20 +518,20 @@ function CategoryPicker({ current, onSelect, onClose, budgetedCats }: {
 // como referencia. El nombre editado se guarda solo en ESTA transacción — no
 // afecta a otras con la misma llave o comercio.
 
-function RenameContactSheet({ current, identificador, onSave, onClose }: {
+function RenameContactSheet({ current, identificador, saving, error, onSave, onClose }: {
   current: string
   identificador?: string
+  saving: boolean
+  error: string | null
   onSave: (nombre: string) => void
   onClose: () => void
 }) {
   const [nombre, setNombre] = useState(current)
-  const [saving, setSaving] = useState(false)
 
   if (typeof document === 'undefined') return null
 
-  const handleSave = async () => {
+  const handleSave = () => {
     if (!nombre.trim() || saving) return
-    setSaving(true)
     onSave(nombre.trim())
   }
 
@@ -556,6 +556,7 @@ function RenameContactSheet({ current, identificador, onSave, onClose }: {
             ? <>Llave/cuenta destino: <strong>{identificador}</strong>. El nombre que pongas aplica solo a esta transacción.</>
             : 'El nombre que pongas aplica solo a esta transacción.'}
         </p>
+        {error && <p className={styles.renameError}>{error}</p>}
         <div className={styles.renameRow}>
           <input
             autoFocus
@@ -711,8 +712,11 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
   const [pendingCats, setPendingCats] = useState<Record<string, Categoria>>({})
   const [isSaving,    setIsSaving]    = useState(false)
   const [savedOk,     setSavedOk]     = useState(false)
+  const [saveError,   setSaveError]   = useState<string | null>(null)
   const [pickerTxId,  setPickerTxId]  = useState<string | null>(null)
   const [renameTxId,  setRenameTxId]  = useState<string | null>(null)
+  const [renameSaving, setRenameSaving] = useState(false)
+  const [renameError,  setRenameError]  = useState<string | null>(null)
   const [deletedIds,  setDeletedIds]  = useState<Set<string>>(new Set())
   const activeFilterKey = activeFilter as FilterKey
   const pendingCount    = Object.keys(pendingCats).length
@@ -743,6 +747,7 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
   const saveCategories = async () => {
     if (!pendingCount || isSaving) return
     setIsSaving(true)
+    setSaveError(null)
     try {
       const results = await Promise.all(
         Object.entries(pendingCats).map(([id, categoria]) =>
@@ -756,28 +761,38 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
       const failed = results.find(r => !r.ok)
       if (failed) {
         const body = await failed.json().catch(() => ({}))
-        throw new Error(`${failed.status}: ${body.error ?? 'error desconocido'}`)
+        throw new Error(body.error ?? 'Error desconocido')
       }
       setPendingCats({})
       setSavedOk(true)
       setTimeout(() => setSavedOk(false), 1800)
       onCategoryChange?.()
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : 'No se pudo guardar')
     } finally {
       setIsSaving(false)
     }
   }
 
   const saveComercio = async (txId: string, nombre: string) => {
+    setRenameSaving(true)
+    setRenameError(null)
     try {
       const res = await fetch('/api/transactions', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: txId, comercio: nombre }),
       })
-      if (!res.ok) throw new Error()
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error ?? 'Error desconocido')
+      }
       onCategoryChange?.()
-    } finally {
       setRenameTxId(null)
+    } catch (e) {
+      setRenameError(e instanceof Error ? e.message : 'No se pudo guardar')
+    } finally {
+      setRenameSaving(false)
     }
   }
 
@@ -874,7 +889,7 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
                     pendingCat={pendingCats[t.id]}
                     onCategoryClick={() => setPickerTxId(t.id)}
                     onDelete={() => handleDelete(t)}
-                    onRenameClick={() => setRenameTxId(t.id)}
+                    onRenameClick={() => { setRenameError(null); setRenameTxId(t.id) }}
                   />
                 </div>
               ))}
@@ -907,9 +922,9 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
     {/* Barra flotante de cambios pendientes */}
     {pendingCount > 0 && (
       <FloatingSaveBar
-        label={`${pendingCount} cambio${pendingCount !== 1 ? 's' : ''} sin guardar`}
-        state={isSaving ? 'saving' : savedOk ? 'saved' : 'idle'}
-        onDiscard={() => setPendingCats({})}
+        label={saveError ?? `${pendingCount} cambio${pendingCount !== 1 ? 's' : ''} sin guardar`}
+        state={isSaving ? 'saving' : savedOk ? 'saved' : saveError ? 'error' : 'idle'}
+        onDiscard={() => { setPendingCats({}); setSaveError(null) }}
         onSave={saveCategories}
         saveAriaLabel={isSaving ? 'Guardando cambios' : 'Guardar cambios de categoría'}
       />
@@ -937,6 +952,8 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
             ? formatContraparteId(renameTx.contraparte_id)
             : undefined
         }
+        saving={renameSaving}
+        error={renameError}
         onSave={nombre => saveComercio(renameTx.id, nombre)}
         onClose={() => setRenameTxId(null)}
       />

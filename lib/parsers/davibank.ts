@@ -1,5 +1,5 @@
 import type { EmailInput, ParseResult } from './types'
-import { parseCOPAmount, toTitleCase, bogotaDateToUTC } from './utils'
+import { parseCOPAmount, cleanComercio, bogotaDateToUTC } from './utils'
 import { guessCategoria } from './commerceCategories'
 
 // Formato de email DAVIbank (Scotiabank Colombia):
@@ -27,7 +27,7 @@ export function parseDavibank(email: EmailInput): ParseResult {
   // Comercio — todo en mayúsculas hasta el siguiente campo "Monto"
   const comercioMatch = body.match(/Comercio\s+([\w\s&./''`\-]+?)(?=\s+Monto|\n|$)/i)
   const comercio = comercioMatch
-    ? toTitleCase(comercioMatch[1].trim())
+    ? cleanComercio(comercioMatch[1].trim())
     : null
 
   // Fecha YYYY/MM/DD + Hora HH:MM:SS → ISO

@@ -152,7 +152,6 @@ export default function CategoriesCard({
     return pctB - pctA
   })
 
-  const maxGasto = Math.max(1, ...sinPresupuesto.map(cat => gastosPorCategoria[cat] ?? 0))
   const hasBudgetContent = withBudget.length > 0 || sinPresupuesto.length > 0
 
   // ── Vista Participación ────────────────────────────────────────────────────
@@ -286,12 +285,11 @@ export default function CategoriesCard({
           )}
           {sinPresupuesto.map((cat, i) => {
             const gasto = gastosPorCategoria[cat] ?? 0
-            const pct   = (gasto / maxGasto) * 100
             const canDefine = cat !== 'TRANSFERENCIA'
             const CatIcon = getCategoryIcon(cat)
             return (
               <div key={cat} className={`${styles.row} ${i < sinPresupuesto.length - 1 ? styles.rowBorder : ''}`}>
-                <div className={styles.rowMeta}>
+                <div className={`${styles.rowMeta} ${styles.rowMetaTight}`}>
                   <span className={styles.rowIcon} style={{ color: getCategoryColor(cat) }}>
                     <CatIcon size={19} />
                   </span>
@@ -313,9 +311,6 @@ export default function CategoriesCard({
                   ) : (
                     <span className={styles.dash}>—</span>
                   )}
-                </div>
-                <div className={styles.barTrack}>
-                  <div className={styles.barFillGray} style={{ '--bar-w': `${pct}%` } as React.CSSProperties} />
                 </div>
               </div>
             )

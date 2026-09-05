@@ -80,6 +80,48 @@ export function toTitleCase(str: string): string {
     .join(' ')
 }
 
+// Prefijo de procesador de pagos pegado al nombre real del comercio en el
+// dato crudo del banco (ej. "DL*DIDI RIDES CO", "SQ *CAFE"). 1-4 letras + "*".
+const PROCESSOR_PREFIX_RE = /^[a-z]{1,4}\s*\*\s*/i
+
+// Código de sucursal/tienda o referencia pegado al final (ej. "STORE #4521",
+// "COMERCIO 00238471"). Solo se recorta un patrón inequívoco (# + dígitos, o
+// una corrida de 3+ dígitos sueltos al final) — no se adivinan sufijos de
+// palabras reales para no arriesgar falsos positivos.
+const TRAILING_CODE_RE = /\s*#\d+\s*$|\s+\d{3,}\s*$/
+
+// Razón social pegada al nombre comercial (ej. "... S.A.S", "... E.S.P",
+// "... LTDA") — se recorta de a un sufijo por iteración porque puede venir
+// más de uno encadenado (ej. "S.A. E.S.P.").
+const LEGAL_SUFFIX_RE = /[,\s]+(?:s\.?\s*a\.?\s*s\.?|e\.?\s*s\.?\s*p\.?|s\.?\s*a\.?|ltda\.?)\.?\s*$/i
+
+const MAX_COMERCIO_LENGTH = 32
+
+// Limpia el nombre crudo de comercio que viene del email del banco: quita
+// prefijos de procesador de pagos, códigos de sucursal/referencia y razón
+// social, y trunca nombres largos en un espacio en vez de cortar a la mitad
+// de una palabra. Los datos de bancos vienen con mucho ruido que no aporta
+// información útil al usuario (ver ejemplos en tests/parsers/*.test.ts).
+export function cleanComercio(raw: string): string {
+  let name = raw.trim()
+  name = name.replace(PROCESSOR_PREFIX_RE, '')
+  name = name.replace(TRAILING_CODE_RE, '')
+
+  let prev: string
+  do {
+    prev = name
+    name = name.replace(LEGAL_SUFFIX_RE, '').trim()
+  } while (name !== prev && name.length > 0)
+
+  name = name.replace(/\s+/g, ' ').trim()
+  const titled = toTitleCase(name)
+  if (titled.length <= MAX_COMERCIO_LENGTH) return titled
+
+  const truncated = titled.slice(0, MAX_COMERCIO_LENGTH)
+  const lastSpace = truncated.lastIndexOf(' ')
+  return (lastSpace > 10 ? truncated.slice(0, lastSpace) : truncated).trim() + '…'
+}
+
 // Parses "18/04/2025" (día/mes/año — convención colombiana) with optional
 // time "14:05" or "2:05 pm". A diferencia de un ISO con guiones, este
 // formato numérico con "/" es el que usan varios bancos colombianos en

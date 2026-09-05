@@ -13,7 +13,7 @@ import type { EmailInput, ParseResult } from './types'
 import {
   parseCOPAmount, parseUSAmount,
   parseSpanishDate, parseEnglishDate, parseISOLikeDate, parseNumericDate,
-  toTitleCase, bogotaDateToUTC,
+  cleanComercio, bogotaDateToUTC,
 } from './utils'
 import { guessCategoria } from './commerceCategories'
 
@@ -101,13 +101,13 @@ function extractComercio(text: string, idioma: Idioma): string | null {
     ? /(?:merchant|payee|recipient)\s*:?\s*\n?\s*([^\n]{2,60})/i
     : /(?:comercio|establecimiento|beneficiario)\s*:?\s*\n?\s*([^\n]{2,60})/i
   const label = text.match(labelRe)
-  if (label) return toTitleCase(label[1].trim())
+  if (label) return cleanComercio(label[1].trim())
 
   const sentenceRe = idioma === 'en'
     ? /\bat\s+([A-Z0-9][\w.&'\- #]{1,40}?)(?:[.,;\n]|\s+(?:on|for)\b)/
     : /\ben\s+([A-ZÁÉÍÓÚÑ][\wÁÉÍÓÚÑáéíóúñ.&'\- ]{1,40}?)(?:[.,;\n]|\s+(?:el|por|con)\b)/
   const sentence = text.match(sentenceRe)
-  if (sentence) return toTitleCase(sentence[1].trim())
+  if (sentence) return cleanComercio(sentence[1].trim())
 
   return null
 }
@@ -163,7 +163,7 @@ function tryTableFormat(text: string, banco: Banco): ParseResult | null {
   const monto = parseCOPAmount(montoRaw)
   if (!Number.isFinite(monto) || monto <= 0) return null
 
-  const comercio = toTitleCase(comercioRaw.trim())
+  const comercio = cleanComercio(comercioRaw.trim())
   return {
     fecha: parseTableDate(fechaRaw, horaRaw),
     monto,
