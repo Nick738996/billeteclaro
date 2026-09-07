@@ -71,11 +71,17 @@ function parseTransferenciaRecibida(email: EmailInput): ParseResult {
   const monto = parseCOPAmount(montoMatch[1])
   if (!monto || monto <= 0) return null
 
+  // Buscar el origen solo en el texto después de "Monto recibido" — algunos
+  // correos traen contenido antes del bloque real de detalles (texto de
+  // preview oculto para la bandeja, imágenes con alt-text, etc.) que podría
+  // repetir palabras como "Banco" fuera de contexto y confundir la
+  // extracción si se busca en todo el cuerpo.
+  const afterMonto = body.slice(montoMatch.index! + montoMatch[0].length)
   // Banco origen (transferencia bancaria): "Banco\nBancolombia\nNro."
-  const bancoMatch = body.match(/\bBanco\s+([^\n$]{1,80}?)(?=\s+(?:Nro|No\.|Fecha|¿|$))/i)
+  const bancoMatch = afterMonto.match(/\bBanco\s+([^\n$]{1,80}?)(?=\s+(?:Nro|No\.|Fecha|¿|$))/i)
   // Contacto P2P: "Nombre de tu contacto\nRAUL GOMEZ\nNo. de transacción"
   // Lookahead para no capturar el número de transacción que sigue (en HTML todo queda en una línea)
-  const contactoMatch = body.match(/Nombre de tu contacto\s+([^\n]{1,80}?)(?=\s+(?:No\.|Nro\.|Fecha|Hora|¿|$))/i)
+  const contactoMatch = afterMonto.match(/Nombre de tu contacto\s+([^\n]{1,80}?)(?=\s+(?:No\.|Nro\.|Fecha|Hora|¿|$))/i)
   const origen = bancoMatch
     ? cleanComercio(bancoMatch[1].trim())
     : contactoMatch ? cleanComercio(contactoMatch[1].trim()) : null
@@ -107,8 +113,11 @@ function parseTransferenciaEnviada(email: EmailInput): ParseResult {
   // Destinatario: llave (@handle) o banco destino (transferencia interbancaria)
   // La llave nunca trae un nombre asociado en el correo — se guarda como
   // contraparte_id para que el usuario le pueda asignar un alias.
-  const llaveMatch = body.match(/Llave destino\s+(@?\S+)/i)
-  const bancoDestinoMatch = body.match(/\bBanco\s+([^\n$]{1,80}?)(?=\s+(?:No\.|Nro|Fecha|Costo|¿|$))/i)
+  // Buscar el destino solo después de "Monto transferido" — ver comentario
+  // equivalente en parseTransferenciaRecibida.
+  const afterMonto = body.slice(montoMatch.index! + montoMatch[0].length)
+  const llaveMatch = afterMonto.match(/Llave destino\s+(@?\S+)/i)
+  const bancoDestinoMatch = afterMonto.match(/\bBanco\s+([^\n$]{1,80}?)(?=\s+(?:No\.|Nro|Fecha|Costo|¿|$))/i)
   const bancoDestino = bancoDestinoMatch ? cleanComercio(bancoDestinoMatch[1].trim()) : null
 
   return {
@@ -136,8 +145,11 @@ function parseIngresoBancario(email: EmailInput): ParseResult {
   const monto = parseCOPAmount(montoMatch[1])
   if (!monto || monto <= 0) return null
 
+  // Buscar el origen solo después de "Monto recibido" — ver comentario
+  // equivalente en parseTransferenciaRecibida.
+  const afterMonto = body.slice(montoMatch.index! + montoMatch[0].length)
   // "Banco\nBANCO CITIBANK COLOMBIA\nNo. de transacción"
-  const bancoMatch = body.match(/\bBanco\s+([^\n$]{1,80}?)(?=\s+(?:No\.|Nro|Fecha|¿|$))/i)
+  const bancoMatch = afterMonto.match(/\bBanco\s+([^\n$]{1,80}?)(?=\s+(?:No\.|Nro|Fecha|¿|$))/i)
   const origen = bancoMatch ? cleanComercio(bancoMatch[1].trim()) : null
 
   return {
@@ -165,8 +177,11 @@ function parsePagoServicio(email: EmailInput): ParseResult {
   const monto = parseCOPAmount(montoMatch[1])
   if (!monto || monto <= 0) return null
 
+  // Buscar el convenio solo después de "Pago total"/"Monto de recibo" — ver
+  // comentario equivalente en parseTransferenciaRecibida.
+  const afterMonto = body.slice(montoMatch.index! + montoMatch[0].length)
   // "Convenio\nENEL\nReferencia"
-  const convenioMatch = body.match(/\bConvenio\s+([^\n$]{1,60}?)(?=\s+(?:Referencia|M[eé]todo|Monto|$))/i)
+  const convenioMatch = afterMonto.match(/\bConvenio\s+([^\n$]{1,60}?)(?=\s+(?:Referencia|M[eé]todo|Monto|$))/i)
   const comercio = convenioMatch ? cleanComercio(convenioMatch[1].trim()) : null
 
   // Formato especial: "Fecha y hora\n19:36 hrs, 27 Abr. 2026"
@@ -201,7 +216,10 @@ function parsePSECompra(email: EmailInput): ParseResult {
   const monto = parseCOPAmount(montoMatch[1])
   if (!monto || monto <= 0) return null
 
-  const comercioMatch = body.match(/Comercio\s+([^\n]{1,120})/i)
+  // Buscar el comercio solo después de "Monto" — ver comentario equivalente
+  // en parseTransferenciaRecibida.
+  const afterMonto = body.slice(montoMatch.index! + montoMatch[0].length)
+  const comercioMatch = afterMonto.match(/Comercio\s+([^\n]{1,120})/i)
   const comercio = comercioMatch ? cleanComercio(comercioMatch[1].trim()) : null
 
   return {
@@ -228,9 +246,15 @@ function parseCompra(email: EmailInput): ParseResult {
   const monto = parseCOPAmount(montoMatch[1])
   if (!monto || monto <= 0) return null
 
+  // Buscar el comercio solo en el texto después de "Monto" — algunos
+  // correos traen contenido antes del bloque real de detalles (texto de
+  // preview oculto para la bandeja, imágenes con alt-text, etc.) que podría
+  // repetir la palabra "Comercio" fuera de contexto y confundir la
+  // extracción si se busca en todo el cuerpo.
+  const afterMonto = body.slice(montoMatch.index! + montoMatch[0].length)
   // "Comercio\nUBER RIDES*DL BOGOTA CO\nFecha de la transacción" — se descarta todo
   // después del "*" (descriptor de red de tarjeta: sucursal/ciudad/país)
-  const comercioMatch = body.match(/\bComercio\s+([^\n$]{1,120}?)(?=\s+(?:Fecha|¿|Escr|$))/i)
+  const comercioMatch = afterMonto.match(/\bComercio\s+([^\n$]{1,120}?)(?=\s+(?:Fecha|¿|Escr|$))/i)
   const comercioRaw = comercioMatch ? comercioMatch[1].trim().split('*')[0].trim() : null
   const comercio = comercioRaw ? cleanComercio(comercioRaw) : null
 
