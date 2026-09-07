@@ -75,6 +75,20 @@ export function detectBankFromForwardedBody(body: string): Banco {
   return 'OTRO'
 }
 
+// Un reenvío MANUAL (botón "Forward" de Gmail/Outlook) reemplaza el
+// remitente visible por el del usuario — ahí hay que rescatar el banco
+// escaneando el "De:"/"From:" citado en el cuerpo (detectBankFromForwardedBody).
+// Pero un reenvío AUTOMÁTICO (filtro "Forward it to" de Gmail, o reenvío de
+// cuenta completa) relayea el correo casi intacto: el remitente visible
+// sigue siendo el del banco. Se prueba el remitente directo primero (cubre
+// el caso automático) y se cae al escaneo del cuerpo si no matchea (cubre el
+// caso manual) — sin esto, todo lo reenviado automáticamente caía a 'OTRO' y
+// nunca usaba el parser específico del banco.
+export function detectBankFromForwardedEmail(from: string, body: string): Banco {
+  const direct = detectBank(from)
+  return direct !== 'OTRO' ? direct : detectBankFromForwardedBody(body)
+}
+
 export function stripHtml(html: string): string {
   return html
     .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')

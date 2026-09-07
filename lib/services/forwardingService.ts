@@ -1,5 +1,5 @@
 import { randomBytes, createHash } from 'crypto'
-import { detectBankFromForwardedBody } from '@/lib/email/bankSenders'
+import { detectBankFromForwardedEmail } from '@/lib/email/bankSenders'
 import { cleanForwardedBody } from '@/lib/utils/cleanForwardedBody'
 import { extractTransaction } from '@/lib/services/emailPipeline'
 import { deduplicateUber, matchUberAgainstPersisted } from '@/lib/utils/deduplicateUber'
@@ -98,7 +98,7 @@ export async function processForwardedEmail(payload: ForwardedEmailPayload, admi
   }
 
   const userId = addr.user_id
-  const banco = detectBankFromForwardedBody(payload.body)
+  const banco = detectBankFromForwardedEmail(payload.from, payload.body)
 
   const email: EmailMessage = {
     id: payload.messageId || `fwd:${createHash('sha256').update(payload.body).digest('hex')}`,
