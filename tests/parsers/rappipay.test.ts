@@ -275,6 +275,39 @@ describe('parseRappiPay — compra directa en comercio (tarjeta débito)', () =>
     expect(result!.fecha).toContain('2026-08-25')
   })
 
+  // Caso real: RappiPay a veces antepone texto de preview/promocional antes
+  // del bloque de detalles de la compra. Si esa promo menciona "comercio" y
+  // por coincidencia trae la palabra "Fecha" poco después, el regex podía
+  // capturar ese texto de promo como si fuera el comercio real — por eso la
+  // búsqueda de "Comercio" ahora se limita al texto después de "Monto".
+  it('ignora un "Comercio" mencionado en texto promocional ANTES de "Monto"', () => {
+    const bodyConPromo = `Comercio destacado: revisa las promos de la semana Fecha límite hoy.
+
+¡Hola, Brandon Nick!
+La compra con tu RappiCuenta fue exitosa.
+
+Monto
+
+$4.800,00
+
+Comercio
+
+OXXO BOGOTA CO
+
+Fecha de la transacción
+
+06 de septiembre de 2026
+
+Hora de la transacción
+
+10:58 am
+`
+    const result = parseRappiPay({ ...BASE_EMAIL, subject: 'Resumen de compra', body: bodyConPromo })
+    expect(result).not.toBeNull()
+    expect(result!.monto).toBe(4800)
+    expect(result!.comercio).toBe('Oxxo Bogota Co')
+  })
+
   it('ignores failed payment email even when it mentions "la compra"', () => {
     const bodyFallo = ' ¡Hola, Brandon Nick! Algo pasó y no pudimos completar tu compra. Por favor, vuelve a intentarlo. Aquí los detalles: Monto $13.698,00 Método de pago Tarjeta digital *1532 No. de referencia 111708775 Comercio UBER RIDES*DL BOGOTA CO Fecha de la transacción 25 de agosto de 2026 Hora de la transacción 05:40 am'
     const result = parseRappiPay({ ...BASE_EMAIL, subject: 'El pago de tu compra falló', body: bodyFallo })
