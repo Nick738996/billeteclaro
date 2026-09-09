@@ -23,14 +23,6 @@ export async function POST(req: Request) {
 
   try {
     const result = await processForwardedEmail(payload, createAdminClient())
-    // TEMPORAL: diagnosticar por qué el reenvío automático no está
-    // insertando transacciones — quitar una vez confirmado. Se loguea el
-    // cuerpo real (recortado) porque lo que se ve/copia desde Gmail no
-    // siempre coincide con el texto plano que realmente procesa el pipeline.
-    console.log('[ingest/forward] resultado:', JSON.stringify({
-      from: payload.from, subject: payload.subject, ...result,
-      bodySnippet: payload.body.slice(0, 1500),
-    }))
     return ok(result)
   } catch (e) {
     console.error('[POST /api/ingest/forward]', e)
