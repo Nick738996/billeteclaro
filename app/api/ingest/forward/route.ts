@@ -23,6 +23,9 @@ export async function POST(req: Request) {
 
   try {
     const result = await processForwardedEmail(payload, createAdminClient())
+    // TEMPORAL: diagnosticar por qué el reenvío automático no está
+    // insertando transacciones — quitar una vez confirmado.
+    console.log('[ingest/forward] resultado:', JSON.stringify({ from: payload.from, subject: payload.subject, ...result }))
     return ok(result)
   } catch (e) {
     console.error('[POST /api/ingest/forward]', e)
