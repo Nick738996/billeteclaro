@@ -29,9 +29,18 @@ export default {
       return
     }
 
+    // `message.from` es el remitente de SOBRE SMTP, no el header "De:" que se
+    // ve al leer el correo — para reenvío automático por filtro de Gmail
+    // ("Forward it to"), Gmail reescribe el sobre a una dirección propia con
+    // formato "usuario+caf_=...@gmail.com" (Confirmed Auto-Forward, para
+    // manejo de rebotes/SPF) aunque el header "De:" siga mostrando el
+    // remitente real (ej. noreply@rappipay.co). `parsed.from` (postal-mime)
+    // sí refleja ese header real — con reenvío manual, el header "De:" pasa a
+    // ser el del usuario, que es exactamente lo que necesita el fallback de
+    // detección por cuerpo en detectBankFromForwardedEmail().
     const payload = {
       token,
-      from: message.from,
+      from: parsed.from?.address || message.from,
       subject: parsed.subject ?? '',
       date: parsed.date ?? new Date().toISOString(),
       body: parsed.text || parsed.html || '',
