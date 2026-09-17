@@ -4,7 +4,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { generateAuditId } from '@/lib/utils/auditId'
 import { reassignCalendarMonths } from '@/lib/services/mesContableService'
 import { SUBCATEGORIA_RETIRO_AHORROS, SUBCATEGORIA_APORTE_AHORROS } from '@/lib/types'
-import type { Categoria, Banco, TipoTransaccion, Transaction } from '@/lib/types'
+import type { Categoria, Banco, TipoTransaccion, Transaction, Capa } from '@/lib/types'
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -160,6 +160,9 @@ export interface TransactionPatch {
   categoria?: Categoria
   subcategoria?: string | null
   comercio?: string | null
+  /** Reclasifica manualmente la capa de esta transacción (toggle "pasar a Fijo"
+   * en TransactionsList) — null = volver al default de la categoría. */
+  capa_override?: Capa | null
 }
 
 export async function patchTransaction(

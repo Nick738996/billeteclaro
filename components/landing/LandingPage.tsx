@@ -28,12 +28,12 @@ const STEPS = [
   {
     Icon: Mail,
     titulo: 'Reenvías los correos de tu banco',
-    descripcion: 'Tú decides qué reenviar — nunca te pedimos acceso a tu correo.',
+    descripcion: 'Tú decides qué reenviar, nunca te pedimos acceso a tu correo.',
   },
   {
     Icon: ScanSearch,
     titulo: 'Detectamos tus movimientos',
-    descripcion: 'Bancolombia, Nequi, Nu, Davivienda y varios bancos más — o cualquier otro, con nuestro lector genérico.',
+    descripcion: 'Bancolombia, Nequi, Nu, Davivienda y varios bancos más, o cualquier otro, con nuestro lector genérico.',
   },
   {
     Icon: BarChart2,

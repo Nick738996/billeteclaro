@@ -18,15 +18,21 @@ export const GET = withAuth(async (req, user, supabase) => {
   }
 })
 
-// PATCH /api/transactions  body: { id, categoria?, subcategoria?, comercio? }
+const VALID_CAPAS = new Set(['AHORRO', 'FIJO', 'VARIABLE'])
+
+// PATCH /api/transactions  body: { id, categoria?, subcategoria?, comercio?, capa_override? }
 export const PATCH = withAuth(async (req, user, supabase) => {
-  const body = await req.json() as { id?: string; categoria?: string; subcategoria?: string; comercio?: string }
+  const body = await req.json() as { id?: string; categoria?: string; subcategoria?: string; comercio?: string; capa_override?: string | null }
   if (!body.id) return err('id es requerido', 400)
+  if (body.capa_override !== undefined && body.capa_override !== null && !VALID_CAPAS.has(body.capa_override)) {
+    return err('capa_override inválida', 400)
+  }
 
   const updates: Record<string, unknown> = {}
-  if (body.categoria    !== undefined) updates.categoria    = body.categoria
-  if (body.subcategoria !== undefined) updates.subcategoria = body.subcategoria
-  if (body.comercio     !== undefined) updates.comercio     = body.comercio
+  if (body.categoria      !== undefined) updates.categoria      = body.categoria
+  if (body.subcategoria   !== undefined) updates.subcategoria   = body.subcategoria
+  if (body.comercio       !== undefined) updates.comercio       = body.comercio
+  if (body.capa_override  !== undefined) updates.capa_override  = body.capa_override
 
   try {
     const data = await patchTransaction(supabase, user.id, body.id, updates)

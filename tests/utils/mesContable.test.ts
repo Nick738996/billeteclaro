@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { asignarMesContable, colombiaMonthRangeUTC } from '../../lib/utils/mesContable'
+import { asignarMesContable, colombiaMonthRangeUTC, colombiaDayRangeUTC } from '../../lib/utils/mesContable'
 
 type TxInput = {
   id: string
@@ -153,5 +153,25 @@ describe('colombiaMonthRangeUTC', () => {
   it('el rango de agosto empieza justo en 2026-08-01T05:00:00Z (medianoche COL)', () => {
     const { start } = colombiaMonthRangeUTC('2026-08')
     expect(start).toBe('2026-08-01T05:00:00.000Z')
+  })
+})
+
+describe('colombiaDayRangeUTC', () => {
+  it('cubre las 24h de un día en hora Colombia (medianoche a medianoche)', () => {
+    const { start, end } = colombiaDayRangeUTC('2026-09-15')
+    expect(start).toBe('2026-09-15T05:00:00.000Z')
+    expect(end).toBe('2026-09-16T04:59:59.999Z')
+  })
+
+  it('incluye una transacción de las 23:41 COL (04:41 UTC del día siguiente)', () => {
+    const { start, end } = colombiaDayRangeUTC('2026-09-15')
+    const fecha = '2026-09-16T04:41:00.000Z'
+    expect(fecha >= start && fecha <= end).toBe(true)
+  })
+
+  it('NO incluye una transacción ya del día siguiente en hora Colombia', () => {
+    const { start, end } = colombiaDayRangeUTC('2026-09-15')
+    const fecha = '2026-09-16T05:00:00.000Z' // 00:00 COL del 16
+    expect(fecha >= start && fecha <= end).toBe(false)
   })
 })

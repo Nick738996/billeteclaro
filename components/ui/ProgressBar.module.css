@@ -1,0 +1,25 @@
+.track {
+  height: 5px;
+  background: var(--border);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.fill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.4s ease, background 0.3s ease;
+}
+
+.segmentedTrack {
+  display: flex;
+  gap: 3px;
+}
+
+.segment {
+  flex: 1;
+  height: 5px;
+  border-radius: 99px;
+  background: var(--border);
+  transition: background 0.3s ease;
+}

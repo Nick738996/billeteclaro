@@ -6,7 +6,7 @@
 // Ver design_handoff_rediseno_visual/README.md — Módulo 1.
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { Pencil, Plus, Check, Info, PieChart, BarChart3 } from 'lucide-react'
+import { Pencil, PieChart, BarChart3 } from 'lucide-react'
 import {
   getCategoryColor,
   catLabel,
@@ -15,11 +15,11 @@ import {
   isGasto,
   isIngreso,
   zoneColor,
-  PRESUPUESTO_CATS,
   type Categoria,
   type Transaction,
   type BudgetEntry,
 } from '@/lib/types'
+import { computeLayerTotals, isFijoBudgetCategory } from '@/lib/services/layerService'
 import BudgetManager from './BudgetManager'
 import { getCategoryIcon } from '@/lib/categoryIcons'
 import { TEST_IDS } from '@/lib/testIds'
@@ -112,6 +112,7 @@ export default function CategoriesCard({
   const [draftMap, setDraftMap] = useState<DraftMap>({})
   const [editing, setEditing] = useState(false)
   const [loaded, setLoaded] = useState(false)
+  const [plan, setPlan] = useState<{ ingresoNetoMensual: number; ahorroMetaMonto: number } | null>(null)
   const [view, setView] = useState<View>('presupuesto')
   const [chartMode, setChartMode] = useState<'donut' | 'bars'>('donut')
 
@@ -133,26 +134,29 @@ export default function CategoriesCard({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mes])
 
+  const loadPlan = useCallback(() => {
+    fetch(`/api/monthly-plan?mes=${mes}`)
+      .then(r => r.json())
+      .then(d => setPlan(d.plan ?? null))
+      .catch(() => setPlan(null))
+  }, [mes])
+
   useEffect(() => { loadBudgets() }, [loadBudgets])
+  useEffect(() => { loadPlan() }, [loadPlan])
 
-  // ── Vista Presupuesto ──────────────────────────────────────────────────────
-  const withBudget = Object.keys(budgets).filter(cat => (budgets[cat] ?? 0) > 0)
-  const budgetOnly = PRESUPUESTO_CATS.filter(
-    cat => !(budgets[cat] ?? 0) && (gastosPorCategoria[cat] ?? 0) > 0
-  )
-  const extraGastos = (['TRANSFERENCIA'] as Categoria[]).filter(
-    cat => (gastosPorCategoria[cat] ?? 0) > 0
-  )
-  const sinPresupuesto = [...budgetOnly, ...extraGastos]
-    .sort((a, b) => (gastosPorCategoria[b] ?? 0) - (gastosPorCategoria[a] ?? 0))
-
-  const withBudgetSorted = [...withBudget].sort((a, b) => {
-    const pctA = (gastosPorCategoria[a] ?? 0) / (budgets[a] ?? 1)
-    const pctB = (gastosPorCategoria[b] ?? 0) / (budgets[b] ?? 1)
-    return pctB - pctA
-  })
-
-  const hasBudgetContent = withBudget.length > 0 || sinPresupuesto.length > 0
+  // ── Vista Presupuesto: 3 capas (Ahorro / Fijo / Variable) ──────────────────
+  // El gasto real por capa sale de las transacciones (computeLayerTotals ya
+  // sabe que Ahorro cuenta como "apartado" aunque isGasto lo excluya del
+  // gasto tradicional). El "límite" de cada capa sale del plan mensual:
+  // Ahorro compara contra la meta, Fijo contra lo presupuestado por
+  // categoría, Variable contra el pool derivado (ingreso - fijos - ahorro).
+  const layerTotals = useMemo(() => computeLayerTotals(transactions, {}), [transactions])
+  const fijoPresupuestado = Object.entries(budgets)
+    .filter(([cat]) => isFijoBudgetCategory(cat))
+    .reduce((s, [, v]) => s + v, 0)
+  const poolVariable = plan
+    ? Math.max(0, plan.ingresoNetoMensual - fijoPresupuestado - plan.ahorroMetaMonto)
+    : 0
 
   // ── Vista Participación ────────────────────────────────────────────────────
   const chartData = useMemo(() => buildChartData(transactions), [transactions])
@@ -165,7 +169,11 @@ export default function CategoriesCard({
   const selEntry = catActive ? chartData.find(d => d.categoria === (activeFilter as Categoria)) : null
   const hasChartContent = chartData.length > 0
 
-  const hasAnyContent = hasBudgetContent || hasChartContent
+  // Las 3 tarjetas de capa siempre tienen algo que mostrar (aunque sea en
+  // cero, con un hint para configurar el plan) — nunca queda un estado vacío
+  // confuso en la pestaña Presupuesto. Solo la pestaña Gráfico puede estar
+  // realmente vacía (hasChartContent, manejado dentro de esa vista).
+  const hasAnyContent = true
 
   if (!loaded) return (
     <div className={`card ${styles.skeletonWrap}`}>
@@ -184,8 +192,8 @@ export default function CategoriesCard({
       <BudgetManager
         mes={mes}
         gastosPorCategoria={gastosPorCategoria}
-        ingresos={ingresos}
         initialBudgets={draftMap}
+        initialPlan={plan}
         onBudgetsChange={newTotals => {
           setDraftMap(prev => {
             const next: DraftMap = {}
@@ -196,10 +204,12 @@ export default function CategoriesCard({
           })
           onBudgetsChange(newTotals)
         }}
+        onPlanChange={setPlan}
         onSaved={() => {
           onSaved()
           setEditing(false)
           loadBudgets()
+          loadPlan()
         }}
         onClose={() => setEditing(false)}
       />
@@ -250,71 +260,84 @@ export default function CategoriesCard({
         </div>
       )}
 
-      {/* Vista Presupuesto */}
+      {/* Vista Presupuesto — 3 Capas (Ahorro / Fijo / Variable), no una lista
+          plana por categoría: el modelo de la app es "controla el bosque",
+          no 13 microcategorías. Editar sigue siendo el camino para ajustar
+          ingreso, meta de ahorro y cada gasto fijo. */}
       {hasAnyContent && view === 'presupuesto' && (
         <>
-          {withBudgetSorted.map((cat, i) => {
-            const gasto  = gastosPorCategoria[cat] ?? 0
-            const limite = budgets[cat] ?? 0
-            const pct    = limite > 0 ? (gasto / limite) * 100 : 0
-            const color  = zoneColor(pct)
-            const CatIcon = getCategoryIcon(cat)
-            return (
-              <div key={cat} className={`${styles.row} ${i < withBudgetSorted.length - 1 ? styles.rowBorder : ''}`}>
-                <div className={`${styles.rowMeta} ${styles.rowMetaTight}`}>
-                  <span className={styles.rowIcon} style={{ color: getCategoryColor(cat) }}>
-                    <CatIcon size={19} />
-                  </span>
-                  <span className={styles.catName}>{catLabel(cat)}</span>
-                  <span className={styles.amounts}>
-                    <span className={styles.spent}>{formatCOP(gasto)}</span>
-                    <span className={styles.limit}> / {formatCOP(limite)}</span>
-                  </span>
-                  <span className={styles.pct} style={{ '--pct-color': color } as React.CSSProperties}>
-                    {pct >= 110 ? `+${Math.round(pct - 100)}%` : pct >= 100 ? <Check size={13} strokeWidth={2.5} /> : `${Math.round(pct)}%`}
-                  </span>
-                </div>
-              </div>
-            )
-          })}
-
-          {sinPresupuesto.length > 0 && (
-            <div className={styles.section}>
-              <p className={styles.sectionLabel}>Sin presupuesto</p>
+          {/* Ahorro y Blindaje */}
+          <div className={styles.layerBlock}>
+            <div className={styles.layerHeader}>
+              <span className={styles.layerName}>Ahorro y Blindaje</span>
+              <span className={styles.amounts}>
+                <span className={styles.spent}>{formatCOP(layerTotals.ahorro)}</span>
+                {plan && plan.ahorroMetaMonto > 0 && <span className={styles.limit}> / {formatCOP(plan.ahorroMetaMonto)}</span>}
+              </span>
             </div>
-          )}
-          {sinPresupuesto.map((cat, i) => {
-            const gasto = gastosPorCategoria[cat] ?? 0
-            const canDefine = cat !== 'TRANSFERENCIA'
-            const CatIcon = getCategoryIcon(cat)
-            return (
-              <div key={cat} className={`${styles.row} ${i < sinPresupuesto.length - 1 ? styles.rowBorder : ''}`}>
-                <div className={`${styles.rowMeta} ${styles.rowMetaTight}`}>
-                  <span className={styles.rowIcon} style={{ color: getCategoryColor(cat) }}>
-                    <CatIcon size={19} />
-                  </span>
-                  <span className={styles.catName}>{catLabel(cat)}</span>
-                  {cat === 'TRANSFERENCIA' && (
-                    <span
-                      className={styles.infoIcon}
-                      title="Transferencias, considera recategorizarlas en la lista de movimientos"
-                    >
-                      <Info size={10} />
-                    </span>
-                  )}
-                  <span className={styles.amountOnly}>{formatCOP(gasto)}</span>
-                  {canDefine ? (
-                    <button onClick={() => setEditing(true)} className={styles.defineBtn}>
-                      <Plus size={11} strokeWidth={2.5} />
-                      Definir
-                    </button>
-                  ) : (
-                    <span className={styles.dash}>—</span>
-                  )}
-                </div>
+            {plan && plan.ahorroMetaMonto > 0 ? (
+              <div className={styles.barTrack}>
+                <div
+                  className={styles.barFill}
+                  style={{
+                    '--bar-w': `${Math.min((layerTotals.ahorro / plan.ahorroMetaMonto) * 100, 100)}%`,
+                    '--bar-color': layerTotals.ahorro >= plan.ahorroMetaMonto ? 'var(--green)' : 'var(--blue)',
+                  } as React.CSSProperties}
+                />
               </div>
-            )
-          })}
+            ) : (
+              <p className={styles.layerHint}>Define tu meta de ahorro en Editar</p>
+            )}
+          </div>
+
+          {/* Gastos Fijos */}
+          <div className={`${styles.layerBlock} ${styles.layerBlockBorder}`}>
+            <div className={styles.layerHeader}>
+              <span className={styles.layerName}>Gastos Fijos</span>
+              <span className={styles.amounts}>
+                <span className={styles.spent}>{formatCOP(layerTotals.fijo)}</span>
+                {fijoPresupuestado > 0 && <span className={styles.limit}> / {formatCOP(fijoPresupuestado)}</span>}
+              </span>
+            </div>
+            {fijoPresupuestado > 0 ? (
+              <div className={styles.barTrack}>
+                <div
+                  className={styles.barFill}
+                  style={{
+                    '--bar-w': `${Math.min((layerTotals.fijo / fijoPresupuestado) * 100, 100)}%`,
+                    '--bar-color': zoneColor((layerTotals.fijo / fijoPresupuestado) * 100),
+                  } as React.CSSProperties}
+                />
+              </div>
+            ) : (
+              <p className={styles.layerHint}>Agrega tus gastos fijos (arriendo, suscripciones…) en Editar</p>
+            )}
+          </div>
+
+          {/* Gasto Variable (derivado, sin presupuesto por categoría) */}
+          <div className={`${styles.layerBlock} ${styles.layerBlockBorder}`}>
+            <div className={styles.layerHeader}>
+              <span className={styles.layerName}>Gasto Variable</span>
+              <span className={styles.amounts}>
+                <span className={styles.spent}>{formatCOP(layerTotals.variable)}</span>
+                {poolVariable > 0 && <span className={styles.limit}> / {formatCOP(poolVariable)}</span>}
+              </span>
+            </div>
+            {poolVariable > 0 ? (
+              <div className={styles.barTrack}>
+                <div
+                  className={styles.barFill}
+                  style={{
+                    '--bar-w': `${Math.min((layerTotals.variable / poolVariable) * 100, 100)}%`,
+                    '--bar-color': zoneColor((layerTotals.variable / poolVariable) * 100),
+                  } as React.CSSProperties}
+                />
+              </div>
+            ) : (
+              <p className={styles.layerHint}>Define tu ingreso en Editar para ver tu pool variable</p>
+            )}
+            <p className={styles.layerFootnote}>Se reparte solo en tu cupo semanal, mira la tarjeta de arriba</p>
+          </div>
         </>
       )}
 

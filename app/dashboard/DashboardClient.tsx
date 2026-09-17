@@ -10,6 +10,7 @@ import type { Transaction, MonthlyStats, Categoria } from '@/lib/types'
 import { isIngreso, isGasto } from '@/lib/types'
 import { TEST_IDS } from '@/lib/testIds'
 import MonthHero from '@/components/dashboard/MonthHero'
+import WeeklyAllowanceCard from '@/components/dashboard/WeeklyAllowanceCard'
 import CategoriesCard from '@/components/dashboard/CategoriesCard'
 import TransactionsList from '@/components/dashboard/TransactionsList'
 import HeaderPill from '@/components/dashboard/HeaderPill'
@@ -253,6 +254,8 @@ export default function DashboardClient({
           mes={month}
           budgetTotal={Object.values(budgets).reduce((s, v) => s + (v || 0), 0)}
         />
+
+        {isCurrent && <WeeklyAllowanceCard refreshSignal={contextVersion} />}
 
         <SavingsOverview
           onTransaction={() => { loadMonth(month); bumpContext() }}

@@ -25,6 +25,19 @@ export function colombiaMonthRangeUTC(mes: string): { start: string; end: string
   return { start, end }
 }
 
+/**
+ * Rango UTC [inicio, fin] que cubre un día calendario completo en hora
+ * Colombia (UTC-5) — usado por weeklyAllowanceService para sumar gasto
+ * variable dentro de un rango de días (semana) sin perder transacciones
+ * nocturnas, igual que colombiaMonthRangeUTC pero a nivel de día.
+ */
+export function colombiaDayRangeUTC(dateStr: string): { start: string; end: string } {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const start = new Date(Date.UTC(y, m - 1, d, 5, 0, 0)).toISOString()
+  const end = new Date(Date.UTC(y, m - 1, d + 1, 4, 59, 59, 999)).toISOString()
+  return { start, end }
+}
+
 type TxBase = {
   fecha: string
   monto: number

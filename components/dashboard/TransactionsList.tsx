@@ -18,6 +18,7 @@ import {
   type Transaction,
   type Categoria,
   type Banco,
+  type Capa,
   CATEGORIA_LABELS,
   catLabel,
   getCategoryColor,
@@ -28,6 +29,7 @@ import {
   SUBCATEGORIA_RETIRO_AHORROS,
   SUBCATEGORIA_APORTE_AHORROS,
 } from '@/lib/types'
+import { getCapaForTransaccion } from '@/lib/services/layerService'
 import { getCategoryIcon } from '@/lib/categoryIcons'
 import { TEST_IDS } from '@/lib/testIds'
 import FloatingSaveBar from '@/components/ui/FloatingSaveBar'
@@ -512,6 +514,64 @@ function CategoryPicker({ current, onSelect, onClose, budgetedCats }: {
   )
 }
 
+// ── CapaPicker bottom sheet ─────────────────────────────────────────────────
+// Responde "¿cómo paso un gasto de Variable a Fijo?" — antes capa_override
+// existía en la base de datos pero no había ninguna forma de tocarlo desde
+// la UI. `null` = automático (usa el default de la categoría, ver
+// CATEGORIA_CAPA_DEFAULT en lib/types.ts).
+
+const CAPA_LABELS: Record<Capa, string> = { AHORRO: 'Ahorro', FIJO: 'Fijo', VARIABLE: 'Variable' }
+
+const CAPA_OPTIONS: { value: Capa | null; label: string }[] = [
+  { value: null, label: 'Automático' },
+  { value: 'FIJO', label: 'Fijo' },
+  { value: 'VARIABLE', label: 'Variable' },
+  { value: 'AHORRO', label: 'Ahorro' },
+]
+
+function CapaPicker({ current, onSelect, onClose }: {
+  current: Capa | null
+  onSelect: (c: Capa | null) => void
+  onClose: () => void
+}) {
+  if (typeof document === 'undefined') return null
+  return createPortal(
+    <>
+      <div className={styles.pickerOverlay} onClick={onClose} aria-hidden="true" />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Cambiar capa"
+        className={styles.pickerSheet}
+        onKeyDown={e => { if (e.key === 'Escape') onClose() }}
+      >
+        <div className={styles.pickerHeader}>
+          <p className={styles.pickerTitle}>¿Cómo cuenta este movimiento?</p>
+          <button onClick={onClose} aria-label="Cerrar" className={styles.pickerCloseBtn}>
+            <X size={16} />
+          </button>
+        </div>
+        <p className={styles.renameHint}>
+          Fijo: lo pagas sí o sí cada mes. Variable: gasto del día a día, sale de tu cupo
+          semanal. Ahorro: dinero que apartas. Automático usa el default de la categoría.
+        </p>
+        <div className={styles.chipGroup}>
+          {CAPA_OPTIONS.map(opt => (
+            <button
+              key={opt.label}
+              onClick={() => onSelect(opt.value)}
+              className={`${styles.catBtn} ${opt.value === current ? styles.catBtnOn : styles.catBtnOff}`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    </>,
+    document.body
+  )
+}
+
 // ── RenameTransaction bottom sheet ────────────────────────────────────────
 // Permite editar el nombre/comercio de cualquier transacción. Si viene de una
 // llave/cuenta sin nombre (contraparte_id) se muestra el identificador real
@@ -584,10 +644,11 @@ function RenameContactSheet({ current, identificador, saving, error, onSave, onC
 
 type DeletePhase = 'idle' | 'confirming' | 'deleting'
 
-function TransactionRow({ t, pendingCat, onCategoryClick, onDelete, onRenameClick }: {
+function TransactionRow({ t, pendingCat, onCategoryClick, onCapaClick, onDelete, onRenameClick }: {
   t: Transaction
   pendingCat?: Categoria
   onCategoryClick: () => void
+  onCapaClick: () => void
   onDelete: () => void
   onRenameClick: () => void
 }) {
@@ -602,6 +663,8 @@ function TransactionRow({ t, pendingCat, onCategoryClick, onDelete, onRenameClic
   const chip       = BANCO_LABEL[banco]
   const time       = format(new Date(t.fecha), 'HH:mm', { locale: es })
   const isDirty    = !!pendingCat
+  const effectiveCapa = getCapaForTransaccion(t, {})
+  const capaOverridden = !!t.capa_override
 
   function startConfirm() {
     setDeletePhase('confirming')
@@ -645,6 +708,18 @@ function TransactionRow({ t, pendingCat, onCategoryClick, onDelete, onRenameClic
             </span>
             <ChevronDown size={10} className={isDirty ? styles.catChipArrowDirty : styles.catChipArrowNormal} />
           </button>
+          {!income && effectiveCapa && (
+            <>
+              <span className={styles.metaDot}>·</span>
+              <button
+                onClick={onCapaClick}
+                aria-label={`Cambiar capa: ${CAPA_LABELS[effectiveCapa]}${capaOverridden ? ' (manual)' : ''}`}
+                className={`${styles.capaChipBtn} ${capaOverridden ? styles.capaChipBtnOverridden : ''}`}
+              >
+                {CAPA_LABELS[effectiveCapa]}
+              </button>
+            </>
+          )}
           <span className={styles.metaDot}>·</span>
           <span className={styles.metaBank}>{chip.label}</span>
           <span className={styles.metaDot}>·</span>
@@ -714,6 +789,7 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
   const [savedOk,     setSavedOk]     = useState(false)
   const [saveError,   setSaveError]   = useState<string | null>(null)
   const [pickerTxId,  setPickerTxId]  = useState<string | null>(null)
+  const [capaPickerTxId, setCapaPickerTxId] = useState<string | null>(null)
   const [renameTxId,  setRenameTxId]  = useState<string | null>(null)
   const [renameSaving, setRenameSaving] = useState(false)
   const [renameError,  setRenameError]  = useState<string | null>(null)
@@ -796,7 +872,23 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
     }
   }
 
+  const saveCapa = async (txId: string, capa: Capa | null) => {
+    setCapaPickerTxId(null)
+    try {
+      const res = await fetch('/api/transactions', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: txId, capa_override: capa }),
+      })
+      if (!res.ok) throw new Error()
+      onCategoryChange?.()
+    } catch {
+      console.error('[TransactionsList] No se pudo cambiar la capa de', txId)
+    }
+  }
+
   const pickerTx = pickerTxId ? transactions.find(t => t.id === pickerTxId) : null
+  const capaPickerTx = capaPickerTxId ? transactions.find(t => t.id === capaPickerTxId) : null
   const renameTx = renameTxId ? transactions.find(t => t.id === renameTxId) : null
 
   const filtered = useMemo(() => transactions.filter(t => !deletedIds.has(t.id)).filter(t => {
@@ -888,6 +980,7 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
                     t={t}
                     pendingCat={pendingCats[t.id]}
                     onCategoryClick={() => setPickerTxId(t.id)}
+                    onCapaClick={() => setCapaPickerTxId(t.id)}
                     onDelete={() => handleDelete(t)}
                     onRenameClick={() => { setRenameError(null); setRenameTxId(t.id) }}
                   />
@@ -939,6 +1032,14 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
         }}
         onClose={() => setPickerTxId(null)}
         budgetedCats={budgetedCats}
+      />
+    )}
+
+    {capaPickerTx && (
+      <CapaPicker
+        current={capaPickerTx.capa_override}
+        onSelect={capa => saveCapa(capaPickerTx.id, capa)}
+        onClose={() => setCapaPickerTxId(null)}
       />
     )}
 

@@ -62,6 +62,61 @@ export interface Transaction {
   es_sueldo: boolean
   created_at: string
   contraparte_id: string | null
+  capa_override: Capa | null
+}
+
+// ── Sistema de 3 Capas (Ahorro/Blindaje, Costo de Existir, Estilo de Vida) ──
+
+export type Capa = 'AHORRO' | 'FIJO' | 'VARIABLE'
+
+/**
+ * Capa por defecto de cada categoría built-in. `null` = fuera de las 3 capas
+ * (movimientos propios/entradas, no gasto ni ahorro real).
+ * Categorías mixtas (HOGAR, SALUD mezclan fijo y variable) toman el default
+ * más común; el caso puntual se resuelve con `capa_override` en la transacción
+ * o con una fila en `category_capas` para reclasificar la categoría entera.
+ */
+export const CATEGORIA_CAPA_DEFAULT: Record<Categoria, Capa | null> = {
+  AHORROS: 'AHORRO',
+  INVERSION: 'AHORRO',
+  PRESTAMO: 'AHORRO',
+  HOGAR: 'FIJO',
+  SUSCRIPCIONES: 'FIJO',
+  SALUD: 'FIJO',
+  EDUCACION: 'FIJO',
+  DEUDA: 'FIJO',
+  TRANSPORTE: 'VARIABLE',
+  SALIDAS: 'VARIABLE',
+  COMPRAS_ONLINE: 'VARIABLE',
+  DONACIONES: 'VARIABLE',
+  OTRO: 'VARIABLE',
+  REEMBOLSABLE: null,
+  TRANSFERENCIA: null,
+  INGRESO: null,
+}
+
+export interface MonthlyPlan {
+  id: string
+  user_id: string
+  mes: string
+  ingreso_neto_mensual: number
+  ahorro_meta_monto: number
+  created_at: string
+  updated_at: string
+}
+
+export interface WeeklyAllowance {
+  id: string
+  user_id: string
+  mes: string
+  semana_inicio: string
+  semana_fin: string
+  cupo_base: number
+  ajuste_carryover: number
+  cerrada: boolean
+  decision: 'bonus_ahorro' | 'rollover' | null
+  created_at: string
+  updated_at: string
 }
 
 export interface Budget {
@@ -100,6 +155,12 @@ export const PRESUPUESTO_CATS: Categoria[] = [
   'HOGAR', 'TRANSPORTE', 'SALIDAS', 'SALUD', 'SUSCRIPCIONES',
   'COMPRAS_ONLINE', 'INVERSION', 'AHORROS', 'DEUDA', 'DONACIONES', 'EDUCACION', 'REEMBOLSABLE', 'OTRO',
 ]
+
+/** Subconjunto de PRESUPUESTO_CATS que son Gastos Fijos, las únicas que
+ * BudgetManager deja presupuestar individualmente. Ahorro se configura como
+ * una sola meta en monthly_plan; Variable se deriva, no se presupuesta
+ * categoría por categoría. */
+export const FIJO_CATS: Categoria[] = PRESUPUESTO_CATS.filter(c => CATEGORIA_CAPA_DEFAULT[c] === 'FIJO')
 
 // Subcategoria usada en la transacción que se crea al retirar/aportar desde
 // Mis Ahorros — permite filtrarlas aparte de otros ingresos/gastos que

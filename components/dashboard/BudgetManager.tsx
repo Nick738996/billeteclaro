@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { Check, ChevronRight, Plus, Trash2, Copy, ArrowLeft } from 'lucide-react'
-import { CATEGORIA_LABELS, catLabel, normalizeCatKey, getCategoryColor, formatCOP, PRESUPUESTO_CATS, type Categoria, type BudgetEntry, type BudgetSubcat } from '@/lib/types'
+import { CATEGORIA_LABELS, catLabel, normalizeCatKey, getCategoryColor, formatCOP, FIJO_CATS, type Categoria, type BudgetEntry, type BudgetSubcat } from '@/lib/types'
+import { isFijoBudgetCategory } from '@/lib/services/layerService'
 import { getCategoryIcon } from '@/lib/categoryIcons'
 import { TEST_IDS } from '@/lib/testIds'
 import FloatingSaveBar from '@/components/ui/FloatingSaveBar'
@@ -19,27 +20,20 @@ function pctBg(pct: number) {
   return 'var(--green-soft)'
 }
 
-// AHORROS/INVERSION no son límites de gasto — son metas a alcanzar o superar.
-// Con la semántica de arriba, superar la "meta" de ahorro se veía en rojo,
-// como si ahorrar de más fuera un error. Acá el 100% es el piso, no el techo:
-// alcanzarlo o superarlo es bueno (verde); no haber llegado todavía es
-// simplemente progreso, sin urgencia (azul, no naranja/rojo).
-const GOAL_CATEGORIES = new Set(['AHORROS', 'INVERSION'])
-function pctColorGoal(pct: number) {
-  return pct >= 100 ? 'var(--green)' : 'var(--blue)'
-}
-function pctBgGoal(pct: number) {
-  return pct >= 100 ? 'var(--green-soft)' : 'var(--blue-soft)'
-}
-
 type DraftMap = Record<string, BudgetEntry>
+
+interface PlanEntry {
+  ingresoNetoMensual: number
+  ahorroMetaMonto: number
+}
 
 interface Props {
   mes: string
   gastosPorCategoria: Record<string, number>
-  ingresos?: number
   initialBudgets?: DraftMap
+  initialPlan?: PlanEntry | null
   onBudgetsChange?: (totals: Record<string, number>) => void
+  onPlanChange?: (plan: PlanEntry) => void
   onSaved?: () => void
   onClose?: () => void
 }
@@ -52,7 +46,22 @@ function budgetedKeys(map: DraftMap): Set<string> {
   )
 }
 
-export default function BudgetManager({ mes, gastosPorCategoria, ingresos = 0, initialBudgets, onBudgetsChange, onSaved, onClose }: Props) {
+function digitsToNumber(value: string): number {
+  return parseInt(value.replace(/\D/g, ''), 10) || 0
+}
+
+function formatDigits(value: string): string {
+  return value ? digitsToNumber(value).toLocaleString('es-CO') : ''
+}
+
+function daysInMonth(mes: string): number {
+  const [y, m] = mes.split('-').map(Number)
+  return new Date(y, m, 0).getDate()
+}
+
+export default function BudgetManager({
+  mes, gastosPorCategoria, initialBudgets, initialPlan, onBudgetsChange, onPlanChange, onSaved, onClose,
+}: Props) {
   const [saved,      setSaved]      = useState<DraftMap>(initialBudgets ?? {})
   const [draft,      setDraft]      = useState<DraftMap>(initialBudgets ?? {})
   const [expanded,   setExpanded]   = useState<string | null>(null)
@@ -68,19 +77,34 @@ export default function BudgetManager({ mes, gastosPorCategoria, ingresos = 0, i
   const [customInput,  setCustomInput]  = useState('')
   const [inputError,   setInputError]   = useState<string | null>(null)
 
+  // ── Plan (ingreso + meta de ahorro) ──────────────────────────────────────────
+  const [planIngreso, setPlanIngreso] = useState(initialPlan ? String(initialPlan.ingresoNetoMensual) : '')
+  const [planAhorro,  setPlanAhorro]  = useState(initialPlan ? String(initialPlan.ahorroMetaMonto) : '')
+  const [planSaved,   setPlanSaved]   = useState<PlanEntry>(initialPlan ?? { ingresoNetoMensual: 0, ahorroMetaMonto: 0 })
+  const [planLoaded,  setPlanLoaded]  = useState(!!initialPlan)
+
   const [yy, mm] = mes.split('-').map(Number)
   const prevMes = mm === 1 ? `${yy - 1}-12` : `${yy}-${String(mm - 1).padStart(2, '0')}`
 
   const copyFromPrev = async () => {
     setCopying(true)
     try {
-      const res = await fetch(`/api/budgets?mes=${prevMes}`)
-      const d = await res.json()
-      const b: DraftMap = d.budgets ?? {}
-      if (Object.keys(b).length > 0) {
-        setDraft(b)
-        onBudgetsChange?.(totals(b))
-        setPinnedCats(prev => new Set([...prev, ...budgetedKeys(b)]))
+      const [budgetsRes, planRes] = await Promise.all([
+        fetch(`/api/budgets?mes=${prevMes}`),
+        fetch(`/api/monthly-plan?mes=${prevMes}`),
+      ])
+      const bd = await budgetsRes.json()
+      const b: DraftMap = bd.budgets ?? {}
+      const fijoOnly = Object.fromEntries(Object.entries(b).filter(([cat]) => isFijoBudgetCategory(cat)))
+      if (Object.keys(fijoOnly).length > 0) {
+        setDraft(fijoOnly)
+        onBudgetsChange?.(totals(fijoOnly))
+        setPinnedCats(prev => new Set([...prev, ...budgetedKeys(fijoOnly)]))
+      }
+      const pd = await planRes.json()
+      if (pd.plan) {
+        setPlanIngreso(String(pd.plan.ingresoNetoMensual))
+        setPlanAhorro(String(pd.plan.ahorroMetaMonto))
       }
     } finally {
       setCopying(false)
@@ -97,7 +121,9 @@ export default function BudgetManager({ mes, gastosPorCategoria, ingresos = 0, i
         .filter(([, v]) => (v as BudgetEntry).monto > 0)
     )
 
-  const isDirty = JSON.stringify(normalize(draft)) !== JSON.stringify(normalize(saved))
+  const budgetsDirty = JSON.stringify(normalize(draft)) !== JSON.stringify(normalize(saved))
+  const planDirty = digitsToNumber(planIngreso) !== planSaved.ingresoNetoMensual || digitsToNumber(planAhorro) !== planSaved.ahorroMetaMonto
+  const isDirty = budgetsDirty || planDirty
 
   const totals = (map: DraftMap) =>
     Object.fromEntries(Object.entries(map).map(([k, v]) => [k, v.monto]))
@@ -119,11 +145,35 @@ export default function BudgetManager({ mes, gastosPorCategoria, ingresos = 0, i
       .catch(() => setLoaded(true))
   }, [mes])
 
+  useEffect(() => {
+    if (initialPlan) return
+    setPlanLoaded(false)
+    fetch(`/api/monthly-plan?mes=${mes}`)
+      .then(r => r.json())
+      .then(d => {
+        const plan: PlanEntry = d.plan ?? { ingresoNetoMensual: 0, ahorroMetaMonto: 0 }
+        setPlanSaved(plan)
+        setPlanIngreso(plan.ingresoNetoMensual > 0 ? String(plan.ingresoNetoMensual) : '')
+        setPlanAhorro(plan.ahorroMetaMonto > 0 ? String(plan.ahorroMetaMonto) : '')
+        setPlanLoaded(true)
+      })
+      .catch(() => setPlanLoaded(true))
+  }, [mes])
+
   const updateEntry = (cat: string, entry: BudgetEntry) => {
     const next = { ...draft, [cat]: entry }
     if (entry.monto === 0 && entry.subcategorias.length === 0) delete next[cat]
     setDraft(next)
     onBudgetsChange?.(totals(next))
+  }
+
+  const handlePlanInput = (field: 'ingreso' | 'ahorro', raw: string) => {
+    if (field === 'ingreso') setPlanIngreso(raw)
+    else setPlanAhorro(raw)
+    onPlanChange?.({
+      ingresoNetoMensual: digitsToNumber(field === 'ingreso' ? raw : planIngreso),
+      ahorroMetaMonto: digitsToNumber(field === 'ahorro' ? raw : planAhorro),
+    })
   }
 
   const handleSave = async () => {
@@ -140,13 +190,43 @@ export default function BudgetManager({ mes, gastosPorCategoria, ingresos = 0, i
         monto: draft[cat]?.monto ?? 0,
         subcategorias: draft[cat]?.subcategorias ?? [],
       }))
-      const res = await fetch('/api/budgets', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mes, items }),
-      })
-      if (!res.ok) throw new Error('Error al guardar')
+
+      const newCustomFijoCats = items
+        .filter(i => i.monto > 0 && !(i.categoria in CATEGORIA_LABELS))
+        .map(i => i.categoria)
+
+      const requests: Promise<Response>[] = [
+        fetch('/api/budgets', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mes, items }),
+        }),
+        ...newCustomFijoCats.map(categoria =>
+          fetch('/api/category-capas', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ categoria, capa: 'FIJO' }),
+          })
+        ),
+      ]
+
+      const newPlan: PlanEntry = { ingresoNetoMensual: digitsToNumber(planIngreso), ahorroMetaMonto: digitsToNumber(planAhorro) }
+      if (planDirty && newPlan.ingresoNetoMensual > 0) {
+        requests.push(fetch('/api/monthly-plan', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mes, ...newPlan }),
+        }))
+      }
+
+      const results = await Promise.all(requests)
+      if (results.some(r => !r.ok)) throw new Error('Error al guardar')
+
       setSaved(draft)
+      if (planDirty && newPlan.ingresoNetoMensual > 0) {
+        setPlanSaved(newPlan)
+        onPlanChange?.(newPlan)
+      }
       setSavedOk(true)
       onSaved?.()
       setTimeout(() => setSavedOk(false), 3000)
@@ -159,10 +239,19 @@ export default function BudgetManager({ mes, gastosPorCategoria, ingresos = 0, i
     }
   }
 
-  const totalPresupuestado = Object.values(draft).reduce((s, v) => s + v.monto, 0)
-  const restante = ingresos - totalPresupuestado
+  const totalFijo = Object.entries(draft)
+    .filter(([cat]) => isFijoBudgetCategory(cat))
+    .reduce((s, [, v]) => s + v.monto, 0)
 
-  const predefinedSet = useMemo(() => new Set<string>(PRESUPUESTO_CATS), [])
+  const ingresoNum = digitsToNumber(planIngreso)
+  const ahorroNum = digitsToNumber(planAhorro)
+  const poolVariable = Math.max(0, ingresoNum - totalFijo - ahorroNum)
+  const numWeeks = Math.max(1, Math.round(daysInMonth(mes) / 7))
+  const ahorroPct = ingresoNum > 0 ? Math.round((ahorroNum / ingresoNum) * 100) : null
+  const fijoPct = ingresoNum > 0 ? Math.round((totalFijo / ingresoNum) * 100) : null
+  const variablePct = ingresoNum > 0 ? Math.round((poolVariable / ingresoNum) * 100) : null
+
+  const predefinedSet = useMemo(() => new Set<string>(FIJO_CATS), [])
 
   // Orden por urgencia real, no por declaración fija. Primero TODO lo que tiene
   // presupuesto asignado (por urgencia), y solo al final lo que no tiene —
@@ -175,10 +264,6 @@ export default function BudgetManager({ mes, gastosPorCategoria, ingresos = 0, i
     const gasto  = gastosPorCategoria[cat] ?? 0
     const limite = draftMap[cat]?.monto ?? 0
     if (limite > 0) {
-      // AHORROS/INVERSION son metas, no límites de gasto — superarlas es
-      // bueno, así que nunca deberían ordenarse como "excedida" (rank 0,
-      // el mismo lugar que un gasto real fuera de control).
-      if (GOAL_CATEGORIES.has(cat)) return gasto > 0 ? 2 : 3
       const pct = (gasto / limite) * 100
       if (pct >= 100) return 0
       if (pct >= 80) return 1
@@ -195,13 +280,13 @@ export default function BudgetManager({ mes, gastosPorCategoria, ingresos = 0, i
   const activeCats = useMemo(() => {
     const seen = new Set<string>()
     const result: string[] = []
-    for (const cat of PRESUPUESTO_CATS) {
+    for (const cat of FIJO_CATS) {
       if ((gastosPorCategoria[cat] ?? 0) > 0 || (draft[cat]?.monto ?? 0) > 0 || pinnedCats.has(cat)) {
         seen.add(cat); result.push(cat)
       }
     }
     for (const cat of [...pinnedCats, ...Object.keys(draft)]) {
-      if (!seen.has(cat) && !predefinedSet.has(cat)) {
+      if (!seen.has(cat) && !predefinedSet.has(cat) && isFijoBudgetCategory(cat)) {
         seen.add(cat); result.push(cat)
       }
     }
@@ -213,7 +298,7 @@ export default function BudgetManager({ mes, gastosPorCategoria, ingresos = 0, i
   }, [gastosPorCategoria, draft, pinnedCats, predefinedSet])
 
   const availablePredefined = useMemo(
-    () => PRESUPUESTO_CATS.filter(cat => !activeCats.includes(cat)),
+    () => FIJO_CATS.filter(cat => !activeCats.includes(cat)),
     [activeCats]
   )
 
@@ -255,7 +340,7 @@ export default function BudgetManager({ mes, gastosPorCategoria, ingresos = 0, i
     setPinnedCats(prev => { const n = new Set(prev); n.delete(cat); return n })
   }
 
-  if (!loaded) return (
+  if (!loaded || !planLoaded) return (
     <div className={`card ${styles.loadingCard}`}>
       {[80, 60, 90].map((w, i) => (
         <div key={i} className={styles.loadingRow}>
@@ -285,31 +370,76 @@ export default function BudgetManager({ mes, gastosPorCategoria, ingresos = 0, i
               <ArrowLeft size={15} />
             </button>
           )}
-          <p className={styles.headerTitle}>Presupuesto mensual</p>
+          <p className={styles.headerTitle}>Tu plan mensual</p>
         </div>
-        {activeCats.length > 0 && (
-          <div className={styles.headerSub} style={{ paddingLeft: onClose ? 23 : 0 }}>
-            <p className={styles.headerHint}>
-              Toca ▸ para editar el límite o desglosar
-            </p>
-            <button
-              onClick={copyFromPrev}
-              disabled={copying}
-              aria-label="Copiar presupuesto del mes anterior"
-              className={styles.copyBtn}
-            >
-              <Copy size={10} />
-              {copying ? 'Copiando…' : 'Copiar mes anterior'}
-            </button>
-          </div>
-        )}
+        <div className={styles.headerSub} style={{ paddingLeft: onClose ? 23 : 0 }}>
+          <p className={styles.headerHint}>
+            Ingreso, ahorro y fijos: lo variable se reparte solo en tu cupo semanal
+          </p>
+          <button
+            onClick={copyFromPrev}
+            disabled={copying}
+            aria-label="Copiar el mes anterior"
+            className={styles.copyBtn}
+          >
+            <Copy size={10} />
+            {copying ? 'Copiando…' : 'Copiar mes anterior'}
+          </button>
+        </div>
       </div>
 
-      {/* Estado vacío — mes sin categorías */}
+      {/* Ahorro: ingreso + meta, la única entrada manual de este bloque */}
+      <div className={styles.planSection}>
+        <p className={styles.planSectionTitle}>Ahorro y Blindaje</p>
+        <label className={styles.planLabel}>
+          Ingreso neto mensual
+          <div className={styles.planInputGroup}>
+            <span className={styles.currencySign}>$</span>
+            <input
+              className={`input-field ${styles.planInputField}`}
+              inputMode="numeric"
+              placeholder="0"
+              value={formatDigits(planIngreso)}
+              onChange={e => handlePlanInput('ingreso', e.target.value)}
+            />
+          </div>
+        </label>
+        <label className={styles.planLabel}>
+          <span className={styles.planLabelRow}>
+            Meta de ahorro este mes
+            {ahorroPct !== null && <span className={styles.planPct}>{ahorroPct}% del ingreso</span>}
+          </span>
+          <div className={styles.planInputGroup}>
+            <span className={styles.currencySign}>$</span>
+            <input
+              className={`input-field ${styles.planInputField}`}
+              inputMode="numeric"
+              placeholder="0"
+              value={formatDigits(planAhorro)}
+              onChange={e => handlePlanInput('ahorro', e.target.value)}
+            />
+          </div>
+        </label>
+        <p className={styles.planBenchmark}>
+          Dinero que apartas antes de gastar: fondo de emergencia, metas, inversión.
+          Recomendado: 20-30% de tu ingreso.
+        </p>
+      </div>
+
+      {/* Gastos Fijos */}
+      <div className={styles.sectionDivider}>
+        <p className={styles.sectionDividerLabel}>Gastos Fijos</p>
+        <p className={styles.sectionDividerHint}>
+          Lo que pagas sí o sí cada mes, mismo monto o parecido: arriendo, servicios,
+          salud prepagada, suscripciones. Recomendado: 45-50% de tu ingreso
+          {fijoPct !== null && ` · hoy vas en ${fijoPct}%`}.
+        </p>
+      </div>
+
       {activeCats.length === 0 && !showPicker && (
         <div className={styles.emptyState}>
-          <p className={styles.emptyTitle}>Aún no tienes categorías</p>
-          <p className={styles.emptyHint}>Cópialas del mes pasado o agrega la primera</p>
+          <p className={styles.emptyTitle}>Aún no tienes fijos configurados</p>
+          <p className={styles.emptyHint}>Cópialos del mes pasado o agrega el primero</p>
           <div className={styles.emptyActions}>
             <button onClick={copyFromPrev} disabled={copying} className={styles.emptyPrimaryBtn}>
               <Copy size={12} />
@@ -317,16 +447,12 @@ export default function BudgetManager({ mes, gastosPorCategoria, ingresos = 0, i
             </button>
             <button onClick={() => setShowPicker(true)} className={styles.emptySecondaryBtn}>
               <Plus size={12} />
-              Agregar categoría
+              Agregar fijo
             </button>
           </div>
         </div>
       )}
 
-      {/* Categorías activas — ordenadas por urgencia real (catRank), sin
-          títulos de sección: una vez el presupuesto ya está armado, separar
-          "necesitan atención / van bien / etc." no aporta — el orden solo
-          ya comunica lo mismo. */}
       {activeCats.map(cat => (
         <CategoryRow
           key={cat}
@@ -341,14 +467,14 @@ export default function BudgetManager({ mes, gastosPorCategoria, ingresos = 0, i
         />
       ))}
 
-      {/* Agregar categoría */}
+      {/* Agregar categoría fija */}
       {(activeCats.length > 0 || showPicker) && (
       <div className={activeCats.length > 0 ? styles.addSectionBordered : styles.addSection}>
         {showPicker ? (
           <div>
             <div className={styles.pickerHeader}>
               <p className={styles.pickerLabel}>
-                Agregar categoría
+                Agregar gasto fijo
               </p>
               <button
                 onClick={() => { setShowPicker(false); setCustomInput(''); setInputError(null) }}
@@ -366,7 +492,7 @@ export default function BudgetManager({ mes, gastosPorCategoria, ingresos = 0, i
                   value={customInput}
                   onChange={e => { setCustomInput(e.target.value); setInputError(null) }}
                   onKeyDown={e => { if (e.key === 'Enter') addCustomCategory() }}
-                  placeholder="Nombre (ej. Mascotas)"
+                  placeholder="Nombre (ej. Colegio)"
                   maxLength={30}
                 />
                 <button
@@ -382,7 +508,7 @@ export default function BudgetManager({ mes, gastosPorCategoria, ingresos = 0, i
               )}
             </div>
 
-            {/* Chips de categorías predefinidas disponibles */}
+            {/* Chips de categorías fijas predefinidas disponibles */}
             {availablePredefined.length > 0 && (
               <>
                 <p className={styles.predefinedLabel}>
@@ -408,41 +534,77 @@ export default function BudgetManager({ mes, gastosPorCategoria, ingresos = 0, i
             className={styles.addBtn}
           >
             <Plus size={12} />
-            Agregar categoría
+            Agregar gasto fijo
           </button>
         )}
       </div>
       )}
 
-      {/* Footer — resumen de asignación */}
-      {(totalPresupuestado > 0 || ingresos > 0) && (
-        <div className={styles.footer}>
-          <div className={styles.footerRow}>
-            <span className={styles.footerLabel}>Total presupuestado</span>
-            <span className={styles.footerTotal}>
-              {formatCOP(totalPresupuestado)}
-            </span>
-          </div>
-          {ingresos > 0 && (
-            <div className={styles.footerRowLast}>
-              <span className={styles.footerLabel}>
-                {restante >= 0 ? 'Sin asignar' : 'Excedido'}
-              </span>
-              <span className={restante >= 0 ? styles.restanteOk : styles.restanteOver}>
-                {restante >= 0 ? formatCOP(restante) : `−${formatCOP(Math.abs(restante))}`}
-              </span>
+      {/* Gasto Variable: derivado, no se presupuesta por categoría */}
+      <div className={styles.sectionDivider}>
+        <p className={styles.sectionDividerLabel}>Gasto Variable</p>
+        <p className={styles.sectionDividerHint}>
+          Todo lo demás: restaurantes, transporte, compras, antojos. No lo presupuestas
+          por categoría, se reparte solo en tu cupo semanal. Recomendado: 25-30% de tu ingreso
+          {variablePct !== null && ` · hoy es ${variablePct}%`}.
+        </p>
+      </div>
+      <div className={styles.variableSection}>
+        {ingresoNum > 0 ? (
+          <>
+            <div className={styles.variableAmountRow}>
+              <span className={styles.variableLabel}>Pool disponible este mes</span>
+              <span className={styles.variableAmount}>{formatCOP(poolVariable)}</span>
             </div>
-          )}
+            <p className={styles.variableHint}>
+              ≈ {formatCOP(Math.round(poolVariable / numWeeks))} por semana ({numWeeks} semanas) ·
+              revisa tu cupo vivo en la tarjeta de arriba del dashboard
+            </p>
+            {/* Toggle "Gasto Fijo" (sección 3C del brief): la forma de mover un gasto
+                individual de Variable a Fijo (o viceversa) es reclasificarlo en la
+                lista de transacciones, no acá — acá solo se ve el pool agregado. */}
+            <p className={styles.variableFootnote}>
+              ¿Un gasto de aquí en realidad es fijo? Cámbialo desde la lista de
+              transacciones, tocando su etiqueta de capa.
+            </p>
+          </>
+        ) : (
+          <p className={styles.variableHint}>
+            Define tu ingreso neto mensual arriba para ver cuánto te queda libre para gastar
+          </p>
+        )}
+      </div>
+
+      {/* Footer — resumen de asignación */}
+      <div className={styles.footer}>
+        <div className={styles.footerRow}>
+          <span className={styles.footerLabel}>Total fijos</span>
+          <span className={styles.footerTotal}>
+            {formatCOP(totalFijo)}
+          </span>
         </div>
-      )}
+        <div className={styles.footerRowLast}>
+          <span className={styles.footerLabel}>Meta de ahorro</span>
+          <span className={styles.footerTotal}>
+            {formatCOP(ahorroNum)}
+          </span>
+        </div>
+      </div>
     </div>
 
     {/* Floating save bar */}
-    {isDirty && loaded && (
+    {isDirty && (
       <FloatingSaveBar
         label={saveError ?? 'Cambios sin guardar'}
         state={saving ? 'saving' : savedOk ? 'saved' : saveError ? 'error' : 'idle'}
-        onDiscard={() => { setDraft(saved); setSaveError(null); onBudgetsChange?.(totals(saved)) }}
+        onDiscard={() => {
+          setDraft(saved)
+          setPlanIngreso(planSaved.ingresoNetoMensual > 0 ? String(planSaved.ingresoNetoMensual) : '')
+          setPlanAhorro(planSaved.ahorroMetaMonto > 0 ? String(planSaved.ahorroMetaMonto) : '')
+          setSaveError(null)
+          onBudgetsChange?.(totals(saved))
+          onPlanChange?.(planSaved)
+        }}
         onSave={handleSave}
         saveTestId={TEST_IDS.BUDGET_SAVE_BUTTON}
         saveAriaLabel={saving ? 'Guardando presupuesto' : saveError ? 'Reintentar guardado' : 'Guardar presupuesto'}
@@ -467,10 +629,8 @@ function CategoryRow({ cat, entry, savedEntry, gasto, isExpanded, onToggle, onCh
   const limite   = entry.monto
   const hasSubs  = entry.subcategorias.length > 0
   const pct      = limite > 0 ? (gasto / limite) * 100 : 0
-  const isGoal   = GOAL_CATEGORIES.has(cat)
-  const over     = limite > 0 && !isGoal && gasto > limite
-  const color    = limite > 0 ? (isGoal ? pctColorGoal(pct) : pctColor(pct)) : 'var(--text-muted)'
-  const bgColor  = limite > 0 ? (isGoal ? pctBgGoal(pct) : pctBg(pct)) : 'transparent'
+  const color    = limite > 0 ? pctColor(pct) : 'var(--text-muted)'
+  const bgColor  = limite > 0 ? pctBg(pct) : 'transparent'
   const isDirty  = JSON.stringify(entry) !== JSON.stringify(savedEntry)
   const CatIcon  = getCategoryIcon(cat)
 
