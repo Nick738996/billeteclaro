@@ -15,7 +15,6 @@ import CategoriesCard from '@/components/dashboard/CategoriesCard'
 import TransactionsList from '@/components/dashboard/TransactionsList'
 import HeaderPill from '@/components/dashboard/HeaderPill'
 import AIAdvisorPanel from '@/components/dashboard/AIAdvisorPanel'
-import SavingsOverview from '@/components/dashboard/SavingsOverview'
 import ManualTransactions from '@/components/dashboard/ManualTransactions'
 import TourTooltip from '@/components/tour/TourTooltip'
 import HelpModal from '@/components/tour/HelpModal'
@@ -252,26 +251,21 @@ export default function DashboardClient({
         <MonthHero
           gastos={stats.gastos}
           mes={month}
-          budgetTotal={Object.values(budgets).reduce((s, v) => s + (v || 0), 0)}
+          refreshSignal={contextVersion}
         />
 
         {isCurrent && <WeeklyAllowanceCard refreshSignal={contextVersion} />}
 
-        <SavingsOverview
-          onTransaction={() => { loadMonth(month); bumpContext() }}
-          refreshSignal={savingsRefresh}
-        />
-
-        <div data-testid="tour-budget">
+        <div data-testid="tour-budget" className={styles.planWrap}>
           <CategoriesCard
             mes={month}
             transactions={txs}
-            gastosPorCategoria={stats.porCategoria}
-            ingresos={stats.ingresos}
             activeFilter={activeFilter}
             onFilterChange={setActiveFilter}
             onBudgetsChange={setBudgets}
             onSaved={bumpContext}
+            onSavingsTransaction={() => { loadMonth(month); bumpContext() }}
+            savingsRefreshSignal={savingsRefresh}
           />
         </div>
 

@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { formatCOPCompact } from '@/lib/types'
-import { SegmentedProgressBar } from '@/components/ui/ProgressBar'
 import styles from './WeeklyAllowanceCard.module.css'
 
 interface WeeklyStatus {
@@ -27,28 +26,37 @@ const ESTADO_COLOR: Record<WeeklyStatus['estado'], string> = {
   rojo: 'var(--red)',
 }
 
+const ESTADO_MENSAJE: Record<WeeklyStatus['estado'], string> = {
+  verde: 'Vas al ritmo esta semana',
+  amarillo: 'Gastando más rápido de lo esperado',
+  rojo: 'Sobregiro esta semana',
+}
+
 interface Props {
-  /** Cambiar este valor fuerza un refetch (ej. después de agregar una transacción manual) */
+  /** Cambiar este valor fuerza un refetch (ej. después de guardar el presupuesto o agregar una transacción) */
   refreshSignal?: number
 }
 
-function digitsToNumber(value: string): number {
-  return parseInt(value.replace(/\D/g, ''), 10) || 0
-}
+// Geometría del anillo — círculo de progreso. Radio grande + trazo grueso
+// para que el monto (lo que de verdad importa) tenga espacio real adentro
+// sin tocar el borde del anillo.
+const R = 118
+const CX = 170
+const CY = 170
+const SW = 16
+const CIRC = 2 * Math.PI * R
 
-function formatDigits(value: string): string {
-  return value ? digitsToNumber(value).toLocaleString('es-CO') : ''
-}
-
+/**
+ * Un solo anillo como foco central del dashboard — reemplaza la franja
+ * compacta (y, antes de eso, el hero grande con barra lineal). El relleno
+ * del anillo es el % gastado del cupo semanal.
+ *
+ * Solo se muestra una vez que hay un plan mensual configurado (ingreso +
+ * meta de ahorro) — eso se hace en BudgetManager, no acá.
+ */
 export default function WeeklyAllowanceCard({ refreshSignal }: Props) {
-  const [loaded, setLoaded] = useState(false)
   const [status, setStatus] = useState<WeeklyStatus | null>(null)
   const [hasPlan, setHasPlan] = useState(false)
-
-  const [ingreso, setIngreso] = useState('')
-  const [ahorro, setAhorro] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(() => {
     fetch('/api/weekly-allowance')
@@ -56,103 +64,41 @@ export default function WeeklyAllowanceCard({ refreshSignal }: Props) {
       .then(d => {
         setStatus(d.status ?? null)
         setHasPlan(!!d.hasPlan)
-        setLoaded(true)
       })
-      .catch(() => setLoaded(true))
+      .catch(() => { setStatus(null); setHasPlan(false) })
   }, [])
 
   useEffect(() => { load() }, [load, refreshSignal])
 
-  const savePlan = async () => {
-    const ingresoNum = digitsToNumber(ingreso)
-    const ahorroNum = digitsToNumber(ahorro)
-    if (ingresoNum <= 0 || !status) return
-
-    setSaving(true)
-    setError(null)
-    try {
-      const res = await fetch('/api/monthly-plan', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mes: status.mes, ingresoNetoMensual: ingresoNum, ahorroMetaMonto: ahorroNum }),
-      })
-      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Error guardando')
-      load()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Error desconocido')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  if (!loaded) {
-    return (
-      <div className={`card ${styles.loadingWrap}`}>
-        <div className={`skeleton ${styles.skeletonTitle}`} />
-        <div className={`skeleton ${styles.skeletonAmount}`} />
-      </div>
-    )
-  }
-
-  if (!hasPlan || !status) {
-    return (
-      <div className={`card ${styles.root}`}>
-        <p className={styles.setupTitle}>Configura tu Cupo Semanal</p>
-        <p className={styles.setupHint}>
-          Dinos tu ingreso neto mensual y cuánto quieres apartar para ahorro; dividimos el resto en
-          un cupo semanal para que gastes sin culpa.
-        </p>
-        <div className={styles.setupFields}>
-          <label className={styles.setupLabel}>
-            Ingreso neto mensual
-            <input
-              className="input-field"
-              inputMode="numeric"
-              placeholder="$0"
-              value={formatDigits(ingreso)}
-              onChange={e => setIngreso(e.target.value)}
-            />
-          </label>
-          <label className={styles.setupLabel}>
-            Meta de ahorro este mes
-            <input
-              className="input-field"
-              inputMode="numeric"
-              placeholder="$0"
-              value={formatDigits(ahorro)}
-              onChange={e => setAhorro(e.target.value)}
-            />
-          </label>
-        </div>
-        {error && <p className={styles.error}>{error}</p>}
-        <button onClick={savePlan} disabled={saving || !ingreso} className={styles.setupBtn}>
-          {saving ? 'Guardando…' : 'Calcular mi cupo semanal'}
-        </button>
-      </div>
-    )
-  }
+  if (!hasPlan || !status) return null
 
   const color = ESTADO_COLOR[status.estado]
   const promedioDiario = status.diasRestantes > 0 ? Math.max(status.restante / status.diasRestantes, 0) : 0
+  const sugerido = status.diasRestantes > 0
+    ? `sugerido ${formatCOPCompact(promedioDiario)}/día`
+    : 'último día de la semana'
+
+  const arcPct = Math.min(status.pctGastado, 100)
+  const dashoffset = CIRC * (1 - arcPct / 100)
 
   return (
-    <div className={`card ${styles.root}`}>
-      <p className={styles.label}>Te quedan esta semana</p>
-      <p className={styles.hero} style={{ color: status.estado === 'rojo' ? color : 'var(--text)' }}>
-        {formatCOPCompact(status.restante)}
-      </p>
-
-      <SegmentedProgressBar segments={7} filled={status.diasTranscurridos} color={color} />
-
-      <div className={styles.footer}>
-        <p className={styles.micro}>
-          {status.diasRestantes > 0
-            ? `Para los próximos ${status.diasRestantes} días · sugerido ${formatCOPCompact(promedioDiario)}/día`
-            : 'Hoy es el último día de la semana'}
-        </p>
-        {status.estado === 'rojo' && (
-          <span className={styles.badgeRojo}>Sobregiro: se ajusta la próxima semana</span>
-        )}
+    <div className={styles.root}>
+      <p className={styles.label}>Cupo semanal</p>
+      <div className={styles.ringWrap}>
+        <svg width="340" height="340" viewBox="0 0 340 340">
+          <circle cx={CX} cy={CY} r={R} fill="none" stroke="var(--border)" strokeWidth={SW} />
+          <circle
+            cx={CX} cy={CY} r={R} fill="none" stroke={color} strokeWidth={SW}
+            strokeDasharray={CIRC} strokeDashoffset={dashoffset} strokeLinecap="round"
+            transform={`rotate(-90 ${CX} ${CY})`}
+            className={styles.ringFill}
+          />
+        </svg>
+        <div className={styles.ringCenter}>
+          <span className={styles.amount} style={{ color }}>{formatCOPCompact(status.restante)}</span>
+          <span className={styles.estadoMsg} style={{ color }}>{ESTADO_MENSAJE[status.estado]}</span>
+          <span className={styles.sugerido}>{sugerido}</span>
+        </div>
       </div>
     </div>
   )

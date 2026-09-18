@@ -48,8 +48,8 @@ describe('computeWeeklyCupoBase — semanas partidas entre meses', () => {
   it('pondera cada día por el pool del mes al que pertenece (caso borde #1)', async () => {
     const { supabase } = createFakeSupabase({
       monthly_plan: [
-        { user_id: 'u1', mes: '2026-08', ingreso_neto_mensual: 3_100_000, ahorro_meta_monto: 0 }, // 100k/día (31 días)
-        { user_id: 'u1', mes: '2026-09', ingreso_neto_mensual: 6_000_000, ahorro_meta_monto: 0 }, // 200k/día (30 días)
+        { user_id: 'u1', mes: '2026-08', ingreso_neto_mensual: 3_100_000, fijo_total_monto: 0, ahorro_meta_monto: 0 }, // 100k/día (31 días)
+        { user_id: 'u1', mes: '2026-09', ingreso_neto_mensual: 6_000_000, fijo_total_monto: 0, ahorro_meta_monto: 0 }, // 200k/día (30 días)
       ],
       budgets: [],
       category_capas: [],
@@ -62,7 +62,7 @@ describe('computeWeeklyCupoBase — semanas partidas entre meses', () => {
 
   it('una semana completa dentro de un solo mes usa solo su pool', async () => {
     const { supabase } = createFakeSupabase({
-      monthly_plan: [{ user_id: 'u1', mes: '2026-09', ingreso_neto_mensual: 6_000_000, ahorro_meta_monto: 0 }],
+      monthly_plan: [{ user_id: 'u1', mes: '2026-09', ingreso_neto_mensual: 6_000_000, fijo_total_monto: 0, ahorro_meta_monto: 0 }],
       budgets: [],
       category_capas: [],
     })
@@ -81,7 +81,7 @@ describe('computeWeeklyCupoBase — semanas partidas entre meses', () => {
 describe('ensureWeekAllowance', () => {
   it('crea la fila con el cupo_base calculado si no existe', async () => {
     const { supabase } = createFakeSupabase({
-      monthly_plan: [{ user_id: 'u1', mes: '2026-09', ingreso_neto_mensual: 6_000_000, ahorro_meta_monto: 0 }],
+      monthly_plan: [{ user_id: 'u1', mes: '2026-09', ingreso_neto_mensual: 6_000_000, fijo_total_monto: 0, ahorro_meta_monto: 0 }],
       budgets: [],
       category_capas: [],
       weekly_allowances: [],
@@ -96,7 +96,7 @@ describe('ensureWeekAllowance', () => {
 
   it('es idempotente: la segunda llamada retorna la misma fila sin duplicar', async () => {
     const { supabase, tables } = createFakeSupabase({
-      monthly_plan: [{ user_id: 'u1', mes: '2026-09', ingreso_neto_mensual: 6_000_000, ahorro_meta_monto: 0 }],
+      monthly_plan: [{ user_id: 'u1', mes: '2026-09', ingreso_neto_mensual: 6_000_000, fijo_total_monto: 0, ahorro_meta_monto: 0 }],
       budgets: [],
       category_capas: [],
       weekly_allowances: [],
@@ -106,6 +106,42 @@ describe('ensureWeekAllowance', () => {
     const second = await ensureWeekAllowance(supabase, 'u1', '2026-09-14')
     expect(second.id).toBe(first.id)
     expect(tables.weekly_allowances).toHaveLength(1)
+  })
+
+  it('una semana ABIERTA refleja de inmediato un cambio al plan mensual (el usuario editó ingreso/fijo/ahorro a mitad de semana)', async () => {
+    const { supabase, tables } = createFakeSupabase({
+      monthly_plan: [{ user_id: 'u1', mes: '2026-09', ingreso_neto_mensual: 6_000_000, fijo_total_monto: 0, ahorro_meta_monto: 0 }],
+      budgets: [],
+      category_capas: [],
+      weekly_allowances: [],
+    })
+
+    const before = await ensureWeekAllowance(supabase, 'u1', '2026-09-14')
+    expect(before.cupo_base).toBe(1_400_000) // 6M / 30 días * 7
+
+    // el usuario sube su ingreso neto mensual (ej. se auto-llenó con ingresos reales más altos)
+    tables.monthly_plan[0].ingreso_neto_mensual = 9_000_000
+
+    const after = await ensureWeekAllowance(supabase, 'u1', '2026-09-14')
+    expect(after.id).toBe(before.id) // misma fila, no duplica
+    expect(after.cupo_base).toBe(2_100_000) // 9M / 30 días * 7
+    expect(tables.weekly_allowances).toHaveLength(1)
+  })
+
+  it('una semana ya CERRADA mantiene su cupo_base congelado aunque el plan cambie después (protege el historial y el rollover ya decidido)', async () => {
+    const { supabase, tables } = createFakeSupabase({
+      monthly_plan: [{ user_id: 'u1', mes: '2026-09', ingreso_neto_mensual: 6_000_000, fijo_total_monto: 0, ahorro_meta_monto: 0 }],
+      budgets: [],
+      category_capas: [],
+      weekly_allowances: [
+        { user_id: 'u1', mes: '2026-09', semana_inicio: '2026-09-14', semana_fin: '2026-09-20', cupo_base: 1_400_000, ajuste_carryover: 0, cerrada: true, decision: 'rollover' },
+      ],
+    })
+
+    tables.monthly_plan[0].ingreso_neto_mensual = 9_000_000
+
+    const week = await ensureWeekAllowance(supabase, 'u1', '2026-09-14')
+    expect(week.cupo_base).toBe(1_400_000)
   })
 })
 
@@ -122,7 +158,7 @@ function txRow(overrides: Record<string, unknown>) {
 }
 
 describe('getLiveWeeklyStatus', () => {
-  const basePlan = { user_id: 'u1', mes: '2026-09', ingreso_neto_mensual: 6_000_000, ahorro_meta_monto: 0 }
+  const basePlan = { user_id: 'u1', mes: '2026-09', ingreso_neto_mensual: 6_000_000, fijo_total_monto: 0, ahorro_meta_monto: 0 }
   // semana 2026-09-14 (lun) .. 2026-09-20 (dom), cupo_base = 1_400_000
   // "hoy" = 2026-09-17 (jueves) → día 4 de 7 → pctTiempo ≈ 57.14%
 
@@ -170,6 +206,21 @@ describe('getLiveWeeklyStatus', () => {
     expect(status.restante).toBe(-100_000)
   })
 
+  it('estado rojo incluso con cupo total en cero (ingreso = fijos + ahorro), donde pctGastado topaba en 100 y nunca cruzaba a rojo', async () => {
+    const { supabase } = createFakeSupabase({
+      monthly_plan: [{ user_id: 'u1', mes: '2026-09', ingreso_neto_mensual: 1_400_000, fijo_total_monto: 0, ahorro_meta_monto: 1_400_000 }],
+      budgets: [],
+      category_capas: [],
+      weekly_allowances: [],
+      transactions: [txRow({ monto: 50_000 })], // cupoBase = 0, cualquier gasto ya es sobregiro
+    })
+
+    const status = await getLiveWeeklyStatus(supabase, 'u1', '2026-09-17')
+    expect(status.cupoBase).toBe(0)
+    expect(status.restante).toBe(-50_000)
+    expect(status.estado).toBe('rojo')
+  })
+
   it('ignora transacciones de otras capas (FIJO, AHORRO) al sumar el gasto variable', async () => {
     const { supabase } = createFakeSupabase({
       monthly_plan: [basePlan],
@@ -189,7 +240,7 @@ describe('getLiveWeeklyStatus', () => {
 })
 
 describe('closeWeek — mecánica de cierre semanal (sección 2.B.4)', () => {
-  const basePlan = { user_id: 'u1', mes: '2026-09', ingreso_neto_mensual: 6_000_000, ahorro_meta_monto: 0 }
+  const basePlan = { user_id: 'u1', mes: '2026-09', ingreso_neto_mensual: 6_000_000, fijo_total_monto: 0, ahorro_meta_monto: 0 }
   // semana a cerrar: 2026-09-14..20, cupo_base = 1_400_000
 
   it('rollover (default): el saldo positivo pasa como ajuste a la semana siguiente', async () => {

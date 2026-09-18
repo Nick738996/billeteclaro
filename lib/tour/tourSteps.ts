@@ -22,8 +22,8 @@ const ALL_STEPS: Array<TourStep & { requiresFeature?: boolean }> = [
   {
     id: 'budget',
     targetTestId: 'tour-budget',
-    titulo: 'Tu presupuesto',
-    descripcion: 'Configura cuánto quieres gastar en cada categoría. Las barras te muestran si vas bien o si ya te pasaste.',
+    titulo: 'Tu plan',
+    descripcion: 'Ahorro, gastos fijos y variable en 3 números. Toca cualquiera para ver el detalle.',
     posicion: 'top',
   },
   {

@@ -93,7 +93,23 @@ export async function ensureWeekAllowance(
   weekStart: string
 ): Promise<WeeklyAllowance> {
   const existing = await findWeekAllowance(supabase, userId, weekStart)
-  if (existing) return existing
+  if (existing) {
+    // Una semana ABIERTA no está congelada: si el usuario edita su plan
+    // mensual a mitad de semana (ej. ajusta el ingreso, fijo o ahorro), el
+    // cupo base debe reflejarlo de inmediato — nada se ha cerrado ni
+    // decidido todavía. Una semana ya `cerrada` sí queda intocable, protege
+    // el historial y el rollover que ya se calculó al cerrarla.
+    if (existing.cerrada) return existing
+    const cupoBaseFresco = await computeWeeklyCupoBase(supabase, userId, weekStart)
+    if (cupoBaseFresco === existing.cupo_base) return existing
+    const { error } = await supabase
+      .from('weekly_allowances')
+      .update({ cupo_base: cupoBaseFresco, updated_at: new Date().toISOString() })
+      .eq('user_id', userId)
+      .eq('semana_inicio', weekStart)
+    if (error) throw new Error(`ensureWeekAllowance (refresh): ${error.message}`)
+    return { ...existing, cupo_base: cupoBaseFresco }
+  }
 
   const cupoBase = await computeWeeklyCupoBase(supabase, userId, weekStart)
   const semanaFin = addDays(weekStart, 6)
@@ -263,8 +279,11 @@ export async function getLiveWeeklyStatus(
   const pctTiempo = Math.min(100, (diasTranscurridos / 7) * 100)
   const pctGastado = cupoTotal > 0 ? (gastado / cupoTotal) * 100 : gastado > 0 ? 100 : 0
 
+  // rojo se decide por `restante < 0` (la verdad de fondo), no por pctGastado
+  // > 100: con cupoTotal muy chico o en cero, pctGastado quedaba tope en
+  // exactamente 100 y nunca cruzaba a rojo aunque ya hubiera sobregiro real.
   let estado: BurnEstado
-  if (pctGastado > 100) estado = 'rojo'
+  if (restante < 0) estado = 'rojo'
   else if (pctGastado > pctTiempo + 10) estado = 'amarillo'
   else estado = 'verde'
 

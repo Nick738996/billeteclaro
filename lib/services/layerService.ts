@@ -52,19 +52,6 @@ export function getCapaForTransaccion(
   return 'VARIABLE'
 }
 
-/**
- * true si `categoria` pertenece al bloque de Gastos Fijos que BudgetManager
- * deja presupuestar (categorías built-in con capa FIJO, o cualquier
- * categoría custom — en BudgetManager solo se crean customs desde la
- * sección Fijo, así que una custom sin CATEGORIA_CAPA_DEFAULT se asume Fijo
- * ahí; getCapaForTransaccion, en cambio, asume VARIABLE por defecto porque
- * ese es el comportamiento correcto para un gasto sin clasificar).
- */
-export function isFijoBudgetCategory(categoria: string): boolean {
-  if (categoria in CATEGORIA_CAPA_DEFAULT) return CATEGORIA_CAPA_DEFAULT[categoria as Categoria] === 'FIJO'
-  return true
-}
-
 export interface LayerTotals {
   ahorro: number
   fijo: number

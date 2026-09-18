@@ -1,9 +1,24 @@
 import { ok, err } from '@/lib/api/response'
 import { withAuth } from '@/lib/api/withAuth'
-import { saveCategoryCapa } from '@/lib/services/layerService'
+import { getCustomCapaOverrides, saveCategoryCapa } from '@/lib/services/layerService'
 import type { Capa } from '@/lib/types'
 
 const VALID_CAPAS = new Set<Capa>(['AHORRO', 'FIJO', 'VARIABLE'])
+
+// GET /api/category-capas
+// Overrides de capa del usuario (categorías custom o built-in reclasificadas)
+// — usado por CategoriesCard para clasificar correctamente el gasto real de
+// cada transacción por capa; sin esto, una categoría custom marcada Fijo al
+// crearla (ver POST abajo) se seguía viendo como Variable en el gasto real.
+export const GET = withAuth(async (_req, user, supabase) => {
+  try {
+    const overrides = await getCustomCapaOverrides(supabase, user.id)
+    return ok({ overrides })
+  } catch (e) {
+    console.error('[GET /api/category-capas]', { userId: user.id }, e)
+    return err('Error cargando las capas de categorías')
+  }
+})
 
 // POST /api/category-capas  body: { categoria, capa }
 // Reclasifica una categoría (built-in o custom) a una capa específica —

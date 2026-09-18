@@ -74,13 +74,30 @@
 .barTrack { height: 3px; background: var(--border); border-radius: 99px; overflow: hidden; }
 .barFill { height: 100%; border-radius: 99px; transition: width 0.3s ease; width: var(--bar-w); background: var(--bar-color); }
 
-/* ── Vista Presupuesto: 3 tarjetas macro por capa ───────────────────────────── */
-.layerBlock { padding: 14px 16px; }
-.layerBlockBorder { border-top: 1px solid var(--border-soft); }
-.layerHeader { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
-.layerName { font-size: var(--text-base); font-weight: 600; color: var(--text); }
-.layerHint { font-size: var(--text-xs); color: var(--text-subtle); }
-.layerFootnote { font-size: var(--text-xs); color: var(--text-subtle); margin-top: 8px; }
+/* ── Vista Presupuesto: fila de 3 números (Ahorro/Fijo/Variable) ────────────
+   Reemplaza lo que antes eran 3 tarjetas con ícono + monto + barra + badge +
+   subtítulo cada una — 5 barras casi idénticas en la misma pantalla entre
+   Mes, Semana y las 3 capas le quitaban peso visual a cada una. Ahora es
+   solo un número por columna; el detalle vive detrás de tocarla. */
+.statsRow { display: flex; padding: 18px 16px 4px; }
+.statCol {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 7px;
+  padding: 0 8px; background: none; border: none; cursor: pointer;
+}
+.statDivider { width: 1px; background: var(--border-soft); }
+.statLabel { font-size: var(--text-xs); color: var(--text-subtle); }
+.statAmounts { font-size: var(--text-base); font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+.statValue { font-size: var(--text-sm); font-weight: 700; }
+.statValueEmpty { font-size: var(--text-sm); font-weight: 700; color: var(--text-subtle); }
+.checkDot { display: flex; align-items: center; justify-content: center; }
+.statsHint { text-align: center; font-size: var(--text-xs); color: var(--text-subtle); padding: 10px 16px 16px; }
+
+.detailPanel { padding: 4px 16px 16px; border-top: 1px solid var(--border-soft); margin-top: 4px; }
+.detailAmounts { font-size: var(--text-lg); font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; margin: 12px 0 0; }
+.detailAmountsMuted { font-size: var(--text-sm); font-weight: 400; color: var(--text-subtle); }
+.layerHint { font-size: var(--text-xs); color: var(--text-subtle); margin-top: 12px; }
+.layerFootnote { font-size: var(--text-xs); color: var(--text-subtle); margin-top: 10px; }
+.layerSubtitle { font-size: var(--text-xs); color: var(--text-subtle); margin-top: 7px; }
 
 /* ── Vista Participación: dona + leyenda ────────────────────────────────────── */
 .chartTitle { padding: 14px 16px 0; }

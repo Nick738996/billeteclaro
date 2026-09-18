@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { getDaysInMonth, parseISO } from 'date-fns'
 import { formatCOPCompact } from '@/lib/types'
 import { TEST_IDS } from '@/lib/testIds'
@@ -8,95 +9,46 @@ import styles from './MonthHero.module.css'
 interface Props {
   gastos: number
   mes: string
-  budgetTotal: number
+  /** Cambiar este valor fuerza un refetch del plan mensual (ej. después de guardar el presupuesto) */
+  refreshSignal?: number
 }
 
-/** Mensaje breve y honesto del pulso del mes — solo con datos reales, nunca inventa positividad */
-function monthPulse(pctTiempo: number, pctPresupuesto: number | null): { texto: string; color: string } | null {
-  if (pctPresupuesto === null) return null // sin presupuesto configurado, no hay base para opinar
+/**
+ * Antes esta era la tarjeta hero del dashboard: número enorme, barra,
+ * mensaje de pulso. Compitiendo con el anillo del Cupo Semanal (el foco real
+ * de "¿cuánto puedo gastar hoy?"), eran dos heroes en la misma pantalla. Ahora
+ * es una sola línea de contexto — el mes sigue siendo relevante, pero de
+ * fondo, no como protagonista.
+ */
+export default function MonthHero({ gastos, mes, refreshSignal }: Props) {
+  const [ingreso, setIngreso] = useState(0)
 
-  if (pctPresupuesto >= 100) {
-    return { texto: 'Ya llegaste al 100% del presupuesto', color: 'var(--red)' }
-  }
-  if (pctPresupuesto - pctTiempo >= 15) {
-    return { texto: 'Gastando más rápido que el tiempo del mes', color: 'var(--yellow)' }
-  }
-  if (pctTiempo < 70 && pctPresupuesto < 70) {
-    return { texto: 'Vas bien este mes', color: 'var(--green)' }
-  }
-  return { texto: 'Vas al ritmo esperado este mes', color: 'var(--text-muted)' }
-}
+  useEffect(() => {
+    fetch(`/api/monthly-plan?mes=${mes}`)
+      .then(r => r.json())
+      .then(d => setIngreso(d.plan?.ingresoNetoMensual ?? 0))
+      .catch(() => setIngreso(0))
+  }, [mes, refreshSignal])
 
-export default function MonthHero({ gastos, mes, budgetTotal }: Props) {
   const ref = parseISO(`${mes}-01`)
   const today = new Date()
   const isCurrentMonth =
     today.getFullYear() === ref.getFullYear() && today.getMonth() === ref.getMonth()
-  const diasEnMes    = getDaysInMonth(ref)
+  const diasEnMes     = getDaysInMonth(ref)
   const diasRestantes = isCurrentMonth ? diasEnMes - today.getDate() : 0
 
-  // Todo el hero usa el presupuesto como única base de comparación — antes el
-  // monto/barra/disponible comparaban contra ingresos, mientras que el
-  // mensaje de ritmo comparaba contra presupuesto. Dos bases distintas en el
-  // mismo bloque hacían que la barra desapareciera los días en que el sueldo
-  // aún no había llegado (ingresos = 0), aunque el presupuesto ya existiera.
-  const hasBudget   = budgetTotal > 0
-  const pct         = hasBudget ? (gastos / budgetTotal) * 100 : 0
-  const over        = hasBudget && gastos > budgetTotal
-  const disponible  = budgetTotal - gastos
+  const hasIngreso = ingreso > 0
+  const over       = hasIngreso && gastos > ingreso
+  const restante   = Math.abs(ingreso - gastos)
 
-  const barColor = over ? 'var(--red)' : pct >= 80 ? 'var(--yellow)' : 'var(--green)'
-
-  const pctTiempo = (today.getDate() / diasEnMes) * 100
-  const pulse = isCurrentMonth ? monthPulse(pctTiempo, hasBudget ? pct : null) : null
+  if (!hasIngreso) return null
 
   return (
-    <div data-testid={TEST_IDS.DASHBOARD_MONTH_PROGRESS} className={styles.hero}>
-
-      {/* Amount row */}
-      <div className={styles.amountRow} style={{ marginBottom: hasBudget ? 12 : 8 }}>
-        <div>
-          <p className={styles.label}>Gastado este mes</p>
-          <div className="flex items-baseline gap-2">
-            <span className={`tabular-nums ${styles.amount}`}>
-              {formatCOPCompact(gastos)}
-            </span>
-            {hasBudget && (
-              <span className={styles.budgetSuffix}>
-                de {formatCOPCompact(budgetTotal)}
-              </span>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Progress bar */}
-      {hasBudget && (
-        <div className={styles.barTrack}>
-          <div
-            className={styles.barFill}
-            style={{ width: `${Math.min(pct, 100)}%`, background: barColor }}
-          />
-        </div>
-      )}
-
-      {pulse && (
-        <p className={styles.pulse} style={{ color: pulse.color }}>{pulse.texto}</p>
-      )}
-
-      {/* Subtext */}
-      <div className={styles.footer}>
-        {hasBudget && (
-          <p className={over ? styles.disponibleOver : styles.disponibleOk}>
-            {over
-              ? `${formatCOPCompact(Math.abs(disponible))} sobre el límite`
-              : `${formatCOPCompact(disponible)} disponibles`}
-          </p>
-        )}
-        {isCurrentMonth && diasRestantes > 0 && (
-          <p className={styles.meta}>{diasRestantes}d restantes</p>
-        )}
-      </div>
-    </div>
+    <p data-testid={TEST_IDS.DASHBOARD_MONTH_PROGRESS} className={styles.hero} style={over ? { color: 'var(--red)' } : undefined}>
+      {over
+        ? `Vas ${formatCOPCompact(restante)} sobre tu ingreso este mes`
+        : `Gastaste ${formatCOPCompact(gastos)} de ${formatCOPCompact(ingreso)} este mes`}
+      {isCurrentMonth && diasRestantes > 0 && ` · ${diasRestantes}d restantes`}
+    </p>
   )
 }

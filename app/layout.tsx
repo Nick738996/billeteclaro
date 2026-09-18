@@ -1,11 +1,20 @@
 import type { Metadata, Viewport } from 'next'
-import { Inter } from 'next/font/google'
+import { Inter, Space_Grotesk } from 'next/font/google'
 import { ThemeProvider } from 'next-themes'
 import './globals.css'
 
 const inter = Inter({
   subsets: ['latin'],
   variable: '--font-inter',
+  display: 'swap',
+})
+
+// Fuente de "cifras protagonistas" — el anillo del cupo semanal, el pool
+// variable — para que los números que de verdad importan tengan una
+// identidad propia en vez de ser Inter Bold como todo lo demás.
+const spaceGrotesk = Space_Grotesk({
+  subsets: ['latin'],
+  variable: '--font-display',
   display: 'swap',
 })
 
@@ -136,7 +145,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="es" className={inter.variable} suppressHydrationWarning>
+    <html lang="es" className={`${inter.variable} ${spaceGrotesk.variable}`} suppressHydrationWarning>
       <head>
         <StructuredData />
       </head>

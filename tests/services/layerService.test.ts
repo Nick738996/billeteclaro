@@ -4,7 +4,6 @@ import {
   computeLayerTotals,
   getCustomCapaOverrides,
   saveCategoryCapa,
-  isFijoBudgetCategory,
 } from '@/lib/services/layerService'
 import type { Transaction } from '@/lib/types'
 import { createFakeSupabase } from '../helpers/fakeSupabase'
@@ -66,23 +65,6 @@ describe('getCapaForTransaccion', () => {
 
   it('una categoría custom SÍ respeta su override en category_capas', () => {
     expect(getCapaForTransaccion(tx({ categoria: 'COLEGIO_HIJOS' }), { COLEGIO_HIJOS: 'FIJO' })).toBe('FIJO')
-  })
-})
-
-describe('isFijoBudgetCategory', () => {
-  it('true para categorías built-in con capa FIJO', () => {
-    expect(isFijoBudgetCategory('HOGAR')).toBe(true)
-    expect(isFijoBudgetCategory('SUSCRIPCIONES')).toBe(true)
-  })
-
-  it('false para categorías built-in que no son FIJO (VARIABLE, AHORRO, o fuera de capas)', () => {
-    expect(isFijoBudgetCategory('SALIDAS')).toBe(false)
-    expect(isFijoBudgetCategory('AHORROS')).toBe(false)
-    expect(isFijoBudgetCategory('TRANSFERENCIA')).toBe(false)
-  })
-
-  it('true para una categoría custom (BudgetManager solo crea customs en la sección Fijo)', () => {
-    expect(isFijoBudgetCategory('MASCOTAS')).toBe(true)
   })
 })
 

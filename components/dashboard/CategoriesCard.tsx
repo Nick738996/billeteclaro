@@ -6,7 +6,7 @@
 // Ver design_handoff_rediseno_visual/README.md — Módulo 1.
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { Pencil, PieChart, BarChart3 } from 'lucide-react'
+import { Pencil, PieChart, BarChart3, Check } from 'lucide-react'
 import {
   getCategoryColor,
   catLabel,
@@ -16,27 +16,35 @@ import {
   isIngreso,
   zoneColor,
   type Categoria,
+  type Capa,
   type Transaction,
   type BudgetEntry,
 } from '@/lib/types'
-import { computeLayerTotals, isFijoBudgetCategory } from '@/lib/services/layerService'
+import { computeLayerTotals } from '@/lib/services/layerService'
 import BudgetManager from './BudgetManager'
+import SavingsOverview from './SavingsOverview'
 import { getCategoryIcon } from '@/lib/categoryIcons'
 import { TEST_IDS } from '@/lib/testIds'
 import styles from './CategoriesCard.module.css'
 
 type DraftMap = Record<string, BudgetEntry>
 type View = 'presupuesto' | 'participacion'
+type StatKey = 'ahorro' | 'fijo' | 'variable'
 
 interface Props {
   mes: string
   transactions: Transaction[]
-  gastosPorCategoria: Record<string, number>
-  ingresos: number
   activeFilter: string
   onFilterChange: (key: string) => void
   onBudgetsChange: (totals: Record<string, number>) => void
   onSaved: () => void
+  /** Ahorro ahora se ve (y se administra) dentro de esta tarjeta — antes
+   * SavingsOverview vivía como su propia tarjeta suelta en el dashboard,
+   * mostrando un segundo número de "ahorro" sin relación visible con la
+   * meta del mes. onSavingsTransaction/savingsRefreshSignal son los mismos
+   * callbacks que antes recibía directo desde DashboardClient. */
+  onSavingsTransaction: () => void
+  savingsRefreshSignal: number
 }
 
 // ── Dona: helpers SVG (sin cambios de lógica, movidos desde SpendingChart) ────
@@ -106,15 +114,48 @@ function buildChartData(transactions: Transaction[]): ChartEntry[] {
   })
 }
 
+// ── Valor de cada columna de la fila de 3 números — reemplaza lo que antes
+// eran 3 tarjetas con ícono + monto + barra + badge + subtítulo cada una (5
+// barras casi idénticas en la misma pantalla entre Mes, Semana y las 3
+// capas). Ahora es solo un número: un check en círculo cuando se cumple la
+// meta/límite, o el % en texto plano. Ahorro usa semántica de meta (llegar o
+// superar es bueno); Fijo/Variable usan semántica de límite (superarlo es
+// la señal de alerta) — mismo criterio que ya regía los badges viejos.
+function CheckDot({ color }: { color: string }) {
+  return (
+    <span className={styles.checkDot}>
+      <Check size={16} strokeWidth={3} color={color} />
+    </span>
+  )
+}
+
+function StatValue({ pct, kind }: { pct: number | null; kind: 'goal' | 'limit' }) {
+  if (pct === null) return <span className={styles.statValueEmpty}>—</span>
+
+  if (kind === 'goal') {
+    return pct >= 100
+      ? <CheckDot color="var(--green)" />
+      : <span className={styles.statValue} style={{ color: 'var(--blue)' }}>{Math.round(pct)}%</span>
+  }
+
+  if (pct >= 100 && pct < 110) return <CheckDot color="var(--green)" />
+  const label = pct >= 110 ? `+${Math.round(pct - 100)}%` : `${Math.round(pct)}%`
+  return <span className={styles.statValue} style={{ color: zoneColor(pct) }}>{label}</span>
+}
+
 export default function CategoriesCard({
-  mes, transactions, gastosPorCategoria, ingresos, activeFilter, onFilterChange, onBudgetsChange, onSaved,
+  mes, transactions, activeFilter, onFilterChange, onBudgetsChange, onSaved,
+  onSavingsTransaction, savingsRefreshSignal,
 }: Props) {
   const [draftMap, setDraftMap] = useState<DraftMap>({})
   const [editing, setEditing] = useState(false)
   const [loaded, setLoaded] = useState(false)
-  const [plan, setPlan] = useState<{ ingresoNetoMensual: number; ahorroMetaMonto: number } | null>(null)
+  const [plan, setPlan] = useState<{ ingresoNetoMensual: number; fijoTotalMonto: number; ahorroMetaMonto: number } | null>(null)
+  const [capaOverrides, setCapaOverrides] = useState<Record<string, Capa>>({})
   const [view, setView] = useState<View>('presupuesto')
   const [chartMode, setChartMode] = useState<'donut' | 'bars'>('donut')
+  const [expandedStat, setExpandedStat] = useState<StatKey | null>(null)
+  const toggleStat = (key: StatKey) => setExpandedStat(prev => prev === key ? null : key)
 
   const budgets: Record<string, number> = Object.fromEntries(
     Object.entries(draftMap).map(([k, v]) => [k, v.monto])
@@ -144,19 +185,40 @@ export default function CategoriesCard({
   useEffect(() => { loadBudgets() }, [loadBudgets])
   useEffect(() => { loadPlan() }, [loadPlan])
 
+  // Overrides reales de capa por categoría (ej. una custom como "Restaurantes"
+  // que el usuario guardó como Fijo) — sin esto, computeLayerTotals y
+  // fijoPresupuestado asumían VARIABLE/FIJO por defecto según el caso, y
+  // terminaban clasificando el gasto real de una categoría distinto a como
+  // se clasificó su presupuesto, inflando el % de sobregiro de Variable.
+  useEffect(() => {
+    fetch('/api/category-capas')
+      .then(r => r.json())
+      .then(d => setCapaOverrides(d.overrides ?? {}))
+      .catch(() => setCapaOverrides({}))
+  }, [])
+
   // ── Vista Presupuesto: 3 capas (Ahorro / Fijo / Variable) ──────────────────
   // El gasto real por capa sale de las transacciones (computeLayerTotals ya
   // sabe que Ahorro cuenta como "apartado" aunque isGasto lo excluya del
   // gasto tradicional). El "límite" de cada capa sale del plan mensual:
-  // Ahorro compara contra la meta, Fijo contra lo presupuestado por
-  // categoría, Variable contra el pool derivado (ingreso - fijos - ahorro).
-  const layerTotals = useMemo(() => computeLayerTotals(transactions, {}), [transactions])
-  const fijoPresupuestado = Object.entries(budgets)
-    .filter(([cat]) => isFijoBudgetCategory(cat))
-    .reduce((s, [, v]) => s + v, 0)
+  // Ahorro compara contra la meta, Fijo contra el total declarado (un solo
+  // número, ya no una suma de presupuestos por categoría), Variable contra
+  // el pool derivado (ingreso - fijos - ahorro).
+  const layerTotals = useMemo(() => computeLayerTotals(transactions, capaOverrides), [transactions, capaOverrides])
+  const ingresoReal = useMemo(
+    () => transactions.filter(t => isIngreso(t.tipo)).reduce((s, t) => s + t.monto, 0),
+    [transactions]
+  )
+  const fijoPresupuestado = plan?.fijoTotalMonto ?? 0
   const poolVariable = plan
     ? Math.max(0, plan.ingresoNetoMensual - fijoPresupuestado - plan.ahorroMetaMonto)
     : 0
+
+  const pctDeIngreso = (monto: number) =>
+    plan && plan.ingresoNetoMensual > 0 ? Math.round((monto / plan.ingresoNetoMensual) * 100) : null
+  const ahorroPct = pctDeIngreso(plan?.ahorroMetaMonto ?? 0)
+  const fijoPct = pctDeIngreso(fijoPresupuestado)
+  const variablePct = pctDeIngreso(poolVariable)
 
   // ── Vista Participación ────────────────────────────────────────────────────
   const chartData = useMemo(() => buildChartData(transactions), [transactions])
@@ -191,24 +253,12 @@ export default function CategoriesCard({
     return (
       <BudgetManager
         mes={mes}
-        gastosPorCategoria={gastosPorCategoria}
-        initialBudgets={draftMap}
         initialPlan={plan}
-        onBudgetsChange={newTotals => {
-          setDraftMap(prev => {
-            const next: DraftMap = {}
-            for (const [k, v] of Object.entries(newTotals)) {
-              next[k] = prev[k] ? { ...prev[k], monto: v } : { monto: v, subcategorias: [] }
-            }
-            return next
-          })
-          onBudgetsChange(newTotals)
-        }}
+        ingresoReal={ingresoReal}
         onPlanChange={setPlan}
         onSaved={() => {
           onSaved()
           setEditing(false)
-          loadBudgets()
           loadPlan()
         }}
         onClose={() => setEditing(false)}
@@ -221,7 +271,7 @@ export default function CategoriesCard({
 
       {/* Header */}
       <div className={`${styles.header} ${!hasAnyContent ? styles.headerBordered : ''}`}>
-        <p className={styles.headerTitle}>Categorías</p>
+        <p className={styles.headerTitle}>Tu Plan</p>
         <button onClick={() => setEditing(true)} className={styles.editBtn}>
           <Pencil size={11} />
           Editar
@@ -260,84 +310,104 @@ export default function CategoriesCard({
         </div>
       )}
 
-      {/* Vista Presupuesto — 3 Capas (Ahorro / Fijo / Variable), no una lista
-          plana por categoría: el modelo de la app es "controla el bosque",
-          no 13 microcategorías. Editar sigue siendo el camino para ajustar
-          ingreso, meta de ahorro y cada gasto fijo. */}
+      {/* Vista Presupuesto — 3 números en una fila, no 3 tarjetas con barra
+          cada una. El detalle (montos, % de tu ingreso, cuentas de ahorro)
+          vive detrás de tocar la columna — nunca se muestra todo a la vez. */}
       {hasAnyContent && view === 'presupuesto' && (
         <>
-          {/* Ahorro y Blindaje */}
-          <div className={styles.layerBlock}>
-            <div className={styles.layerHeader}>
-              <span className={styles.layerName}>Ahorro y Blindaje</span>
-              <span className={styles.amounts}>
-                <span className={styles.spent}>{formatCOP(layerTotals.ahorro)}</span>
-                {plan && plan.ahorroMetaMonto > 0 && <span className={styles.limit}> / {formatCOP(plan.ahorroMetaMonto)}</span>}
-              </span>
-            </div>
-            {plan && plan.ahorroMetaMonto > 0 ? (
-              <div className={styles.barTrack}>
-                <div
-                  className={styles.barFill}
-                  style={{
-                    '--bar-w': `${Math.min((layerTotals.ahorro / plan.ahorroMetaMonto) * 100, 100)}%`,
-                    '--bar-color': layerTotals.ahorro >= plan.ahorroMetaMonto ? 'var(--green)' : 'var(--blue)',
-                  } as React.CSSProperties}
-                />
-              </div>
-            ) : (
-              <p className={styles.layerHint}>Define tu meta de ahorro en Editar</p>
-            )}
+          <div className={styles.statsRow}>
+            <button
+              className={styles.statCol}
+              onClick={() => toggleStat('ahorro')}
+              aria-expanded={expandedStat === 'ahorro'}
+              aria-label="Ahorro, ver detalle"
+            >
+              <span className={styles.statLabel}>Ahorro</span>
+              {plan && plan.ahorroMetaMonto > 0 && (
+                <span className={styles.statAmounts}>
+                  {formatCOPCompact(layerTotals.ahorro)} de {formatCOPCompact(plan.ahorroMetaMonto)}
+                </span>
+              )}
+              <StatValue kind="goal" pct={plan && plan.ahorroMetaMonto > 0 ? (layerTotals.ahorro / plan.ahorroMetaMonto) * 100 : null} />
+            </button>
+            <div className={styles.statDivider} />
+            <button
+              className={styles.statCol}
+              onClick={() => toggleStat('fijo')}
+              aria-expanded={expandedStat === 'fijo'}
+              aria-label="Gastos fijos, ver detalle"
+            >
+              <span className={styles.statLabel}>Fijo</span>
+              {fijoPresupuestado > 0 && (
+                <span className={styles.statAmounts}>
+                  {formatCOPCompact(layerTotals.fijo)} de {formatCOPCompact(fijoPresupuestado)}
+                </span>
+              )}
+              <StatValue kind="limit" pct={fijoPresupuestado > 0 ? (layerTotals.fijo / fijoPresupuestado) * 100 : null} />
+            </button>
+            <div className={styles.statDivider} />
+            <button
+              className={styles.statCol}
+              onClick={() => toggleStat('variable')}
+              aria-expanded={expandedStat === 'variable'}
+              aria-label="Gasto variable, ver detalle"
+            >
+              <span className={styles.statLabel}>Variable</span>
+              {poolVariable > 0 && (
+                <span className={styles.statAmounts}>
+                  {formatCOPCompact(layerTotals.variable)} de {formatCOPCompact(poolVariable)}
+                </span>
+              )}
+              <StatValue kind="limit" pct={poolVariable > 0 ? (layerTotals.variable / poolVariable) * 100 : null} />
+            </button>
           </div>
+          <p className={styles.statsHint}>Toca cualquiera para ver el detalle</p>
 
-          {/* Gastos Fijos */}
-          <div className={`${styles.layerBlock} ${styles.layerBlockBorder}`}>
-            <div className={styles.layerHeader}>
-              <span className={styles.layerName}>Gastos Fijos</span>
-              <span className={styles.amounts}>
-                <span className={styles.spent}>{formatCOP(layerTotals.fijo)}</span>
-                {fijoPresupuestado > 0 && <span className={styles.limit}> / {formatCOP(fijoPresupuestado)}</span>}
-              </span>
+          {expandedStat === 'ahorro' && (
+            <div className={styles.detailPanel}>
+              <SavingsOverview onTransaction={onSavingsTransaction} refreshSignal={savingsRefreshSignal} />
+              {plan && plan.ahorroMetaMonto > 0 && ahorroPct !== null && (
+                <p className={styles.layerSubtitle}>
+                  Este mes: {formatCOP(layerTotals.ahorro)} de {formatCOP(plan.ahorroMetaMonto)} ·
+                  {' '}{ahorroPct}% de tu ingreso · recomendado 20-30%
+                </p>
+              )}
+              {!(plan && plan.ahorroMetaMonto > 0) && (
+                <p className={styles.layerHint}>Define tu meta de ahorro en Editar</p>
+              )}
             </div>
-            {fijoPresupuestado > 0 ? (
-              <div className={styles.barTrack}>
-                <div
-                  className={styles.barFill}
-                  style={{
-                    '--bar-w': `${Math.min((layerTotals.fijo / fijoPresupuestado) * 100, 100)}%`,
-                    '--bar-color': zoneColor((layerTotals.fijo / fijoPresupuestado) * 100),
-                  } as React.CSSProperties}
-                />
-              </div>
-            ) : (
-              <p className={styles.layerHint}>Agrega tus gastos fijos (arriendo, suscripciones…) en Editar</p>
-            )}
-          </div>
+          )}
 
-          {/* Gasto Variable (derivado, sin presupuesto por categoría) */}
-          <div className={`${styles.layerBlock} ${styles.layerBlockBorder}`}>
-            <div className={styles.layerHeader}>
-              <span className={styles.layerName}>Gasto Variable</span>
-              <span className={styles.amounts}>
-                <span className={styles.spent}>{formatCOP(layerTotals.variable)}</span>
-                {poolVariable > 0 && <span className={styles.limit}> / {formatCOP(poolVariable)}</span>}
-              </span>
+          {expandedStat === 'fijo' && (
+            <div className={styles.detailPanel}>
+              {fijoPresupuestado > 0 ? (
+                <>
+                  <p className={styles.detailAmounts}>
+                    {formatCOP(layerTotals.fijo)} <span className={styles.detailAmountsMuted}>de {formatCOP(fijoPresupuestado)}</span>
+                  </p>
+                  {fijoPct !== null && <p className={styles.layerSubtitle}>{fijoPct}% de tu ingreso · recomendado 45-50%</p>}
+                </>
+              ) : (
+                <p className={styles.layerHint}>Agrega tus gastos fijos (arriendo, suscripciones…) en Editar</p>
+              )}
             </div>
-            {poolVariable > 0 ? (
-              <div className={styles.barTrack}>
-                <div
-                  className={styles.barFill}
-                  style={{
-                    '--bar-w': `${Math.min((layerTotals.variable / poolVariable) * 100, 100)}%`,
-                    '--bar-color': zoneColor((layerTotals.variable / poolVariable) * 100),
-                  } as React.CSSProperties}
-                />
-              </div>
-            ) : (
-              <p className={styles.layerHint}>Define tu ingreso en Editar para ver tu pool variable</p>
-            )}
-            <p className={styles.layerFootnote}>Se reparte solo en tu cupo semanal, mira la tarjeta de arriba</p>
-          </div>
+          )}
+
+          {expandedStat === 'variable' && (
+            <div className={styles.detailPanel}>
+              {poolVariable > 0 ? (
+                <>
+                  <p className={styles.detailAmounts}>
+                    {formatCOP(layerTotals.variable)} <span className={styles.detailAmountsMuted}>de {formatCOP(poolVariable)}</span>
+                  </p>
+                  {variablePct !== null && <p className={styles.layerSubtitle}>{variablePct}% de tu ingreso · recomendado 25-30%</p>}
+                </>
+              ) : (
+                <p className={styles.layerHint}>Define tu ingreso en Editar para ver tu pool variable</p>
+              )}
+              <p className={styles.layerFootnote}>Se reparte solo en tu cupo semanal, mira la tarjeta de arriba</p>
+            </div>
+          )}
         </>
       )}
 

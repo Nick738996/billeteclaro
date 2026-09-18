@@ -1,6 +1,18 @@
 import { ok, err } from '@/lib/api/response'
 import { withAuth } from '@/lib/api/withAuth'
 import { fetchMonthlyPlan, saveMonthlyPlan } from '@/lib/services/monthlyPlanService'
+import type { BudgetSubcat } from '@/lib/types'
+
+function validItems(value: unknown): BudgetSubcat[] {
+  if (!Array.isArray(value)) return []
+  return value
+    .filter((i): i is BudgetSubcat =>
+      typeof i === 'object' && i !== null &&
+      typeof (i as BudgetSubcat).nombre === 'string' &&
+      typeof (i as BudgetSubcat).monto === 'number'
+    )
+    .map(i => ({ nombre: i.nombre, monto: i.monto }))
+}
 
 // GET /api/monthly-plan?mes=YYYY-MM
 export const GET = withAuth(async (req, user, supabase) => {
@@ -14,10 +26,17 @@ export const GET = withAuth(async (req, user, supabase) => {
   }
 })
 
-// PUT /api/monthly-plan  body: { mes, ingresoNetoMensual, ahorroMetaMonto }
+// PUT /api/monthly-plan  body: { mes, ingresoNetoMensual, fijoTotalMonto, fijoItems?, ahorroMetaMonto, ahorroItems? }
 export const PUT = withAuth(async (req, user, supabase) => {
-  const body = await req.json() as { mes?: string; ingresoNetoMensual?: number; ahorroMetaMonto?: number }
-  const { mes, ingresoNetoMensual, ahorroMetaMonto } = body
+  const body = await req.json() as {
+    mes?: string
+    ingresoNetoMensual?: number
+    fijoTotalMonto?: number
+    fijoItems?: unknown
+    ahorroMetaMonto?: number
+    ahorroItems?: unknown
+  }
+  const { mes, ingresoNetoMensual, fijoTotalMonto, fijoItems, ahorroMetaMonto, ahorroItems } = body
 
   if (!mes || typeof ingresoNetoMensual !== 'number' || ingresoNetoMensual <= 0) {
     return err('mes e ingresoNetoMensual (> 0) son requeridos', 400)
@@ -26,7 +45,10 @@ export const PUT = withAuth(async (req, user, supabase) => {
   try {
     await saveMonthlyPlan(supabase, user.id, mes, {
       ingresoNetoMensual,
+      fijoTotalMonto: typeof fijoTotalMonto === 'number' && fijoTotalMonto >= 0 ? fijoTotalMonto : 0,
+      fijoItems: validItems(fijoItems),
       ahorroMetaMonto: typeof ahorroMetaMonto === 'number' && ahorroMetaMonto >= 0 ? ahorroMetaMonto : 0,
+      ahorroItems: validItems(ahorroItems),
     })
     return ok({ ok: true })
   } catch (e) {

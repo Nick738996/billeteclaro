@@ -245,6 +245,13 @@ export function zoneColor(pct: number): string {
   return 'var(--green)'
 }
 
+/** Fondo "-soft" a juego con zoneColor, para pastillas de porcentaje (ej. pctBadge) */
+export function zoneBg(pct: number): string {
+  if (pct >= 110) return 'var(--red-soft)'
+  if (pct >= 80 && pct < 100) return 'var(--yellow-soft)'
+  return 'var(--green-soft)'
+}
+
 export function getCategoryColor(cat: string): string {
   if (cat in CATEGORIA_COLORS) return CATEGORIA_COLORS[cat as Categoria]
   let h = 0
