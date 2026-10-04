@@ -6,8 +6,8 @@ import { format, parseISO, addMonths, subMonths, startOfMonth } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import type { Transaction, MonthlyStats, Categoria } from '@/lib/types'
-import { isIngreso, isGasto } from '@/lib/types'
+import type { Transaction, Capa } from '@/lib/types'
+import { computeLayerTotals } from '@/lib/services/layerService'
 import { TEST_IDS } from '@/lib/testIds'
 import MonthHero from '@/components/dashboard/MonthHero'
 import WeeklyAllowanceCard from '@/components/dashboard/WeeklyAllowanceCard'
@@ -16,6 +16,7 @@ import TransactionsList from '@/components/dashboard/TransactionsList'
 import HeaderPill from '@/components/dashboard/HeaderPill'
 import AIAdvisorPanel from '@/components/dashboard/AIAdvisorPanel'
 import ManualTransactions from '@/components/dashboard/ManualTransactions'
+import CategoryManager from '@/components/dashboard/CategoryManager'
 import TourTooltip from '@/components/tour/TourTooltip'
 import HelpModal from '@/components/tour/HelpModal'
 import Logo from '@/components/ui/Logo'
@@ -34,27 +35,6 @@ interface Props {
   isCurrentMonth: boolean
   canGoNext: boolean
   tourCompleted: boolean
-}
-
-function buildStats(txs: Transaction[]): MonthlyStats {
-  // AHORROS, PRESTAMO, DEUDA y TRANSFERENCIA (salientes) cuentan como salidas del mes
-  const gastosTxs = txs.filter(t => isGasto(t.tipo, t.categoria) || t.categoria === 'AHORROS' || t.categoria === 'PRESTAMO' || t.categoria === 'DEUDA' || (t.categoria === 'TRANSFERENCIA' && !isIngreso(t.tipo)))
-  const gastos    = gastosTxs.reduce((s, t) => s + t.monto, 0)
-  const ingresos  = txs.filter(t => isIngreso(t.tipo)).reduce((s, t) => s + t.monto, 0)
-  const ahorros   = txs.filter(t => t.categoria === 'AHORROS').reduce((s, t) => s + t.monto, 0)
-  const porCategoria = gastosTxs.reduce<Record<string, number>>((acc, t) => {
-    acc[t.categoria] = (acc[t.categoria] ?? 0) + t.monto
-    return acc
-  }, {})
-  return {
-    gastos,
-    gastosReales: gastos,
-    ingresos,
-    ahorros,
-    balance: ingresos - gastos,
-    transacciones: txs.length,
-    porCategoria: porCategoria as Record<Categoria, number>,
-  }
 }
 
 export default function DashboardClient({
@@ -80,6 +60,7 @@ export default function DashboardClient({
   const [activeFilter, setActiveFilter] = useState<string>('TODOS')
   const [budgets, setBudgets] = useState<Record<string, number>>({})
   const [manualOpen, setManualOpen] = useState(false)
+  const [catManagerOpen, setCatManagerOpen] = useState(false)
   const [showHelpModal, setShowHelpModal] = useState(false)
 
   // Versión de contexto: sube cada vez que cambian datos relevantes para el asesor
@@ -136,7 +117,22 @@ export default function DashboardClient({
     }
   }, [tourCompleted, tour])
 
-  const stats = useMemo(() => buildStats(txs), [txs])
+  // Overrides de capa por categoría (custom o built-in reclasificadas) — una
+  // sola fuente para el hero, Tu Plan y la lista, así los tres cuadran.
+  const [capaOverrides, setCapaOverrides] = useState<Record<string, Capa>>({})
+  const loadCapas = useCallback(() => {
+    fetch('/api/category-capas')
+      .then(r => r.json())
+      .then(d => setCapaOverrides(d.overrides ?? {}))
+      .catch(() => setCapaOverrides({}))
+  }, [])
+  useEffect(() => { loadCapas() }, [loadCapas])
+
+  // "Gastaste" = Fijo + Variable, lo mismo que suman las columnas de Tu Plan.
+  // Antes sumaba también pagos de tarjeta (las compras ya estaban contadas una
+  // por una), préstamos y transferencias sin categorizar — inflaba el número
+  // sin que se pudiera reconstruir desde ninguna otra parte de la pantalla.
+  const layerTotals = useMemo(() => computeLayerTotals(txs, capaOverrides), [txs, capaOverrides])
 
   const monthRef = parseISO(`${month}-01`)
   const prevMonth = format(subMonths(monthRef, 1), 'yyyy-MM')
@@ -249,7 +245,7 @@ export default function DashboardClient({
 
 
         <MonthHero
-          gastos={stats.gastos}
+          gastos={layerTotals.fijo + layerTotals.variable}
           mes={month}
           refreshSignal={contextVersion}
         />
@@ -260,12 +256,14 @@ export default function DashboardClient({
           <CategoriesCard
             mes={month}
             transactions={txs}
+            capaOverrides={capaOverrides}
             activeFilter={activeFilter}
             onFilterChange={setActiveFilter}
             onBudgetsChange={setBudgets}
             onSaved={bumpContext}
             onSavingsTransaction={() => { loadMonth(month); bumpContext() }}
             savingsRefreshSignal={savingsRefresh}
+            onManageCategories={() => setCatManagerOpen(true)}
           />
         </div>
 
@@ -292,7 +290,10 @@ export default function DashboardClient({
             transactions={txs}
             activeFilter={activeFilter}
             onFilterChange={setActiveFilter}
-            onCategoryChange={() => loadMonth(month)}
+            capaOverrides={capaOverrides}
+            onCategoryCreated={loadCapas}
+            onManageCategories={() => setCatManagerOpen(true)}
+            onCategoryChange={() => { loadMonth(month); bumpContext() }}
             onTransactionDeleted={() => { loadMonth(month); bumpContext(); bumpSavingsRefresh() }}
             onAdd={() => setManualOpen(v => !v)}
             addOpen={manualOpen}
@@ -300,6 +301,19 @@ export default function DashboardClient({
           />
         </div>
       </main>
+
+      {catManagerOpen && (
+        <CategoryManager
+          capaOverrides={capaOverrides}
+          transactions={txs}
+          onClose={() => setCatManagerOpen(false)}
+          onChanged={({ transaccionesCambiaron }) => {
+            loadCapas()
+            bumpContext()
+            if (transaccionesCambiaron) loadMonth(month)
+          }}
+        />
+      )}
 
       {/* Product tour */}
       {tour.isActive && (

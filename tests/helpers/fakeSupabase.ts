@@ -4,7 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 // tablas (monthly_plan, budgets, category_capas, weekly_allowances,
 // transactions). Cubre solo las formas de query que estos servicios usan:
 // select().eq()...maybeSingle()/single()/await-directo, insert().select().single(),
-// update(patch).eq().eq(), upsert(row, {onConflict}).
+// update(patch).eq().eq()[.select()], delete().eq(), upsert(row, {onConflict}).
 
 type Row = Record<string, unknown>
 type Filter = ['eq' | 'gte' | 'lte', string, unknown]
@@ -48,9 +48,13 @@ export function createFakeSupabase(seed: Record<string, Row[]> = {}) {
     return builder
   }
 
-  function eqChain(apply: (filters: [string, unknown][]) => void, filters: [string, unknown][] = []) {
+  function eqChain(apply: (filters: [string, unknown][]) => Row[], filters: [string, unknown][] = []) {
     const chain = {
       eq: (col: string, val: unknown) => eqChain(apply, [...filters, [col, val]]),
+      // update(...).eq(...).select() → filas afectadas
+      select: (_cols?: string) => ({
+        then: (resolve: (v: { data: Row[]; error: null }) => void) => resolve({ data: apply(filters), error: null }),
+      }),
       then: (resolve: (v: { error: null }) => void) => {
         apply(filters)
         resolve({ error: null })
@@ -69,9 +73,20 @@ export function createFakeSupabase(seed: Record<string, Row[]> = {}) {
       },
       update: (patch: Row) =>
         eqChain(filters => {
-          tables[table] = (tables[table] ?? []).map(r =>
-            filters.every(([c, v]) => r[c] === v) ? { ...r, ...patch } : r
-          )
+          const affected: Row[] = []
+          tables[table] = (tables[table] ?? []).map(r => {
+            if (!filters.every(([c, v]) => r[c] === v)) return r
+            const next = { ...r, ...patch }
+            affected.push(next)
+            return next
+          })
+          return affected
+        }),
+      delete: () =>
+        eqChain(filters => {
+          const removed = (tables[table] ?? []).filter(r => filters.every(([c, v]) => r[c] === v))
+          tables[table] = (tables[table] ?? []).filter(r => !filters.every(([c, v]) => r[c] === v))
+          return removed
         }),
       upsert: async (row: Row, opts?: { onConflict?: string }) => {
         const conflictCols = opts?.onConflict?.split(',') ?? ['id']

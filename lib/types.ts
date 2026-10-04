@@ -71,7 +71,7 @@ export type Capa = 'AHORRO' | 'FIJO' | 'VARIABLE'
 
 /**
  * Capa por defecto de cada categoría built-in. `null` = fuera de las 3 capas
- * (movimientos propios/entradas, no gasto ni ahorro real).
+ * (movimientos propios/entradas/préstamos, no gasto ni ahorro real).
  * Categorías mixtas (HOGAR, SALUD mezclan fijo y variable) toman el default
  * más común; el caso puntual se resuelve con `capa_override` en la transacción
  * o con una fila en `category_capas` para reclasificar la categoría entera.
@@ -79,17 +79,20 @@ export type Capa = 'AHORRO' | 'FIJO' | 'VARIABLE'
 export const CATEGORIA_CAPA_DEFAULT: Record<Categoria, Capa | null> = {
   AHORROS: 'AHORRO',
   INVERSION: 'AHORRO',
-  PRESTAMO: 'AHORRO',
   HOGAR: 'FIJO',
   SUSCRIPCIONES: 'FIJO',
   SALUD: 'FIJO',
   EDUCACION: 'FIJO',
   DEUDA: 'FIJO',
+  DONACIONES: 'FIJO',
   TRANSPORTE: 'VARIABLE',
   SALIDAS: 'VARIABLE',
   COMPRAS_ONLINE: 'VARIABLE',
-  DONACIONES: 'VARIABLE',
   OTRO: 'VARIABLE',
+  // Plata prestada a alguien no es ahorro (no queda apartada para ti) ni
+  // gasto de estilo de vida — queda fuera de las 3 capas y se muestra aparte
+  // en "Fuera de tu plan" (CategoriesCard) para que el total cuadre.
+  PRESTAMO: null,
   REEMBOLSABLE: null,
   TRANSFERENCIA: null,
   INGRESO: null,

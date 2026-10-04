@@ -93,7 +93,7 @@ export async function processForwardedEmail(payload: ForwardedEmailPayload, admi
   }
 
   if (!addr.confirmed_at) {
-    console.warn(`[forwardingService] dirección aún no confirmada — correo descartado (user=${addr.user_id})`)
+    console.warn(`[forwardingService] dirección aún no confirmada, correo descartado (user=${addr.user_id})`)
     return { processed: false, reason: 'not_confirmed' }
   }
 

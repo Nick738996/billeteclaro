@@ -180,6 +180,8 @@
   border-radius: var(--radius-xl) var(--radius-xl) 0 0;
   padding: 16px 20px;
   padding-bottom: max(32px, env(safe-area-inset-bottom));
+  max-height: 85dvh;
+  overflow-y: auto;
 }
 .pickerHeader {
   display: flex;
@@ -217,6 +219,23 @@
 }
 .renameRow :global(.input-field) {
   flex: 1;
+}
+.sectionLabelMt {
+  margin-top: 18px;
+}
+
+.manageLink {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  margin-top: 12px;
+  background: none;
+  border: none;
+  color: var(--blue);
+  font-size: var(--text-xs);
+  text-align: left;
+  text-decoration: underline;
+  cursor: pointer;
 }
 
 /* ─── TransactionRow ─────────────────────────────────────────────────────────── */

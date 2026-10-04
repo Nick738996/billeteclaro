@@ -2,8 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { WeeklyAllowance } from '@/lib/types'
 import { colombiaDayRangeUTC } from '@/lib/utils/mesContable'
 import { computeMonthlyPlan } from '@/lib/services/monthlyPlanService'
-import { getCapaForTransaccion, getCustomCapaOverrides } from '@/lib/services/layerService'
-import { isGasto } from '@/lib/types'
+import { countedCapa, getCustomCapaOverrides } from '@/lib/services/layerService'
 
 // ── Helpers de fecha (strings 'YYYY-MM-DD', sin dependencia de timezone) ───
 
@@ -49,24 +48,41 @@ export function getIsoWeekStart(dateStr: string): string {
  * borde #1 del brief) cada día aporta la porción del mes al que pertenece,
  * en vez de partir la semana completa por un solo mes.
  */
+export interface CupoTramo {
+  /** 'YYYY-MM' */
+  mes: string
+  /** Días de esta semana que caen en ese mes */
+  dias: number
+  /** Pool variable del mes ÷ días del mes */
+  porDia: number
+}
+
+/** De dónde sale el cupo base, mes por mes — lo que la tarjeta le explica al usuario. */
+export async function computeWeeklyCupoDesglose(
+  supabase: SupabaseClient,
+  userId: string,
+  weekStart: string
+): Promise<CupoTramo[]> {
+  const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
+  const tramos: CupoTramo[] = []
+  for (const mes of [...new Set(days.map(mesOfDate))]) {
+    const { poolVariableMensual } = await computeMonthlyPlan(supabase, userId, mes)
+    tramos.push({
+      mes,
+      dias: days.filter(d => mesOfDate(d) === mes).length,
+      porDia: poolVariableMensual / daysInMonth(mes),
+    })
+  }
+  return tramos
+}
+
 export async function computeWeeklyCupoBase(
   supabase: SupabaseClient,
   userId: string,
   weekStart: string
 ): Promise<number> {
-  const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
-  const meses = [...new Set(days.map(mesOfDate))]
-
-  const poolPorMes = new Map<string, number>()
-  for (const mes of meses) {
-    const { poolVariableMensual } = await computeMonthlyPlan(supabase, userId, mes)
-    poolPorMes.set(mes, poolVariableMensual)
-  }
-
-  return days.reduce((sum, day) => {
-    const mes = mesOfDate(day)
-    return sum + (poolPorMes.get(mes) ?? 0) / daysInMonth(mes)
-  }, 0)
+  const tramos = await computeWeeklyCupoDesglose(supabase, userId, weekStart)
+  return tramos.reduce((sum, t) => sum + t.porDia * t.dias, 0)
 }
 
 // ── Ledger semanal ──────────────────────────────────────────────────────
@@ -154,9 +170,7 @@ async function sumVariableGastoEnRango(
   const capaOverrides = await getCustomCapaOverrides(supabase, userId)
 
   return (data ?? []).reduce((sum, tx) => {
-    const capa = getCapaForTransaccion(tx, capaOverrides)
-    if (capa === 'VARIABLE' && isGasto(tx.tipo, tx.categoria)) return sum + Number(tx.monto)
-    return sum
+    return countedCapa(tx, capaOverrides) === 'VARIABLE' ? sum + Number(tx.monto) : sum
   }, 0)
 }
 
@@ -225,6 +239,8 @@ export interface WeeklyStatus {
   diasTranscurridos: number
   diasRestantes: number
   estado: BurnEstado
+  /** Cómo se armó cupoBase (solo informativo; una semana cerrada no se recalcula) */
+  desglose: CupoTramo[]
 }
 
 /**
@@ -272,6 +288,7 @@ export async function getLiveWeeklyStatus(
 
   const week = await ensureWeekAllowance(supabase, userId, weekStart)
   const gastado = await sumVariableGastoEnRango(supabase, userId, weekStart, referenceDateStr)
+  const desglose = await computeWeeklyCupoDesglose(supabase, userId, weekStart)
 
   const cupoTotal = week.cupo_base + week.ajuste_carryover
   const restante = cupoTotal - gastado
@@ -301,5 +318,6 @@ export async function getLiveWeeklyStatus(
     diasTranscurridos,
     diasRestantes: 7 - diasTranscurridos,
     estado,
+    desglose,
   }
 }
