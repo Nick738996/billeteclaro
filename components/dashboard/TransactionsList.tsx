@@ -29,7 +29,8 @@ import {
   SUBCATEGORIA_RETIRO_AHORROS,
   SUBCATEGORIA_APORTE_AHORROS,
 } from '@/lib/types'
-import { getCapaForTransaccion } from '@/lib/services/layerService'
+import { getCapaForTransaccion, listCustomCategories } from '@/lib/services/layerService'
+import NewCategoryForm, { CAPA_LABELS, CAPA_COLOR } from './NewCategoryForm'
 import { getCategoryIcon } from '@/lib/categoryIcons'
 import { TEST_IDS } from '@/lib/testIds'
 import FloatingSaveBar from '@/components/ui/FloatingSaveBar'
@@ -460,16 +461,23 @@ function CatPickerBtn({ cat, current, onSelect }: { cat: string; current: string
   )
 }
 
-function CategoryPicker({ current, onSelect, onClose, budgetedCats }: {
+function CategoryPicker({ current, onSelect, onClose, budgetedCats, customCats, onCreated, onManage }: {
   current: Categoria
   onSelect: (c: Categoria) => void
   onClose: () => void
   budgetedCats: string[]
+  /** Categorías creadas por el usuario (no built-in) */
+  customCats: string[]
+  /** Se llama después de crear una categoría nueva */
+  onCreated: (key: string) => void
+  /** Abre la hoja de Categorías */
+  onManage?: () => void
 }) {
   if (typeof document === 'undefined') return null
   const allCats = Object.keys(CATEGORIA_LABELS) as Categoria[]
   const budgetSet = new Set<string>(budgetedCats)
   const otherCats = allCats.filter(c => !budgetSet.has(c))
+  const customOnly = customCats.filter(c => !budgetSet.has(c))
 
   return createPortal(
     <>
@@ -508,6 +516,31 @@ function CategoryPicker({ current, onSelect, onClose, budgetedCats }: {
             <CatPickerBtn key={cat} cat={cat} current={current} onSelect={onSelect} />
           ))}
         </div>
+
+        {customOnly.length > 0 && (
+          <>
+            <p className={`${styles.sectionLabel} ${styles.sectionLabelMt}`}>Tus categorías</p>
+            <div className={styles.chipGroup}>
+              {customOnly.map(cat => (
+                <CatPickerBtn key={cat} cat={cat} current={current} onSelect={onSelect} />
+              ))}
+            </div>
+          </>
+        )}
+
+        <p className={`${styles.sectionLabel} ${styles.sectionLabelMt}`}>Nueva categoría</p>
+        <NewCategoryForm
+          existing={customCats}
+          onDone={(key, creada) => {
+            if (creada) onCreated(key)
+            onSelect(key as Categoria)
+          }}
+        />
+        {onManage && (
+          <button className={styles.manageLink} onClick={() => { onClose(); onManage() }}>
+            Cambiar si una categoría es Variable, Fijo o Ahorro, o eliminarla
+          </button>
+        )}
       </div>
     </>,
     document.body
@@ -520,8 +553,6 @@ function CategoryPicker({ current, onSelect, onClose, budgetedCats }: {
 // CATEGORIA_CAPA_DEFAULT ya cubre las 16 categorías, y cualquier categoría
 // sin default cae en 'VARIABLE' (el catch-all seguro). Se ve como el color
 // del punto junto a la categoría, no como un chip/pregunta propios.
-const CAPA_LABELS: Record<Capa, string> = { AHORRO: 'Ahorro', FIJO: 'Fijo', VARIABLE: 'Variable' }
-const CAPA_COLOR: Record<Capa, string> = { AHORRO: 'var(--blue)', FIJO: 'var(--purple)', VARIABLE: 'var(--text-muted)' }
 
 // ── RenameTransaction bottom sheet ────────────────────────────────────────
 // Permite editar el nombre/comercio de cualquier transacción. Si viene de una
@@ -595,9 +626,10 @@ function RenameContactSheet({ current, identificador, saving, error, onSave, onC
 
 type DeletePhase = 'idle' | 'confirming' | 'deleting'
 
-function TransactionRow({ t, pendingCat, onCategoryClick, onDelete, onRenameClick }: {
+function TransactionRow({ t, pendingCat, capaOverrides, onCategoryClick, onDelete, onRenameClick }: {
   t: Transaction
   pendingCat?: Categoria
+  capaOverrides: Record<string, Capa>
   onCategoryClick: () => void
   onDelete: () => void
   onRenameClick: () => void
@@ -613,7 +645,7 @@ function TransactionRow({ t, pendingCat, onCategoryClick, onDelete, onRenameClic
   const chip       = BANCO_LABEL[banco]
   const time       = format(new Date(t.fecha), 'HH:mm', { locale: es })
   const isDirty    = !!pendingCat
-  const effectiveCapa = getCapaForTransaccion(t, {})
+  const effectiveCapa = getCapaForTransaccion({ ...t, categoria: displayCat }, capaOverrides)
 
   function startConfirm() {
     setDeletePhase('confirming')
@@ -720,9 +752,13 @@ interface Props {
   onAdd?: () => void
   addOpen?: boolean
   budgets?: Record<string, number>
+  capaOverrides?: Record<string, Capa>
+  /** Se llama después de crear una categoría nueva, para recargar sus capas */
+  onCategoryCreated?: () => void
+  onManageCategories?: () => void
 }
 
-export default function TransactionsList({ transactions, activeFilter, onFilterChange, onCategoryChange, onTransactionDeleted, onAdd, addOpen, budgets }: Props) {
+export default function TransactionsList({ transactions, activeFilter, onFilterChange, onCategoryChange, onTransactionDeleted, onAdd, addOpen, budgets, capaOverrides, onCategoryCreated, onManageCategories }: Props) {
   const [search,      setSearch]      = useState('')
   const [pendingCats, setPendingCats] = useState<Record<string, Categoria>>({})
   const [isSaving,    setIsSaving]    = useState(false)
@@ -737,6 +773,15 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
   const pendingCount    = Object.keys(pendingCats).length
 
   const budgetedCats = useMemo(() => Object.keys(budgets ?? {}), [budgets])
+
+  // Categorías del usuario: las que tienen capa guardada (se crearon desde el
+  // selector) más cualquier no built-in que ya aparezca en sus transacciones.
+  // Categorías del usuario (ver listCustomCategories)
+  const [justCreated, setJustCreated] = useState<string[]>([])
+  const customCats = useMemo(
+    () => listCustomCategories(capaOverrides ?? {}, transactions, justCreated),
+    [capaOverrides, transactions, justCreated]
+  )
 
   const handleDelete = async (t: Transaction) => {
     setDeletedIds(prev => new Set(prev).add(t.id))
@@ -902,6 +947,7 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
                   <TransactionRow
                     t={t}
                     pendingCat={pendingCats[t.id]}
+                    capaOverrides={capaOverrides ?? {}}
                     onCategoryClick={() => setPickerTxId(t.id)}
                     onDelete={() => handleDelete(t)}
                     onRenameClick={() => { setRenameError(null); setRenameTxId(t.id) }}
@@ -954,6 +1000,9 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
         }}
         onClose={() => setPickerTxId(null)}
         budgetedCats={budgetedCats}
+        customCats={customCats}
+        onCreated={key => { setJustCreated(prev => [...prev, key]); onCategoryCreated?.() }}
+        onManage={onManageCategories}
       />
     )}
 

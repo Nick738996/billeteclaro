@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { format, parseISO } from 'date-fns'
+import { es } from 'date-fns/locale'
 import { formatCOPCompact } from '@/lib/types'
 import styles from './WeeklyAllowanceCard.module.css'
 
@@ -18,7 +20,11 @@ interface WeeklyStatus {
   diasTranscurridos: number
   diasRestantes: number
   estado: 'verde' | 'amarillo' | 'rojo'
+  desglose: { mes: string; dias: number; porDia: number }[]
 }
+
+const nombreMes = (mes: string) => format(parseISO(`${mes}-01`), 'MMMM', { locale: es })
+const fechaCorta = (d: string) => format(parseISO(d), 'd MMM', { locale: es })
 
 const ESTADO_COLOR: Record<WeeklyStatus['estado'], string> = {
   verde: 'var(--green)',
@@ -29,7 +35,7 @@ const ESTADO_COLOR: Record<WeeklyStatus['estado'], string> = {
 const ESTADO_MENSAJE: Record<WeeklyStatus['estado'], string> = {
   verde: 'Vas al ritmo esta semana',
   amarillo: 'Gastando más rápido de lo esperado',
-  rojo: 'Sobregiro esta semana',
+  rojo: 'Te pasaste esta semana',
 }
 
 interface Props {
@@ -73,17 +79,29 @@ export default function WeeklyAllowanceCard({ refreshSignal }: Props) {
   if (!hasPlan || !status) return null
 
   const color = ESTADO_COLOR[status.estado]
+  const over = status.restante < 0
   const promedioDiario = status.diasRestantes > 0 ? Math.max(status.restante / status.diasRestantes, 0) : 0
-  const sugerido = status.diasRestantes > 0
-    ? `sugerido ${formatCOPCompact(promedioDiario)}/día`
-    : 'último día de la semana'
+  const sugerido = status.diasRestantes === 0
+    ? over
+      ? 'Hoy cierra la semana, el exceso se descuenta de la próxima'
+      : 'Hoy cierra la semana, lo que sobre pasa a la próxima'
+    : over
+      ? `Se descuenta de la próxima semana`
+      : `Unos ${formatCOPCompact(promedioDiario)} por día hasta el domingo`
 
   const arcPct = Math.min(status.pctGastado, 100)
   const dashoffset = CIRC * (1 - arcPct / 100)
 
+  // Si un mes da mucho más cupo por día que el otro en la misma semana, casi
+  // siempre es porque el ingreso de ese mes en el plan está inflado.
+  const [a, b] = status.desglose
+  const desbalance = a && b && a.porDia > 0 && b.porDia > 0 && Math.max(a.porDia, b.porDia) / Math.min(a.porDia, b.porDia) >= 1.5
+  const mesAlto = desbalance ? (a.porDia > b.porDia ? a : b) : null
+
   return (
     <div className={styles.root}>
-      <p className={styles.label}>Cupo semanal</p>
+      <p className={styles.label}>Disponible esta semana</p>
+      <p className={styles.semana}>{fechaCorta(status.semanaInicio)} al {fechaCorta(status.semanaFin)}</p>
       <div className={styles.ringWrap}>
         <svg width="340" height="340" viewBox="0 0 340 340">
           <circle cx={CX} cy={CY} r={R} fill="none" stroke="var(--border)" strokeWidth={SW} />
@@ -95,11 +113,50 @@ export default function WeeklyAllowanceCard({ refreshSignal }: Props) {
           />
         </svg>
         <div className={styles.ringCenter}>
-          <span className={styles.amount} style={{ color }}>{formatCOPCompact(status.restante)}</span>
+          <span className={styles.amountLabel}>{over ? 'Te pasaste' : 'Te quedan'}</span>
+          <span className={styles.amount} style={{ color }}>{formatCOPCompact(Math.abs(status.restante))}</span>
           <span className={styles.estadoMsg} style={{ color }}>{ESTADO_MENSAJE[status.estado]}</span>
           <span className={styles.sugerido}>{sugerido}</span>
         </div>
       </div>
+
+      {/* El número del centro, desarmado: de dónde sale, línea por línea. */}
+      <dl className={styles.receipt} aria-label="Cómo se calcula lo disponible esta semana">
+        <div className={styles.receiptRow}>
+          <dt>Cupo de esta semana</dt>
+          <dd>{formatCOPCompact(status.cupoBase)}</dd>
+        </div>
+        {status.desglose.map(t => (
+          <div key={t.mes} className={styles.receiptSub}>
+            <dt>{t.dias} {t.dias === 1 ? 'día' : 'días'} de {nombreMes(t.mes)} × {formatCOPCompact(t.porDia)}</dt>
+            <dd />
+          </div>
+        ))}
+        {status.ajusteCarryover !== 0 && (
+          <div className={styles.receiptRow}>
+            <dt>{status.ajusteCarryover > 0 ? '+ Te sobró la semana pasada' : '− Te pasaste la semana pasada'}</dt>
+            <dd>{formatCOPCompact(Math.abs(status.ajusteCarryover))}</dd>
+          </div>
+        )}
+        <div className={styles.receiptRow}>
+          <dt>− Gasto variable hasta hoy</dt>
+          <dd>{formatCOPCompact(status.gastado)}</dd>
+        </div>
+        <div className={`${styles.receiptRow} ${styles.receiptTotal}`}>
+          <dt>= {over ? 'Te pasaste' : 'Te quedan'}</dt>
+          <dd style={{ color }}>{formatCOPCompact(Math.abs(status.restante))}</dd>
+        </div>
+      </dl>
+      <p className={styles.receiptNote}>
+        Tu cupo por día es (ingreso − fijos − ahorro) ÷ días del mes, según el plan de cada mes.
+        Solo cuenta gasto Variable: arriendo, suscripciones y demás fijos no salen de aquí.
+      </p>
+      {mesAlto && (
+        <p className={styles.receiptWarn}>
+          {nombreMes(mesAlto.mes)} te da {formatCOPCompact(mesAlto.porDia)} por día, mucho más que el otro mes.
+          Revisa que el ingreso de ese plan sea real (sin retiros de ahorros ni plata entre tus cuentas).
+        </p>
+      )}
     </div>
   )
 }

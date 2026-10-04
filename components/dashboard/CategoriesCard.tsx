@@ -6,11 +6,10 @@
 // Ver design_handoff_rediseno_visual/README.md — Módulo 1.
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { Pencil, PieChart, BarChart3, Check } from 'lucide-react'
+import { Pencil, PieChart, BarChart3, Check, Tags } from 'lucide-react'
 import {
   getCategoryColor,
   catLabel,
-  formatCOP,
   formatCOPCompact,
   isGasto,
   isIngreso,
@@ -20,7 +19,8 @@ import {
   type Transaction,
   type BudgetEntry,
 } from '@/lib/types'
-import { computeLayerTotals } from '@/lib/services/layerService'
+import { computeLayerTotals, computeIngresoReal, countedCapa, isSalidaFueraDelPlan } from '@/lib/services/layerService'
+import LayerDetail from './LayerDetail'
 import BudgetManager from './BudgetManager'
 import SavingsOverview from './SavingsOverview'
 import { getCategoryIcon } from '@/lib/categoryIcons'
@@ -34,6 +34,8 @@ type StatKey = 'ahorro' | 'fijo' | 'variable'
 interface Props {
   mes: string
   transactions: Transaction[]
+  /** Overrides de capa por categoría — los carga DashboardClient una sola vez */
+  capaOverrides: Record<string, Capa>
   activeFilter: string
   onFilterChange: (key: string) => void
   onBudgetsChange: (totals: Record<string, number>) => void
@@ -45,6 +47,8 @@ interface Props {
    * callbacks que antes recibía directo desde DashboardClient. */
   onSavingsTransaction: () => void
   savingsRefreshSignal: number
+  /** Abre la hoja de Categorías (cambiar Variable/Fijo/Ahorro, crear, eliminar) */
+  onManageCategories: () => void
 }
 
 // ── Dona: helpers SVG (sin cambios de lógica, movidos desde SpendingChart) ────
@@ -130,7 +134,7 @@ function CheckDot({ color }: { color: string }) {
 }
 
 function StatValue({ pct, kind }: { pct: number | null; kind: 'goal' | 'limit' }) {
-  if (pct === null) return <span className={styles.statValueEmpty}>—</span>
+  if (pct === null) return <span className={styles.statValueEmpty}>-</span>
 
   if (kind === 'goal') {
     return pct >= 100
@@ -144,14 +148,13 @@ function StatValue({ pct, kind }: { pct: number | null; kind: 'goal' | 'limit' }
 }
 
 export default function CategoriesCard({
-  mes, transactions, activeFilter, onFilterChange, onBudgetsChange, onSaved,
-  onSavingsTransaction, savingsRefreshSignal,
+  mes, transactions, capaOverrides, activeFilter, onFilterChange, onBudgetsChange, onSaved,
+  onSavingsTransaction, savingsRefreshSignal, onManageCategories,
 }: Props) {
   const [draftMap, setDraftMap] = useState<DraftMap>({})
   const [editing, setEditing] = useState(false)
   const [loaded, setLoaded] = useState(false)
   const [plan, setPlan] = useState<{ ingresoNetoMensual: number; fijoTotalMonto: number; ahorroMetaMonto: number } | null>(null)
-  const [capaOverrides, setCapaOverrides] = useState<Record<string, Capa>>({})
   const [view, setView] = useState<View>('presupuesto')
   const [chartMode, setChartMode] = useState<'donut' | 'bars'>('donut')
   const [expandedStat, setExpandedStat] = useState<StatKey | null>(null)
@@ -185,18 +188,6 @@ export default function CategoriesCard({
   useEffect(() => { loadBudgets() }, [loadBudgets])
   useEffect(() => { loadPlan() }, [loadPlan])
 
-  // Overrides reales de capa por categoría (ej. una custom como "Restaurantes"
-  // que el usuario guardó como Fijo) — sin esto, computeLayerTotals y
-  // fijoPresupuestado asumían VARIABLE/FIJO por defecto según el caso, y
-  // terminaban clasificando el gasto real de una categoría distinto a como
-  // se clasificó su presupuesto, inflando el % de sobregiro de Variable.
-  useEffect(() => {
-    fetch('/api/category-capas')
-      .then(r => r.json())
-      .then(d => setCapaOverrides(d.overrides ?? {}))
-      .catch(() => setCapaOverrides({}))
-  }, [])
-
   // ── Vista Presupuesto: 3 capas (Ahorro / Fijo / Variable) ──────────────────
   // El gasto real por capa sale de las transacciones (computeLayerTotals ya
   // sabe que Ahorro cuenta como "apartado" aunque isGasto lo excluya del
@@ -205,10 +196,7 @@ export default function CategoriesCard({
   // número, ya no una suma de presupuestos por categoría), Variable contra
   // el pool derivado (ingreso - fijos - ahorro).
   const layerTotals = useMemo(() => computeLayerTotals(transactions, capaOverrides), [transactions, capaOverrides])
-  const ingresoReal = useMemo(
-    () => transactions.filter(t => isIngreso(t.tipo)).reduce((s, t) => s + t.monto, 0),
-    [transactions]
-  )
+  const ingresoReal = useMemo(() => computeIngresoReal(transactions), [transactions])
   const fijoPresupuestado = plan?.fijoTotalMonto ?? 0
   const poolVariable = plan
     ? Math.max(0, plan.ingresoNetoMensual - fijoPresupuestado - plan.ahorroMetaMonto)
@@ -216,9 +204,57 @@ export default function CategoriesCard({
 
   const pctDeIngreso = (monto: number) =>
     plan && plan.ingresoNetoMensual > 0 ? Math.round((monto / plan.ingresoNetoMensual) * 100) : null
-  const ahorroPct = pctDeIngreso(plan?.ahorroMetaMonto ?? 0)
-  const fijoPct = pctDeIngreso(fijoPresupuestado)
-  const variablePct = pctDeIngreso(poolVariable)
+
+  // Mismas transacciones que suman en cada capa (countedCapa es la regla
+  // única), para que el detalle reconstruya exactamente el número de arriba.
+  const txsPorCapa = useMemo(() => {
+    const out: Record<StatKey, Transaction[]> = { ahorro: [], fijo: [], variable: [] }
+    for (const t of transactions) {
+      const capa = countedCapa(t, capaOverrides)
+      if (capa) out[capa === 'AHORRO' ? 'ahorro' : capa === 'FIJO' ? 'fijo' : 'variable'].push(t)
+    }
+    return out
+  }, [transactions, capaOverrides])
+
+  // Salidas que no suman en ninguna capa — préstamos y transferencias sin
+  // categorizar. Se muestran aparte para que nada "desaparezca" del total.
+  const fueraDelPlan = useMemo(() => {
+    const porCat = new Map<string, number>()
+    for (const t of transactions) {
+      if (!isSalidaFueraDelPlan(t, capaOverrides)) continue
+      porCat.set(t.categoria, (porCat.get(t.categoria) ?? 0) + Number(t.monto))
+    }
+    return [...porCat.entries()].sort((a, b) => b[1] - a[1])
+  }, [transactions, capaOverrides])
+
+  const diasRestantesMes = useMemo(() => {
+    const [y, m] = mes.split('-').map(Number)
+    const today = new Date()
+    if (today.getFullYear() !== y || today.getMonth() + 1 !== m) return 0
+    return new Date(y, m, 0).getDate() - today.getDate()
+  }, [mes])
+
+  const pctTxt = (monto: number) => {
+    const p = pctDeIngreso(monto)
+    return p !== null ? ` (${p}% de tu ingreso)` : ''
+  }
+  const origenPorCapa: Record<StatKey, string | null> = {
+    ahorro: plan && plan.ahorroMetaMonto > 0
+      ? `Meta que definiste${pctTxt(plan.ahorroMetaMonto)}. Suma lo que categorices como Ahorros o Inversión, recomendado 20-30% de tu ingreso.`
+      : null,
+    fijo: fijoPresupuestado > 0
+      ? `Total de fijos que declaraste${pctTxt(fijoPresupuestado)}. Suma Hogar, Suscripciones, Salud, Educación, Deuda y tus categorías marcadas como Fijo.`
+      : null,
+    variable: plan && poolVariable > 0
+      ? `Ingreso ${formatCOPCompact(plan.ingresoNetoMensual)} − Fijos ${formatCOPCompact(fijoPresupuestado)} − Ahorro ${formatCOPCompact(plan.ahorroMetaMonto)} = ${formatCOPCompact(poolVariable)}. Se reparte en tu cupo semanal.`
+      : null,
+  }
+  const limitePorCapa: Record<StatKey, number> = {
+    ahorro: plan?.ahorroMetaMonto ?? 0,
+    fijo: fijoPresupuestado,
+    variable: poolVariable,
+  }
+  const toggleFilter = (cat: string) => onFilterChange(activeFilter === cat ? 'TODOS' : cat)
 
   // ── Vista Participación ────────────────────────────────────────────────────
   const chartData = useMemo(() => buildChartData(transactions), [transactions])
@@ -272,10 +308,16 @@ export default function CategoriesCard({
       {/* Header */}
       <div className={`${styles.header} ${!hasAnyContent ? styles.headerBordered : ''}`}>
         <p className={styles.headerTitle}>Tu Plan</p>
-        <button onClick={() => setEditing(true)} className={styles.editBtn}>
-          <Pencil size={11} />
-          Editar
-        </button>
+        <div className={styles.headerActions}>
+          <button onClick={onManageCategories} className={styles.editBtn}>
+            <Tags size={11} />
+            Categorías
+          </button>
+          <button onClick={() => setEditing(true)} className={styles.editBtn}>
+            <Pencil size={11} />
+            Editar
+          </button>
+        </div>
       </div>
 
       {/* Segmented control */}
@@ -363,49 +405,37 @@ export default function CategoriesCard({
           </div>
           <p className={styles.statsHint}>Toca cualquiera para ver el detalle</p>
 
-          {expandedStat === 'ahorro' && (
-            <div className={styles.detailPanel}>
-              <SavingsOverview onTransaction={onSavingsTransaction} refreshSignal={savingsRefreshSignal} />
-              {plan && plan.ahorroMetaMonto > 0 && ahorroPct !== null && (
-                <p className={styles.layerSubtitle}>
-                  Este mes: {formatCOP(layerTotals.ahorro)} de {formatCOP(plan.ahorroMetaMonto)} ·
-                  {' '}{ahorroPct}% de tu ingreso · recomendado 20-30%
-                </p>
-              )}
-              {!(plan && plan.ahorroMetaMonto > 0) && (
-                <p className={styles.layerHint}>Define tu meta de ahorro en Editar</p>
-              )}
-            </div>
+          {fueraDelPlan.length > 0 && (
+            <button
+              className={styles.fueraNote}
+              onClick={() => toggleFilter(fueraDelPlan[0][0])}
+              aria-label="Ver en la lista las salidas que no cuentan en tu plan"
+            >
+              <span className={styles.fueraTitle}>Fuera de tu plan</span>
+              <span className={styles.fueraBody}>
+                {fueraDelPlan.map(([cat, monto]) => `${catLabel(cat)} ${formatCOPCompact(monto)}`).join(' · ')}
+                {', '}préstamos y transferencias sin categoría no cuentan como gasto ni ahorro. Categorízalas si deberían.
+              </span>
+            </button>
           )}
 
-          {expandedStat === 'fijo' && (
+          {expandedStat && (
             <div className={styles.detailPanel}>
-              {fijoPresupuestado > 0 ? (
-                <>
-                  <p className={styles.detailAmounts}>
-                    {formatCOP(layerTotals.fijo)} <span className={styles.detailAmountsMuted}>de {formatCOP(fijoPresupuestado)}</span>
-                  </p>
-                  {fijoPct !== null && <p className={styles.layerSubtitle}>{fijoPct}% de tu ingreso · recomendado 45-50%</p>}
-                </>
-              ) : (
-                <p className={styles.layerHint}>Agrega tus gastos fijos (arriendo, suscripciones…) en Editar</p>
+              <LayerDetail
+                kind={expandedStat}
+                txs={txsPorCapa[expandedStat]}
+                total={layerTotals[expandedStat]}
+                limite={limitePorCapa[expandedStat]}
+                origen={origenPorCapa[expandedStat]}
+                diasRestantes={diasRestantesMes}
+                activeFilter={activeFilter}
+                onFilterCategory={toggleFilter}
+              />
+              {expandedStat === 'ahorro' && (
+                <div className={styles.savingsWrap}>
+                  <SavingsOverview onTransaction={onSavingsTransaction} refreshSignal={savingsRefreshSignal} />
+                </div>
               )}
-            </div>
-          )}
-
-          {expandedStat === 'variable' && (
-            <div className={styles.detailPanel}>
-              {poolVariable > 0 ? (
-                <>
-                  <p className={styles.detailAmounts}>
-                    {formatCOP(layerTotals.variable)} <span className={styles.detailAmountsMuted}>de {formatCOP(poolVariable)}</span>
-                  </p>
-                  {variablePct !== null && <p className={styles.layerSubtitle}>{variablePct}% de tu ingreso · recomendado 25-30%</p>}
-                </>
-              ) : (
-                <p className={styles.layerHint}>Define tu ingreso en Editar para ver tu pool variable</p>
-              )}
-              <p className={styles.layerFootnote}>Se reparte solo en tu cupo semanal, mira la tarjeta de arriba</p>
             </div>
           )}
         </>

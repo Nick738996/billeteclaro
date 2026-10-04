@@ -58,3 +58,53 @@
   font-size: var(--text-xs);
   color: var(--text-subtle);
 }
+
+
+.semana {
+  font-size: var(--text-xs);
+  color: var(--text-subtle);
+  margin: 0;
+}
+
+.amountLabel {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Recibo: el número del anillo desarmado línea por línea */
+.receipt {
+  width: min(340px, 100%);
+  margin: 8px 0 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  font-variant-numeric: tabular-nums;
+}
+.receiptRow, .receiptSub {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+}
+.receiptRow { font-size: var(--text-sm); color: var(--text-muted); padding: 3px 0; }
+.receiptRow dd { margin: 0; color: var(--text); font-weight: 600; }
+.receiptSub { font-size: var(--text-xs); color: var(--text-subtle); padding: 0 0 3px 12px; }
+.receiptSub dd { margin: 0; }
+.receiptTotal {
+  border-top: 1px solid var(--border-soft);
+  margin-top: 4px;
+  padding-top: 8px;
+  color: var(--text);
+  font-weight: 600;
+}
+.receiptNote, .receiptWarn {
+  width: min(340px, 100%);
+  font-size: var(--text-xs);
+  line-height: 1.45;
+  margin-top: 8px;
+}
+.receiptNote { color: var(--text-subtle); }
+.receiptWarn { color: var(--yellow); }
+.receiptWarn::first-letter { text-transform: uppercase; }

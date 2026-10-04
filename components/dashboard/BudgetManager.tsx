@@ -342,7 +342,7 @@ export default function BudgetManager({ mes, initialPlan, ingresoReal = 0, onPla
         )}
         <p className={styles.planBenchmark}>
           {ingresoReal > 0
-            ? 'Se llenó solo con tus ingresos reales del mes. Ajústalo si vas a planear distinto.'
+            ? 'Se llenó solo con lo que te entró este mes, sin contar retiros de tus ahorros. Si incluye plata que pasaste entre tus propias cuentas, réstala: de este número sale tu cupo semanal.'
             : 'Lo que te queda libre cada mes, después de impuestos.'}
         </p>
       </div>

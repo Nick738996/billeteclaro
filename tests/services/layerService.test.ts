@@ -2,8 +2,13 @@ import { describe, it, expect } from 'vitest'
 import {
   getCapaForTransaccion,
   computeLayerTotals,
+  isSalidaFueraDelPlan,
   getCustomCapaOverrides,
   saveCategoryCapa,
+  resetCategoryCapa,
+  deleteCustomCategory,
+  listCustomCategories,
+  computeIngresoReal,
 } from '@/lib/services/layerService'
 import type { Transaction } from '@/lib/types'
 import { createFakeSupabase } from '../helpers/fakeSupabase'
@@ -47,6 +52,7 @@ describe('getCapaForTransaccion', () => {
     expect(getCapaForTransaccion(tx({ categoria: 'TRANSFERENCIA' }), {})).toBeNull()
     expect(getCapaForTransaccion(tx({ categoria: 'INGRESO' }), {})).toBeNull()
     expect(getCapaForTransaccion(tx({ categoria: 'REEMBOLSABLE' }), {})).toBeNull()
+    expect(getCapaForTransaccion(tx({ categoria: 'PRESTAMO' }), {})).toBeNull()
   })
 
   it('capa_override gana sobre el default de la categoría', () => {
@@ -90,6 +96,16 @@ describe('computeLayerTotals', () => {
     expect(computeLayerTotals(txs, {})).toEqual({ ahorro: 0, fijo: 0, variable: 0 })
   })
 
+  it('un préstamo que diste NO cuenta como ahorro', () => {
+    const txs = [tx({ categoria: 'PRESTAMO', tipo: 'TRANSFERENCIA_ENVIADA', monto: 343_000 })]
+    expect(computeLayerTotals(txs, {})).toEqual({ ahorro: 0, fijo: 0, variable: 0 })
+  })
+
+  it('una entrada categorizada como INVERSION (rendimientos) no suma como ahorro', () => {
+    const txs = [tx({ categoria: 'INVERSION', tipo: 'INGRESO', monto: 12_000 })]
+    expect(computeLayerTotals(txs, {})).toEqual({ ahorro: 0, fijo: 0, variable: 0 })
+  })
+
   it('un gasto real (isGasto) marcado con capa_override=AHORRO cuenta como apartado', () => {
     const txs = [tx({ categoria: 'COMPRAS_ONLINE', tipo: 'COMPRA', monto: 200_000, capa_override: 'AHORRO' })]
     expect(computeLayerTotals(txs, {})).toEqual({ ahorro: 200_000, fijo: 0, variable: 0 })
@@ -98,6 +114,19 @@ describe('computeLayerTotals', () => {
   it('respeta el toggle "Gasto Fijo": una compra normal reclasificada a FIJO', () => {
     const txs = [tx({ categoria: 'HOGAR', tipo: 'COMPRA', monto: 80_000, capa_override: 'VARIABLE' })]
     expect(computeLayerTotals(txs, {})).toEqual({ ahorro: 0, fijo: 0, variable: 80_000 })
+  })
+})
+
+describe('isSalidaFueraDelPlan', () => {
+  it('préstamos y transferencias sin categorizar salen del plan', () => {
+    expect(isSalidaFueraDelPlan(tx({ categoria: 'PRESTAMO', tipo: 'TRANSFERENCIA_ENVIADA' }), {})).toBe(true)
+    expect(isSalidaFueraDelPlan(tx({ categoria: 'TRANSFERENCIA', tipo: 'TRANSFERENCIA_ENVIADA' }), {})).toBe(true)
+  })
+
+  it('pagos de tarjeta, entradas y gastos que ya suman en una capa no', () => {
+    expect(isSalidaFueraDelPlan(tx({ categoria: 'TRANSFERENCIA', tipo: 'ABONO_DEUDA' }), {})).toBe(false)
+    expect(isSalidaFueraDelPlan(tx({ categoria: 'INGRESO', tipo: 'TRANSFERENCIA_RECIBIDA' }), {})).toBe(false)
+    expect(isSalidaFueraDelPlan(tx({ categoria: 'SALIDAS', tipo: 'COMPRA' }), {})).toBe(false)
   })
 })
 
@@ -115,5 +144,60 @@ describe('getCustomCapaOverrides / saveCategoryCapa', () => {
     await saveCategoryCapa(supabase, 'u1', 'HOGAR', 'VARIABLE')
     const overrides = await getCustomCapaOverrides(supabase, 'u1')
     expect(overrides).toEqual({ HOGAR: 'VARIABLE' })
+  })
+})
+
+describe('resetCategoryCapa / deleteCustomCategory', () => {
+  it('reset borra el override y la categoría vuelve a su capa por defecto', async () => {
+    const { supabase } = createFakeSupabase({ category_capas: [{ user_id: 'u1', categoria: 'HOGAR', capa: 'VARIABLE' }] })
+    await resetCategoryCapa(supabase, 'u1', 'HOGAR')
+    const overrides = await getCustomCapaOverrides(supabase, 'u1')
+    expect(getCapaForTransaccion(tx({ categoria: 'HOGAR' }), overrides)).toBe('FIJO')
+  })
+
+  it('eliminar una categoría custom mueve sus transacciones a OTRO y borra su capa y presupuestos', async () => {
+    const { supabase, tables } = createFakeSupabase({
+      category_capas: [{ user_id: 'u1', categoria: 'MASCOTAS', capa: 'FIJO' }],
+      transactions: [
+        { id: 'a', user_id: 'u1', categoria: 'MASCOTAS' },
+        { id: 'b', user_id: 'u1', categoria: 'MASCOTAS' },
+        { id: 'c', user_id: 'u1', categoria: 'SALIDAS' },
+        { id: 'd', user_id: 'u2', categoria: 'MASCOTAS' },
+      ],
+      budgets: [{ user_id: 'u1', mes: '2026-10', categoria: 'MASCOTAS', monto_presupuestado: 100 }],
+    })
+    const movidas = await deleteCustomCategory(supabase, 'u1', 'MASCOTAS')
+    expect(movidas).toBe(2)
+    expect(tables.transactions.map(t => t.categoria)).toEqual(['OTRO', 'OTRO', 'SALIDAS', 'MASCOTAS'])
+    expect(tables.category_capas).toEqual([])
+    expect(tables.budgets).toEqual([])
+  })
+
+  it('no deja eliminar una categoría predeterminada', async () => {
+    const { supabase } = createFakeSupabase({ transactions: [] })
+    await expect(deleteCustomCategory(supabase, 'u1', 'HOGAR')).rejects.toThrow()
+  })
+})
+
+describe('listCustomCategories', () => {
+  it('une overrides, categorías vistas en transacciones y recién creadas, sin las predeterminadas', () => {
+    const result = listCustomCategories(
+      { DEPORTES: 'FIJO', HOGAR: 'VARIABLE' },
+      [{ categoria: 'MASCOTAS' }, { categoria: 'SALIDAS' }],
+      ['REGALOS']
+    )
+    expect(result).toEqual(['DEPORTES', 'MASCOTAS', 'REGALOS'])
+  })
+})
+
+describe('computeIngresoReal', () => {
+  it('no cuenta los retiros de tus propios ahorros como ingreso', () => {
+    const txs = [
+      tx({ tipo: 'INGRESO', monto: 10_000_000 }),
+      tx({ tipo: 'TRANSFERENCIA_RECIBIDA', monto: 700_000 }),
+      tx({ tipo: 'INGRESO', monto: 2_600_000, subcategoria: 'retiro_ahorros' }),
+      tx({ tipo: 'COMPRA', monto: 50_000 }),
+    ]
+    expect(computeIngresoReal(txs)).toBe(10_700_000)
   })
 })

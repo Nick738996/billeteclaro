@@ -1,6 +1,12 @@
 import { ok, err } from '@/lib/api/response'
 import { withAuth } from '@/lib/api/withAuth'
-import { getCustomCapaOverrides, saveCategoryCapa } from '@/lib/services/layerService'
+import {
+  getCustomCapaOverrides,
+  saveCategoryCapa,
+  resetCategoryCapa,
+  deleteCustomCategory,
+  isBuiltInCategoria,
+} from '@/lib/services/layerService'
 import type { Capa } from '@/lib/types'
 
 const VALID_CAPAS = new Set<Capa>(['AHORRO', 'FIJO', 'VARIABLE'])
@@ -39,5 +45,25 @@ export const POST = withAuth(async (req, user, supabase) => {
   } catch (e) {
     console.error('[POST /api/category-capas]', { userId: user.id, categoria, capa }, e)
     return err('Error guardando la capa de la categoría')
+  }
+})
+
+// DELETE /api/category-capas  body: { categoria }
+// Built-in → restaura su capa por defecto (borra el override).
+// Custom → elimina la categoría: sus transacciones pasan a OTRO.
+export const DELETE = withAuth(async (req, user, supabase) => {
+  const { categoria } = await req.json() as { categoria?: string }
+  if (!categoria) return err('categoria es requerida', 400)
+
+  try {
+    if (isBuiltInCategoria(categoria)) {
+      await resetCategoryCapa(supabase, user.id, categoria)
+      return ok({ eliminada: false, movidas: 0 })
+    }
+    const movidas = await deleteCustomCategory(supabase, user.id, categoria)
+    return ok({ eliminada: true, movidas })
+  } catch (e) {
+    console.error('[DELETE /api/category-capas]', { userId: user.id, categoria }, e)
+    return err('Error eliminando la categoría')
   }
 })
