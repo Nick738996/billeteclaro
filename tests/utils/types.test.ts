@@ -96,16 +96,18 @@ describe('isGasto', () => {
 })
 
 describe('formatCOPCompact', () => {
-  it('millones con una cifra decimal', () => {
-    expect(formatCOPCompact(1_500_000)).toBe('$1.5M')
+  it('millones con una cifra decimal y coma', () => {
+    expect(formatCOPCompact(1_500_000)).toBe('$1,5 millones')
   })
 
   it('millones exactos sin decimal', () => {
-    expect(formatCOPCompact(2_000_000)).toBe('$2M')
+    expect(formatCOPCompact(2_000_000)).toBe('$2 millones')
+    expect(formatCOPCompact(1_000_000)).toBe('$1 millón')
   })
 
   it('miles', () => {
-    expect(formatCOPCompact(50_000)).toBe('$50K')
+    expect(formatCOPCompact(50_000)).toBe('$50 mil')
+    expect(formatCOPCompact(903_600)).toBe('$904 mil')
   })
 
   it('monto pequeño sin sufijo', () => {
@@ -113,7 +115,7 @@ describe('formatCOPCompact', () => {
   })
 
   it('negativo en millones', () => {
-    expect(formatCOPCompact(-1_200_000)).toBe('-$1.2M')
+    expect(formatCOPCompact(-1_200_000)).toBe('-$1,2 millones')
   })
 
   it('cero', () => {

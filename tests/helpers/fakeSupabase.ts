@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 // Fake in-memory de Supabase para tests de servicios que encadenan varias
-// tablas (monthly_plan, budgets, category_capas, weekly_allowances,
+// tablas (monthly_plan, budgets, category_capas,
 // transactions). Cubre solo las formas de query que estos servicios usan:
 // select().eq()...maybeSingle()/single()/await-directo, insert().select().single(),
 // update(patch).eq().eq()[.select()], delete().eq(), upsert(row, {onConflict}).

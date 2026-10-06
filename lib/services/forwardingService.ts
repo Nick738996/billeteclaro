@@ -8,6 +8,7 @@ import { reassignCalendarMonths } from '@/lib/services/mesContableService'
 import { toColombiaDate } from '@/lib/utils/mesContable'
 import { createAdminClient } from '@/lib/supabase/server'
 import type { EmailMessage } from '@/lib/email/types'
+import { categoriaPorRegla, getCommerceRules } from '@/lib/services/commerceRules'
 
 type Admin = ReturnType<typeof createAdminClient>
 
@@ -147,6 +148,23 @@ export async function processForwardedEmail(payload: ForwardedEmailPayload, admi
 
   const fecha = extracted.fecha ? new Date(extracted.fecha) : new Date()
 
+  // Si el usuario ya le corrigió la categoría a este comercio (o a esta
+  // cuenta destino) antes, se usa esa en vez de la que adivinó el parser.
+  let categoria: string = extracted.categoria
+  let flags = extracted.flags
+  try {
+    const regla = categoriaPorRegla(
+      { tipo: extracted.tipo, comercio: extracted.comercio, contraparte_id: extracted.contraparte_id ?? null, subcategoria: extracted.subcategoria },
+      await getCommerceRules(admin, userId)
+    )
+    if (regla) {
+      categoria = regla
+      flags = [...flags, 'regla_comercio']
+    }
+  } catch (e) {
+    console.error('[forwardingService] reglas de comercio:', e)
+  }
+
   // Reenviar el mismo correo original dos veces (a mano, o porque el
   // usuario recuperó una transacción borrada reenviándola de nuevo) produce
   // dos correos con Message-ID distinto — el `onConflict` de más abajo no
@@ -169,10 +187,10 @@ export async function processForwardedEmail(payload: ForwardedEmailPayload, admi
       fecha: fecha.toISOString(), monto: extracted.monto,
       comercio: extracted.comercio, descripcion: extracted.descripcion,
       banco: extracted.banco, tipo: extracted.tipo,
-      categoria: extracted.categoria, subcategoria: extracted.subcategoria,
+      categoria, subcategoria: extracted.subcategoria,
       id_auditoria: await generateAuditId(admin, userId, fecha),
       moneda: extracted.moneda, monto_usd: extracted.monto_usd,
-      flags: extracted.flags, raw_snippet: null, procesado: true,
+      flags, raw_snippet: null, procesado: true,
       contraparte_id: extracted.contraparte_id ?? null,
     }, { onConflict: 'user_id,gmail_message_id', ignoreDuplicates: true })
     .select('id')

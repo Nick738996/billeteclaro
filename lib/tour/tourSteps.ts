@@ -15,15 +15,15 @@ const ALL_STEPS: Array<TourStep & { requiresFeature?: boolean }> = [
   {
     id: 'progress',
     targetTestId: 'dashboard-month-progress',
-    titulo: 'Tu resumen del mes',
-    descripcion: 'Acá ves cuánto llevas gastado vs tus ingresos totales, el dinero disponible, y los días que quedan. Todo en tiempo real.',
+    titulo: 'Tu semana',
+    descripcion: 'Cuánto te queda esta semana. Se recalcula cada lunes con lo que queda del mes: si una semana se te va, la siguiente te dice cómo recuperarte.',
     posicion: 'bottom',
   },
   {
     id: 'budget',
     targetTestId: 'tour-budget',
-    titulo: 'Tu plan',
-    descripcion: 'Ahorro, gastos fijos y variable en 3 números. Toca cualquiera para ver el detalle.',
+    titulo: 'En qué se fue',
+    descripcion: 'Tu gasto del mes por categoría, con los fijos en una línea. Toca cualquiera para ver sus movimientos.',
     posicion: 'top',
   },
   {

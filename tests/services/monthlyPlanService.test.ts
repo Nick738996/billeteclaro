@@ -15,28 +15,28 @@ describe('fetchMonthlyPlan / saveMonthlyPlan', () => {
       fijoTotalMonto: 2_800_000,
       fijoItems: [{ nombre: 'Arriendo', monto: 2_500_000 }, { nombre: 'Servicios', monto: 300_000 }],
       ahorroMetaMonto: 1_200_000,
-      ahorroItems: [],
+      ahorroItems: [], imprevistosMonto: 0,
     })
     await expect(fetchMonthlyPlan(supabase, 'u1', '2026-09')).resolves.toEqual({
       ingresoNetoMensual: 6_000_000,
       fijoTotalMonto: 2_800_000,
       fijoItems: [{ nombre: 'Arriendo', monto: 2_500_000 }, { nombre: 'Servicios', monto: 300_000 }],
       ahorroMetaMonto: 1_200_000,
-      ahorroItems: [],
+      ahorroItems: [], imprevistosMonto: 0,
     })
   })
 
   it('un segundo save del mismo mes actualiza en vez de duplicar (upsert user_id+mes)', async () => {
     const { supabase, tables } = createFakeSupabase({ monthly_plan: [] })
-    await saveMonthlyPlan(supabase, 'u1', '2026-09', { ingresoNetoMensual: 6_000_000, fijoTotalMonto: 2_000_000, fijoItems: [], ahorroMetaMonto: 1_000_000, ahorroItems: [] })
-    await saveMonthlyPlan(supabase, 'u1', '2026-09', { ingresoNetoMensual: 7_000_000, fijoTotalMonto: 2_500_000, fijoItems: [], ahorroMetaMonto: 1_500_000, ahorroItems: [] })
+    await saveMonthlyPlan(supabase, 'u1', '2026-09', { ingresoNetoMensual: 6_000_000, fijoTotalMonto: 2_000_000, fijoItems: [], ahorroMetaMonto: 1_000_000, ahorroItems: [], imprevistosMonto: 0 })
+    await saveMonthlyPlan(supabase, 'u1', '2026-09', { ingresoNetoMensual: 7_000_000, fijoTotalMonto: 2_500_000, fijoItems: [], ahorroMetaMonto: 1_500_000, ahorroItems: [], imprevistosMonto: 0 })
     expect(tables.monthly_plan).toHaveLength(1)
     await expect(fetchMonthlyPlan(supabase, 'u1', '2026-09')).resolves.toEqual({
       ingresoNetoMensual: 7_000_000,
       fijoTotalMonto: 2_500_000,
       fijoItems: [],
       ahorroMetaMonto: 1_500_000,
-      ahorroItems: [],
+      ahorroItems: [], imprevistosMonto: 0,
     })
   })
 
@@ -49,7 +49,7 @@ describe('fetchMonthlyPlan / saveMonthlyPlan', () => {
       fijoTotalMonto: 2_000_000,
       fijoItems: [],
       ahorroMetaMonto: 1_000_000,
-      ahorroItems: [],
+      ahorroItems: [], imprevistosMonto: 0,
     })
   })
 })

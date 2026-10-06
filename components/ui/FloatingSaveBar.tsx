@@ -15,7 +15,7 @@ interface Props {
   saveAriaLabel?: string
 }
 
-// Compartida por BudgetManager y TransactionsList — misma barra flotante de
+// Usada por TransactionsList (antes también por el editor de plan): barra flotante de
 // cambios pendientes, antes duplicada con nombres de clase distintos
 // (.saveBarWrap / .pendingBarWrap) pero estructura y CSS idénticos.
 export default function FloatingSaveBar({ label, state, onDiscard, onSave, saveTestId, saveAriaLabel }: Props) {

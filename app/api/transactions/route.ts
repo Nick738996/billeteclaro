@@ -6,6 +6,7 @@ import {
   patchTransaction,
   deleteAllTransactions,
 } from '@/lib/services/transactionService'
+import { learnCategoryRule } from '@/lib/services/commerceRules'
 // GET /api/transactions?month=YYYY-MM
 export const GET = withAuth(async (req, user, supabase) => {
   const mes = new URL(req.url).searchParams.get('month') ?? new Date().toISOString().slice(0, 7)
@@ -22,7 +23,7 @@ const VALID_CAPAS = new Set(['AHORRO', 'FIJO', 'VARIABLE'])
 
 // PATCH /api/transactions  body: { id, categoria?, subcategoria?, comercio?, capa_override? }
 export const PATCH = withAuth(async (req, user, supabase) => {
-  const body = await req.json() as { id?: string; categoria?: string; subcategoria?: string; comercio?: string; capa_override?: string | null }
+  const body = await req.json() as { id?: string; categoria?: string; subcategoria?: string | null; comercio?: string; capa_override?: string | null }
   if (!body.id) return err('id es requerido', 400)
   if (body.capa_override !== undefined && body.capa_override !== null && !VALID_CAPAS.has(body.capa_override)) {
     return err('capa_override inválida', 400)
@@ -36,7 +37,18 @@ export const PATCH = withAuth(async (req, user, supabase) => {
 
   try {
     const data = await patchTransaction(supabase, user.id, body.id, updates)
-    return ok(data)
+
+    // Si cambió la categoría, la app la recuerda para ese comercio y corrige
+    // los parecidos del mes. Si esto falla, el cambio principal ya quedó.
+    let parecidosActualizados = 0
+    if (body.categoria !== undefined) {
+      try {
+        parecidosActualizados = await learnCategoryRule(supabase, user.id, data)
+      } catch (e) {
+        console.error('[PATCH /api/transactions] learnCategoryRule', { userId: user.id, id: body.id }, e)
+      }
+    }
+    return ok({ ...data, parecidosActualizados })
   } catch (e) {
     console.error('[PATCH /api/transactions]', { userId: user.id, id: body.id }, e)
     return err('Error actualizando transacción')

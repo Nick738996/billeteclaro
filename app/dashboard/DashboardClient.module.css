@@ -42,13 +42,6 @@
   transition: opacity 0.2s;
 }
 
-/* Acerca "Tu Plan" al anillo del cupo semanal — el gap general de .main
-   (24px) es parejo para todas las secciones, este margen negativo achica
-   solo esta transición sin afectar el resto. */
-.planWrap {
-  margin-top: -16px;
-}
-
 .mainLoading {
   opacity: 0.4;
   pointer-events: none;

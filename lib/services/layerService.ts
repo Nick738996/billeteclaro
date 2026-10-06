@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Categoria, Transaction, Capa } from '@/lib/types'
-import { CATEGORIA_CAPA_DEFAULT, CATEGORIA_LABELS, SUBCATEGORIA_RETIRO_AHORROS, isGasto, isIngreso } from '@/lib/types'
+import { deleteRulesForCategoria } from '@/lib/services/commerceRules'
+import { CATEGORIA_CAPA_DEFAULT, CATEGORIA_LABELS, isGasto, isIngreso } from '@/lib/types'
 
 export async function getCustomCapaOverrides(
   supabase: SupabaseClient,
@@ -82,6 +83,7 @@ export async function deleteCustomCategory(
   if (budgetsError) throw new Error(`deleteCustomCategory (budgets): ${budgetsError.message}`)
 
   await resetCategoryCapa(supabase, userId, categoria)
+  await deleteRulesForCategoria(supabase, userId, categoria)
   return data?.length ?? 0
 }
 
@@ -140,50 +142,4 @@ export function countedCapa(
   if (!capa) return null
   if (capa === 'AHORRO') return isIngreso(tx.tipo) ? null : 'AHORRO'
   return isGasto(tx.tipo, tx.categoria) ? capa : null
-}
-
-export interface LayerTotals {
-  ahorro: number
-  fijo: number
-  variable: number
-}
-
-export function computeLayerTotals(
-  txs: Transaction[],
-  capaOverrides: Record<string, Capa>
-): LayerTotals {
-  const totals: LayerTotals = { ahorro: 0, fijo: 0, variable: 0 }
-  for (const tx of txs) {
-    const capa = countedCapa(tx, capaOverrides)
-    if (capa) totals[capa === 'AHORRO' ? 'ahorro' : capa === 'FIJO' ? 'fijo' : 'variable'] += Number(tx.monto)
-  }
-  return totals
-}
-
-/**
- * Ingreso real del mes para el plan: todo lo que entró, MENOS los retiros de
- * tus propios ahorros. Sacar plata de un bolsillo no es ganarla, y contarla
- * inflaba el ingreso del plan y con él el cupo semanal (septiembre 2026:
- * $2.8M de retiros hicieron que cada día valiera más del doble).
- */
-export function computeIngresoReal(
-  txs: Pick<Transaction, 'tipo' | 'monto' | 'subcategoria'>[]
-): number {
-  return txs
-    .filter(t => isIngreso(t.tipo) && t.subcategoria !== SUBCATEGORIA_RETIRO_AHORROS)
-    .reduce((s, t) => s + Number(t.monto), 0)
-}
-
-/**
- * Salidas de plata del mes que no suman en ninguna capa: préstamos que diste
- * y transferencias a personas sin categorizar. Los pagos de tarjeta
- * (ABONO_DEUDA) no entran — las compras de la tarjeta ya se registraron una
- * por una, contarlos sería doble.
- */
-export function isSalidaFueraDelPlan(
-  tx: Pick<Transaction, 'categoria' | 'capa_override' | 'tipo'>,
-  capaOverrides: Record<string, Capa>
-): boolean {
-  if (isIngreso(tx.tipo) || tx.tipo === 'ABONO_DEUDA') return false
-  return countedCapa(tx, capaOverrides) === null
 }

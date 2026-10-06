@@ -35,7 +35,7 @@
 ```bash
 npm run dev        # servidor local en :3000
 npm run build      # build de producción
-npm test           # 266 tests (Vitest)
+npm test           # 354 tests (Vitest)
 npm run test:watch # modo watch
 npx tsc --noEmit   # type check
 ```
@@ -65,10 +65,15 @@ El login con Google/Outlook se configura como provider de OAuth directo en el da
 | --------------- | --------------------------------------------------------------------------------------------------------- |
 | `transactions`  | Todas las transacciones. UNIQUE `(user_id, gmail_message_id)` — para un correo reenviado, `gmail_message_id` es su header `Message-ID` (o un hash del body si no viene). Columnas `mes_contable` y `es_sueldo` |
 | `sync_log`      | Resto de la era de sync por OAuth — `deleteTransaction()` todavía inserta un registro `SKIPPED` con el `gmail_message_id` borrado, pero nada lo vuelve a leer hoy (la ingesta por reenvío no consulta `skipped_ids`) |
-| `budgets`       | `(user_id, mes, categoria, monto_presupuestado, subcategorias jsonb)`. UNIQUE `(user_id, mes, categoria)` |
+| `monthly_plan`  | El plan del mes. UNIQUE `(user_id, mes)`. `ingreso_neto_mensual`, `ahorro_meta_monto`, `fijo_total_monto` + `fijo_items jsonb` (desglose: cada ítem es una categoría fija), `imprevistos_monto` (migración 018). Ver "Modelo de presupuesto" |
+| `category_capas` | Categorías creadas por el usuario `(user_id, categoria, capa)`. Hoy se usa solo por los nombres: qué es fijo sale del plan, no de aquí |
+| `savings_accounts` | Bolsillos de ahorro con saldo manual. Aportar/retirar crea transacciones `aporte_ahorros` / `retiro_ahorros` |
+| `budgets`       | Modelo anterior de presupuesto por categoría. Solo lo leen el asesor IA (apagado) y la sección "Presupuestadas" del selector de categoría |
+| `weekly_allowances` | **Sin uso** desde que el cupo semanal se calcula en vivo (ver "Modelo de presupuesto"). Candidata a borrarse con una migración |
 | `ai_insights`   | Cache de insights. UNIQUE `(user_id, mes)`. Columnas: `insights jsonb`, `context_hash`, `generated_at`    |
 | `chat_messages` | Historial del chat con el asesor. `role CHECK IN ('user','assistant')`                                    |
 | `user_settings` | `onboarding_completed boolean DEFAULT false`                                                              |
+| `commerce_rules` | Categoría recordada por comercio/cuenta destino. PK `(user_id, clave)`, clave `com:<comercio normalizado>` o `cta:<contraparte_id>` |
 | `forwarding_addresses` | Dirección única de reenvío por usuario (`token`, `confirmed_at`, `pending_confirm_url`). Reemplaza la ingesta por OAuth — ver `lib/services/forwardingService.ts` |
 
 - RLS habilitado en todas las tablas con `auth.uid() = user_id`
@@ -171,7 +176,22 @@ Lógica de negocio en `lib/services/`, nunca en route handlers.
 
 **Colores principales:** `--green #4ADE80` · `--red #FF6B6B` · `--yellow #FCD34D` · `--blue #60A5FA` · `--purple #A78BFA`
 
-> `CategoriesCard` (fusión de SpendingChart + BudgetOverview) usa colores hex vía `getCategoryColor()` porque SVG `fill` no acepta `var()`.
+> Los colores por categoría salen de `getCategoryColor()` (hex, no `var()`), para poder usarlos en estilos inline y SVG.
+
+---
+
+## Modelo de presupuesto (`lib/services/monthSummary.ts`, `planReality.ts`, `planCategories.ts`)
+
+Todo lo que muestra el dashboard sale de `computeMonthSummary()`, recalculado desde las transacciones cada vez (nada guardado ni arrastrado entre semanas).
+
+- **Qué es cada movimiento — `naturaleza()`:** `INGRESO` (solo categoría Ingreso: préstamos que te pagaron, plata entre cuentas o reembolsos no son ingreso) · `GASTO_FIJO` · `GASTO_VARIABLE` · `AHORRO_APORTE` · `AHORRO_RETIRO` · `NO_CUENTA` (pagos de tarjeta `ABONO_DEUDA`, Préstamo, Entre mis cuentas, Transferencia, Reembolsable).
+- **Fijo = un ítem del desglose del plan.** Ninguna categoría predeterminada es fija (`CATEGORIA_CAPA_DEFAULT`): `capasDelPlan(plan)` marca FIJO las categorías de los ítems de `fijo_items` (salvo categorías de ahorro o que no cuentan: un ítem "Inversión" no vuelve gasto tus aportes). `esFijoDeHecho()` también trata como fijo un pago que se llama como un ítem del plan ("Arriendo" en Hogar) o que se repite cada mes (`gruposRecurrentes`).
+- **Imprevisto (`esImprevisto`)** = todo gasto variable en la categoría `OTRO` (que en la app se muestra como "Imprevisto": lo que no estaba en ninguna categoría planeada), o un gasto variable ≥ `UMBRAL_IMPREVISTO` ($300 mil) que no se repite y no es un recibo (`PAGO_SERVICIO`). Un "Otro" que se repite cada mes (la cuota del Fondo) es fijo de hecho, no imprevisto. Tiene su reserva en el plan (`imprevistos_monto`) y no cuenta en el presupuesto semanal.
+- **Plan "págate primero" (`PlanEditor`):** ingreso → ahorro → fijos → imprevistos → lo que queda es el día a día. Cada línea sugiere "tu mes normal" (`historialPlan`: mediana de los 3 meses anteriores) y arriba se ve dónde se va la plata contra la guía 50/30/20.
+- **Presupuesto semanal (cada lunes, nuevo comienzo):** lo que queda del mes para el día a día (plan − exceso de fijos − exceso de imprevistos − lo gastado antes del lunes) repartido entre los días que faltan. Si no alcanza ni para la mitad del ritmo planeado → `mesFueraDelPlan`.
+- **Sacar de los ahorros no agranda el presupuesto:** es la señal de que algo no estaba en el plan; se muestra en la línea de Ahorro (metiste / sacaste).
+- **Por revisar (`motivoRevision`):** transferencias recibidas marcadas Ingreso y salidas ≥ $200 mil en Otro/Transferencia, hasta que el usuario responde (subcategoría `confirmado` o cambio de categoría).
+- **Reglas por comercio:** ver Etapa 2 abajo (`commerce_rules`).
 
 ---
 
@@ -180,7 +200,7 @@ Lógica de negocio en `lib/services/`, nunca en route handlers.
 ```typescript
 type Categoria = 'HOGAR' | 'TRANSPORTE' | 'SALIDAS' | 'SALUD' | 'SUSCRIPCIONES'
   | 'COMPRAS_ONLINE' | 'INVERSION' | 'AHORROS' | 'PRESTAMO' | 'DEUDA' | 'DONACIONES'
-  | 'EDUCACION' | 'REEMBOLSABLE' | 'TRANSFERENCIA' | 'INGRESO' | 'OTRO'
+  | 'EDUCACION' | 'REEMBOLSABLE' | 'TRANSFERENCIA' | 'ENTRE_CUENTAS' | 'INGRESO' | 'OTRO'
 
 type Banco = 'RAPPICARD' | 'RAPPIPAY' | 'BANCOLOMBIA' | 'DAVIVIENDA' | 'BBVA'
   | 'SCOTIABANK_COLPATRIA' | 'BANCO_DE_BOGOTA' | 'NU' | 'NEQUI' | 'LULO_BANK'
@@ -222,7 +242,7 @@ feature/<nombre>   ← una por mejora, PR a main
 ### ⬜ Etapa 2 — Categorización inteligente (parcial)
 
 - [x] `guessCategoria()` con 120+ patrones — `lib/parsers/commerceCategories.ts`
-- [ ] **Caché por comercio** — nueva tabla `commerce_rules`. Si el usuario cambia "Uber" a TRANSPORTE una vez, se aplica siempre en futuros syncs.
+- [x] **Reglas por comercio** — tabla `commerce_rules` (migración 017, `lib/services/commerceRules.ts`). Al cambiar la categoría de un movimiento se guarda la regla (compras por comercio normalizado, transferencias por cuenta destino; las entradas no aprenden), se corrigen los parecidos del mismo mes, y `processForwardedEmail` la aplica a los correos nuevos (flag `regla_comercio`).
 
 ### ⬜ Accesibilidad (a11y) — WCAG 2.1 AA
 
