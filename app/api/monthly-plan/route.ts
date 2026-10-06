@@ -26,7 +26,7 @@ export const GET = withAuth(async (req, user, supabase) => {
   }
 })
 
-// PUT /api/monthly-plan  body: { mes, ingresoNetoMensual, fijoTotalMonto, fijoItems?, ahorroMetaMonto, ahorroItems? }
+// PUT /api/monthly-plan  body: { mes, ingresoNetoMensual, fijoTotalMonto, fijoItems?, ahorroMetaMonto, ahorroItems?, imprevistosMonto? }
 export const PUT = withAuth(async (req, user, supabase) => {
   const body = await req.json() as {
     mes?: string
@@ -35,8 +35,9 @@ export const PUT = withAuth(async (req, user, supabase) => {
     fijoItems?: unknown
     ahorroMetaMonto?: number
     ahorroItems?: unknown
+    imprevistosMonto?: number
   }
-  const { mes, ingresoNetoMensual, fijoTotalMonto, fijoItems, ahorroMetaMonto, ahorroItems } = body
+  const { mes, ingresoNetoMensual, fijoTotalMonto, fijoItems, ahorroMetaMonto, ahorroItems, imprevistosMonto } = body
 
   if (!mes || typeof ingresoNetoMensual !== 'number' || ingresoNetoMensual <= 0) {
     return err('mes e ingresoNetoMensual (> 0) son requeridos', 400)
@@ -49,6 +50,7 @@ export const PUT = withAuth(async (req, user, supabase) => {
       fijoItems: validItems(fijoItems),
       ahorroMetaMonto: typeof ahorroMetaMonto === 'number' && ahorroMetaMonto >= 0 ? ahorroMetaMonto : 0,
       ahorroItems: validItems(ahorroItems),
+      imprevistosMonto: typeof imprevistosMonto === 'number' && imprevistosMonto >= 0 ? imprevistosMonto : 0,
     })
     return ok({ ok: true })
   } catch (e) {

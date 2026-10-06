@@ -6,12 +6,16 @@ import { format, parseISO, addMonths, subMonths, startOfMonth } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import type { Transaction, Capa } from '@/lib/types'
-import { computeLayerTotals } from '@/lib/services/layerService'
+import type { Transaction, Capa, BudgetSubcat } from '@/lib/types'
+import { computeMonthSummary, gruposRecurrentes, pagosRecurrentesFueraDelPlan, type PlanBase, type PagoRecurrente } from '@/lib/services/monthSummary'
+import { historialPlan } from '@/lib/services/planReality'
+import { toColombiaDate } from '@/lib/utils/mesContable'
+import { capasDelPlan, categoriasDelPlan, categoriasPorRegistrar } from '@/lib/services/planCategories'
 import { TEST_IDS } from '@/lib/testIds'
-import MonthHero from '@/components/dashboard/MonthHero'
-import WeeklyAllowanceCard from '@/components/dashboard/WeeklyAllowanceCard'
-import CategoriesCard from '@/components/dashboard/CategoriesCard'
+import MonthSummaryCard from '@/components/dashboard/MonthSummaryCard'
+import SpendingCard from '@/components/dashboard/SpendingCard'
+import ReviewCard from '@/components/dashboard/ReviewCard'
+import PlanEditor from '@/components/dashboard/PlanEditor'
 import TransactionsList from '@/components/dashboard/TransactionsList'
 import HeaderPill from '@/components/dashboard/HeaderPill'
 import AIAdvisorPanel from '@/components/dashboard/AIAdvisorPanel'
@@ -119,24 +123,124 @@ export default function DashboardClient({
 
   // Overrides de capa por categoría (custom o built-in reclasificadas) — una
   // sola fuente para el hero, Tu Plan y la lista, así los tres cuadran.
-  const [capaOverrides, setCapaOverrides] = useState<Record<string, Capa>>({})
+  const [categoriasGuardadas, setCategoriasGuardadas] = useState<Record<string, Capa>>({})
+  const [capasLoaded, setCapasLoaded] = useState(false)
   const loadCapas = useCallback(() => {
     fetch('/api/category-capas')
       .then(r => r.json())
-      .then(d => setCapaOverrides(d.overrides ?? {}))
-      .catch(() => setCapaOverrides({}))
+      .then(d => { setCategoriasGuardadas(d.overrides ?? {}); setCapasLoaded(true) })
+      .catch(() => setCategoriasGuardadas({}))
   }, [])
   useEffect(() => { loadCapas() }, [loadCapas])
-
-  // "Gastaste" = Fijo + Variable, lo mismo que suman las columnas de Tu Plan.
-  // Antes sumaba también pagos de tarjeta (las compras ya estaban contadas una
-  // por una), préstamos y transferencias sin categorizar — inflaba el número
-  // sin que se pudiera reconstruir desde ninguna otra parte de la pantalla.
-  const layerTotals = useMemo(() => computeLayerTotals(txs, capaOverrides), [txs, capaOverrides])
 
   const monthRef = parseISO(`${month}-01`)
   const prevMonth = format(subMonths(monthRef, 1), 'yyyy-MM')
   const nextMonth = format(addMonths(monthRef, 1), 'yyyy-MM')
+
+  // Plan del mes (ingreso, fijos, meta de ahorro)
+  type Plan = PlanBase & { fijoItems?: BudgetSubcat[]; ahorroItems?: BudgetSubcat[]; imprevistosMonto?: number }
+  const [plan, setPlan] = useState<Plan | null>(null)
+  const [editingPlan, setEditingPlan] = useState(false)
+  const loadPlan = useCallback((m: string) => {
+    fetch(`/api/monthly-plan?mes=${m}`)
+      .then(r => r.json())
+      .then(d => setPlan(d.plan ?? null))
+      .catch(() => setPlan(null))
+  }, [])
+  useEffect(() => { loadPlan(month) }, [loadPlan, month])
+
+  // Presupuestos por categoría (modelo anterior) — solo los usan el asesor IA
+  // y la sección "Presupuestadas" del selector de categoría.
+  useEffect(() => {
+    fetch(`/api/budgets?mes=${month}`)
+      .then(r => r.json())
+      .then(d => setBudgets(Object.fromEntries(Object.entries(d.budgets ?? {}).map(([k, v]) => [k, (v as { monto: number }).monto]))))
+      .catch(() => setBudgets({}))
+  }, [month])
+
+  // Últimos 3 meses, para detectar pagos que se repiten y no están en el plan
+  const [prevTxs, setPrevTxs] = useState<Transaction[]>([])
+  useEffect(() => {
+    const meses = [1, 2, 3].map(i => format(subMonths(parseISO(`${month}-01`), i), 'yyyy-MM'))
+    supabase
+      .from('transactions')
+      .select('id, fecha, monto, tipo, categoria, capa_override, subcategoria, mes_contable, comercio, contraparte_id')
+      .in('mes_contable', meses)
+      .then(({ data }) => setPrevTxs((data ?? []) as Transaction[]))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [month])
+
+  // Todo lo que muestran las tarjetas sale de este resumen: una sola regla
+  // para qué es cada movimiento, recalculada desde cero en cada cambio.
+  const hoy = toColombiaDate(new Date().toISOString())
+  // Lo que se repite mes a mes (para no tomar un pago recurrente como
+  // imprevisto) y tu mes normal de los meses anteriores (para el plan)
+  // Qué es fijo lo decide solo el plan del mes: los ítems de su desglose
+  // (ver capasDelPlan). Las demás categorías predeterminadas son día a día.
+  const capasPlan = useMemo(() => capasDelPlan(plan), [plan])
+  const clavesRecurrentes = useMemo(
+    () => new Set(gruposRecurrentes([...prevTxs, ...txs], capasPlan).keys()),
+    [prevTxs, txs, capasPlan]
+  )
+  const historial = useMemo(() => historialPlan(prevTxs, capasPlan, plan?.fijoItems ?? []), [prevTxs, capasPlan, plan])
+  const summary = useMemo(
+    () => computeMonthSummary(txs, capasPlan, plan, month, hoy, clavesRecurrentes),
+    [txs, capasPlan, plan, month, hoy, clavesRecurrentes]
+  )
+  const hasPlan = !!plan && plan.ingresoNetoMensual > 0
+
+  const guardarPlan = useCallback(async (m: string, p: Plan) => {
+    const res = await fetch('/api/monthly-plan', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mes: m, ...p, fijoItems: p.fijoItems ?? [], ahorroItems: p.ahorroItems ?? [] }),
+    })
+    if (!res.ok) throw new Error('No se pudo guardar el plan')
+    loadPlan(m)
+    bumpContext()
+  }, [loadPlan, bumpContext])
+
+  // Pagos que se repiten cada mes y no están en el plan → "Agregar al plan"
+  const recurrentes = useMemo(
+    () => hasPlan ? pagosRecurrentesFueraDelPlan(prevTxs, capasPlan, plan?.fijoItems ?? []) : [],
+    [hasPlan, prevTxs, capasPlan, plan]
+  )
+  const agregarAlPlan = useCallback(async (r: PagoRecurrente) => {
+    if (!plan) return
+    await guardarPlan(month, {
+      ...plan,
+      fijoItems: [...(plan.fijoItems ?? []), { nombre: r.nombre, monto: r.monto }],
+      fijoTotalMonto: plan.fijoTotalMonto + r.monto,
+    })
+  }, [plan, month, guardarPlan])
+
+  // Mes sin plan: ofrecer el del mes anterior con un toque
+  const [planAnterior, setPlanAnterior] = useState<Plan | null>(null)
+  useEffect(() => {
+    setPlanAnterior(null)
+    if (hasPlan) return
+    fetch(`/api/monthly-plan?mes=${prevMonth}`)
+      .then(r => r.json())
+      .then(d => setPlanAnterior(d.plan && d.plan.ingresoNetoMensual > 0 ? d.plan : null))
+      .catch(() => setPlanAnterior(null))
+  }, [hasPlan, prevMonth])
+
+  // Cada ítem del desglose del plan (Arriendo, Gym, Mercado…) es una categoría
+  // elegible al clasificar movimientos. Las nuevas se registran con la capa de
+  // su sección (Fijos → Fijo, Ahorro → Ahorro) para que cuenten donde deben.
+  // Espera a tener las capas cargadas: sin eso pisaría una que el usuario ya
+  // reclasificó a mano.
+  const planCats = useMemo(() => categoriasDelPlan(plan), [plan])
+  useEffect(() => {
+    if (!capasLoaded) return
+    const nuevas = categoriasPorRegistrar(planCats, categoriasGuardadas)
+    if (nuevas.length === 0) return
+    Promise.all(nuevas.map(c => fetch('/api/category-capas', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ categoria: c.categoria, capa: c.capa }),
+    }))).then(() => loadCapas()).catch(() => {})
+  }, [planCats, categoriasGuardadas, capasLoaded, loadCapas])
 
   const loadMonth = useCallback(async (m: string) => {
     setLoading(true)
@@ -244,26 +348,39 @@ export default function DashboardClient({
         </div>
 
 
-        <MonthHero
-          gastos={layerTotals.fijo + layerTotals.variable}
-          mes={month}
-          refreshSignal={contextVersion}
-        />
-
-        {isCurrent && <WeeklyAllowanceCard refreshSignal={contextVersion} />}
-
-        <div data-testid="tour-budget" className={styles.planWrap}>
-          <CategoriesCard
+        {editingPlan ? (
+          <PlanEditor
             mes={month}
-            transactions={txs}
-            capaOverrides={capaOverrides}
-            activeFilter={activeFilter}
-            onFilterChange={setActiveFilter}
-            onBudgetsChange={setBudgets}
-            onSaved={bumpContext}
+            mesLabel={format(parseISO(`${month}-01`), 'MMMM', { locale: es })}
+            plan={plan}
+            historial={historial}
+            recibidoMes={summary.recibido}
+            onSaved={() => { loadPlan(month); bumpContext(); setEditingPlan(false) }}
+            onClose={() => setEditingPlan(false)}
+          />
+        ) : (
+          <MonthSummaryCard
+            summary={summary}
+            hasPlan={hasPlan}
+            isCurrent={isCurrent}
+            onEditPlan={() => setEditingPlan(true)}
+            planAnterior={planAnterior ? {
+              mesLabel: format(parseISO(`${prevMonth}-01`), 'MMMM', { locale: es }),
+              usar: () => guardarPlan(month, planAnterior),
+            } : null}
             onSavingsTransaction={() => { loadMonth(month); bumpContext() }}
             savingsRefreshSignal={savingsRefresh}
+          />
+        )}
+
+        <ReviewCard items={summary.porRevisar} onChanged={() => { loadMonth(month); bumpContext() }} />
+
+        <div data-testid="tour-budget">
+          <SpendingCard
+            summary={summary}
             onManageCategories={() => setCatManagerOpen(true)}
+            recurrentes={recurrentes}
+            onAddToPlan={agregarAlPlan}
           />
         </div>
 
@@ -290,7 +407,9 @@ export default function DashboardClient({
             transactions={txs}
             activeFilter={activeFilter}
             onFilterChange={setActiveFilter}
-            capaOverrides={capaOverrides}
+            capaOverrides={capasPlan}
+            categoriasPropias={Object.keys(categoriasGuardadas)}
+            planCats={planCats.map(c => c.categoria)}
             onCategoryCreated={loadCapas}
             onManageCategories={() => setCatManagerOpen(true)}
             onCategoryChange={() => { loadMonth(month); bumpContext() }}
@@ -304,7 +423,8 @@ export default function DashboardClient({
 
       {catManagerOpen && (
         <CategoryManager
-          capaOverrides={capaOverrides}
+          categoriasPropias={Object.keys(categoriasGuardadas)}
+          planCats={planCats.map(c => c.categoria)}
           transactions={txs}
           onClose={() => setCatManagerOpen(false)}
           onChanged={({ transaccionesCambiaron }) => {

@@ -12,10 +12,9 @@ import type { Capa } from '@/lib/types'
 const VALID_CAPAS = new Set<Capa>(['AHORRO', 'FIJO', 'VARIABLE'])
 
 // GET /api/category-capas
-// Overrides de capa del usuario (categorías custom o built-in reclasificadas)
-// — usado por CategoriesCard para clasificar correctamente el gasto real de
-// cada transacción por capa; sin esto, una categoría custom marcada Fijo al
-// crearla (ver POST abajo) se seguía viendo como Variable en el gasto real.
+// Las categorías que creó el usuario (la tabla guarda nombre + capa). Hoy se
+// usa solo por los nombres: qué es fijo sale del plan del mes (capasDelPlan),
+// no de aquí.
 export const GET = withAuth(async (_req, user, supabase) => {
   try {
     const overrides = await getCustomCapaOverrides(supabase, user.id)
@@ -27,10 +26,8 @@ export const GET = withAuth(async (_req, user, supabase) => {
 })
 
 // POST /api/category-capas  body: { categoria, capa }
-// Reclasifica una categoría (built-in o custom) a una capa específica —
-// usado por BudgetManager al crear una categoría custom en la sección de
-// Gastos Fijos, para que computeMonthlyPlan la cuente como compromiso fijo
-// en vez de asumir VARIABLE (el default para una categoría sin clasificar).
+// Registra una categoría nueva (al crearla desde el selector o la hoja de
+// Categorías, o al agregar un ítem al plan).
 export const POST = withAuth(async (req, user, supabase) => {
   const body = await req.json() as { categoria?: string; capa?: string }
   const { categoria, capa } = body

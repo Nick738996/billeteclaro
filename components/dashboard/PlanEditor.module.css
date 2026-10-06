@@ -1,0 +1,115 @@
+.root { padding: 16px; }
+
+.header { display: flex; align-items: center; justify-content: space-between; }
+.title { font-size: var(--text-base); font-weight: 600; color: var(--text); }
+.close {
+  display: flex; align-items: center; justify-content: center;
+  width: 44px; height: 44px; margin: -10px -10px -10px 0;
+  background: none; border: none; color: var(--text-muted); cursor: pointer;
+}
+
+.reality {
+  margin-top: 10px; padding: 12px 14px;
+  border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-2);
+  font-size: var(--text-sm); color: var(--text-muted); line-height: 1.45;
+}
+.reality strong { color: var(--text); font-weight: 600; }
+.realitySub { font-size: var(--text-xs); color: var(--text-subtle); margin-top: 6px; line-height: 1.4; }
+.red { color: var(--red); font-weight: 600; }
+
+.row { padding: 16px 0 14px; border-bottom: 1px solid var(--border-soft); }
+.rowHead { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.label { font-size: var(--text-sm); font-weight: 600; color: var(--text); }
+.desc { font-size: var(--text-xs); color: var(--text-subtle); margin-top: 6px; line-height: 1.4; }
+.desc strong { color: var(--text-muted); }
+.hint { font-size: var(--text-xs); color: var(--text-muted); margin-top: 6px; }
+.hint strong { color: var(--text); }
+.examples { font-size: var(--text-xs); color: var(--text-subtle); margin-top: 4px; line-height: 1.4; }
+
+.money { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.currency { font-size: var(--text-sm); color: var(--text-muted); }
+.moneyInput {
+  width: 9.5rem; min-height: 44px; padding: 0 10px;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--surface-2); color: var(--text);
+  font-size: var(--text-sm); font-weight: 600; text-align: right; font-variant-numeric: tabular-nums;
+}
+.moneyInput:disabled { opacity: 0.7; }
+
+.link {
+  display: inline-flex; align-items: center; gap: 4px;
+  min-height: 32px; padding: 0; margin-top: 4px;
+  background: none; border: none; cursor: pointer;
+  color: var(--blue); font-size: var(--text-xs); font-weight: 500;
+}
+.hint .link { min-height: 0; margin: 0; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.chip {
+  min-height: 36px; padding: 0 12px;
+  border: 1px solid var(--border); border-radius: var(--radius-pill);
+  background: none; color: var(--text-muted); font-size: var(--text-xs); cursor: pointer;
+}
+.chipOn { border-color: var(--green); color: var(--green); background: var(--green-soft); }
+
+.items { margin-top: 8px; }
+.item { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
+.itemName {
+  flex: 1; min-width: 0; min-height: 44px; padding: 0 10px;
+  border: 1px solid var(--border-soft); border-radius: var(--radius-sm);
+  background: none; color: var(--text); font-size: var(--text-sm);
+}
+.item .moneyInput { width: 7.5rem; }
+.itemRemove {
+  display: flex; align-items: center; justify-content: center;
+  width: 36px; height: 44px; background: none; border: none; color: var(--text-subtle); cursor: pointer;
+}
+
+.result {
+  margin-top: 16px; padding: 14px;
+  border: 1px solid var(--green); border-radius: var(--radius-md); background: var(--green-soft);
+}
+.resultBad { border-color: var(--red); background: var(--red-soft); }
+.resultLabel { font-size: var(--text-sm); font-weight: 600; color: var(--text); }
+.resultAmount {
+  font-family: var(--font-display), var(--font-inter), sans-serif;
+  font-size: 24px; font-weight: 700; color: var(--green); font-variant-numeric: tabular-nums;
+}
+.resultBad .resultAmount { color: var(--red); }
+.resultHint { font-size: var(--text-xs); color: var(--text-muted); margin-top: 6px; line-height: 1.45; }
+
+.error { font-size: var(--text-xs); color: var(--red); margin-top: 10px; }
+.actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+.primary, .secondary {
+  min-height: 44px; padding: 0 18px; border-radius: var(--radius-pill);
+  font-size: var(--text-sm); cursor: pointer;
+}
+.primary { border: none; background: var(--text); color: var(--bg); font-weight: 600; }
+.primary:disabled { opacity: 0.6; cursor: default; }
+.secondary { border: 1px solid var(--border); background: none; color: var(--text); font-weight: 500; }
+.reality .secondary { margin-top: 10px; min-height: 40px; font-size: var(--text-xs); }
+
+.badge {
+  margin-left: 6px; padding: 2px 8px; border-radius: var(--radius-pill);
+  background: var(--green-soft); color: var(--green); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
+}
+.realityTitle { font-size: var(--text-sm); font-weight: 600; color: var(--text); }
+.diag { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.diagRow { display: grid; grid-template-columns: 5.5rem 1fr auto; align-items: center; gap: 10px; font-size: var(--text-xs); color: var(--text-muted); }
+.diagBar { height: 6px; border-radius: 99px; background: var(--border); overflow: hidden; }
+.diagBar span { display: block; height: 100%; border-radius: 99px; }
+.diagNum { font-variant-numeric: tabular-nums; color: var(--text); white-space: nowrap; }
+.diagTotal { font-size: var(--text-xs); color: var(--text-muted); margin-top: 10px; }
+.verdict { font-size: var(--text-sm); color: var(--text); font-weight: 500; margin-top: 8px; line-height: 1.4; }
+.resultWarn { border-color: var(--yellow); background: var(--yellow-soft); }
+.resultWarn .resultAmount { color: var(--yellow); }
+.resultWeek { font-size: var(--text-sm); color: var(--text); margin-top: 4px; }
+
+.resultSplit { font-size: var(--text-xs); color: var(--text-muted); margin-top: 4px; }
+.resultSplit strong { color: var(--text); }
+.cuts { margin-top: 12px; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius-md); }
+.cutsTitle { font-size: var(--text-xs); font-weight: 600; color: var(--text-muted); }
+.cutsList { list-style: none; margin: 8px 0 0; padding: 0; }
+.cutsList li { display: flex; justify-content: space-between; padding: 4px 0; font-size: var(--text-sm); color: var(--text); font-variant-numeric: tabular-nums; border-bottom: 1px solid var(--border-soft); }
+.cutsList li:last-child { border-bottom: none; }
+.cutsHint { font-size: var(--text-xs); color: var(--text-subtle); margin-top: 8px; line-height: 1.4; }

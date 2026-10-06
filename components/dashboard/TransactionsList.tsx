@@ -25,12 +25,14 @@ import {
   formatCOP,
   formatCOPCompact,
   isIngreso,
-  isGasto,
   SUBCATEGORIA_RETIRO_AHORROS,
   SUBCATEGORIA_APORTE_AHORROS,
+  SUBCATEGORIA_CONFIRMADO,
 } from '@/lib/types'
 import { getCapaForTransaccion, listCustomCategories } from '@/lib/services/layerService'
 import NewCategoryForm, { CAPA_LABELS, CAPA_COLOR } from './NewCategoryForm'
+import { agruparRepetidos } from '@/lib/utils/agruparRepetidos'
+import { naturaleza } from '@/lib/services/monthSummary'
 import { getCategoryIcon } from '@/lib/categoryIcons'
 import { TEST_IDS } from '@/lib/testIds'
 import FloatingSaveBar from '@/components/ui/FloatingSaveBar'
@@ -461,13 +463,15 @@ function CatPickerBtn({ cat, current, onSelect }: { cat: string; current: string
   )
 }
 
-function CategoryPicker({ current, onSelect, onClose, budgetedCats, customCats, onCreated, onManage }: {
+function CategoryPicker({ current, onSelect, onClose, budgetedCats, customCats, planCats, onCreated, onManage }: {
   current: Categoria
   onSelect: (c: Categoria) => void
   onClose: () => void
   budgetedCats: string[]
   /** Categorías creadas por el usuario (no built-in) */
   customCats: string[]
+  /** Ítems del desglose del plan del mes, como categorías (ver planCategories.ts) */
+  planCats: string[]
   /** Se llama después de crear una categoría nueva */
   onCreated: (key: string) => void
   /** Abre la hoja de Categorías */
@@ -475,9 +479,13 @@ function CategoryPicker({ current, onSelect, onClose, budgetedCats, customCats, 
 }) {
   if (typeof document === 'undefined') return null
   const allCats = Object.keys(CATEGORIA_LABELS) as Categoria[]
-  const budgetSet = new Set<string>(budgetedCats)
-  const otherCats = allCats.filter(c => !budgetSet.has(c))
-  const customOnly = customCats.filter(c => !budgetSet.has(c))
+  // Cada categoría aparece una sola vez: primero las de tu plan
+  const planSet = new Set<string>(planCats)
+  const budgetedOnly = budgetedCats.filter(c => !planSet.has(c))
+  const shownSet = new Set<string>([...budgetedOnly, ...planCats])
+  const otherCats = allCats.filter(c => !shownSet.has(c))
+  const customOnly = customCats.filter(c => !shownSet.has(c))
+  const hayArriba = planCats.length > 0 || budgetedOnly.length > 0
 
   return createPortal(
     <>
@@ -496,23 +504,31 @@ function CategoryPicker({ current, onSelect, onClose, budgetedCats, customCats, 
           </button>
         </div>
 
-        {budgetedCats.length > 0 && (
+        {planCats.length > 0 && (
+          <>
+            <p className={styles.sectionLabel}>De tu plan</p>
+            <div className={`${styles.chipGroup} ${styles.chipGroupMb}`}>
+              {planCats.map(cat => (
+                <CatPickerBtn key={cat} cat={cat} current={current} onSelect={onSelect} />
+              ))}
+            </div>
+          </>
+        )}
+        {budgetedOnly.length > 0 && (
           <>
             <p className={styles.sectionLabel}>
               Presupuestadas
             </p>
             <div className={`${styles.chipGroup} ${styles.chipGroupMb}`}>
-              {budgetedCats.map(cat => (
+              {budgetedOnly.map(cat => (
                 <CatPickerBtn key={cat} cat={cat} current={current} onSelect={onSelect} />
               ))}
             </div>
-            <p className={styles.sectionLabel}>
-              Otras
-            </p>
           </>
         )}
+        {hayArriba && <p className={styles.sectionLabel}>Otras</p>}
         <div className={styles.chipGroup}>
-          {(budgetedCats.length > 0 ? otherCats : allCats).map(cat => (
+          {otherCats.map(cat => (
             <CatPickerBtn key={cat} cat={cat} current={current} onSelect={onSelect} />
           ))}
         </div>
@@ -619,6 +635,33 @@ function RenameContactSheet({ current, identificador, saving, error, onSave, onC
       </div>
     </>,
     document.body
+  )
+}
+
+// ── GroupRow: compras repetidas del mismo comercio en el día ────────────────
+
+function GroupRow({ txs, total, open, onToggle }: {
+  txs: Transaction[]
+  total: number
+  open: boolean
+  onToggle: () => void
+}) {
+  const first = txs[0]
+  const theme = catTheme(first.categoria)
+  const Icon = getCategoryIcon(first.categoria)
+  const nombre = first.comercio ? toTitleCase(first.comercio.replace(/\s+(trip|rides)$/i, '')) : getDisplayParts(first).name
+  return (
+    <button className={styles.groupRow} onClick={onToggle} aria-expanded={open}>
+      <span className={styles.catPlate} style={{ '--plate-clr': theme.color } as React.CSSProperties}>
+        <Icon size={17} />
+      </span>
+      <span className={styles.groupMain}>
+        <span className={styles.groupName}>{nombre}</span>
+        <span className={styles.groupMeta}>{txs.length} movimientos · {catLabel(first.categoria)}</span>
+      </span>
+      <span className={`${styles.amount} ${styles.amountExpense}`}>-{formatCOP(total)}</span>
+      <ChevronDown size={14} className={`${styles.groupChev} ${open ? styles.groupChevOpen : ''}`} />
+    </button>
   )
 }
 
@@ -753,17 +796,30 @@ interface Props {
   addOpen?: boolean
   budgets?: Record<string, number>
   capaOverrides?: Record<string, Capa>
+  /** Ítems del plan del mes como categorías, se muestran primero en el selector */
+  planCats?: string[]
+  /** Categorías creadas por el usuario (guardadas en category_capas) */
+  categoriasPropias?: string[]
   /** Se llama después de crear una categoría nueva, para recargar sus capas */
   onCategoryCreated?: () => void
   onManageCategories?: () => void
 }
 
-export default function TransactionsList({ transactions, activeFilter, onFilterChange, onCategoryChange, onTransactionDeleted, onAdd, addOpen, budgets, capaOverrides, onCategoryCreated, onManageCategories }: Props) {
+export default function TransactionsList({ transactions, activeFilter, onFilterChange, onCategoryChange, onTransactionDeleted, onAdd, addOpen, budgets, capaOverrides, planCats, categoriasPropias, onCategoryCreated, onManageCategories }: Props) {
   const [search,      setSearch]      = useState('')
   const [pendingCats, setPendingCats] = useState<Record<string, Categoria>>({})
   const [isSaving,    setIsSaving]    = useState(false)
   const [savedOk,     setSavedOk]     = useState(false)
   const [saveError,   setSaveError]   = useState<string | null>(null)
+  const [learnMsg,    setLearnMsg]    = useState<string | null>(null)
+  // Grupos de compras repetidas abiertos ("día|clave")
+  const [openGroups,  setOpenGroups]  = useState<Set<string>>(new Set())
+  const toggleGroup = (k: string) => setOpenGroups(prev => {
+    const next = new Set(prev)
+    if (next.has(k)) next.delete(k)
+    else next.add(k)
+    return next
+  })
   const [pickerTxId,  setPickerTxId]  = useState<string | null>(null)
   const [renameTxId,  setRenameTxId]  = useState<string | null>(null)
   const [renameSaving, setRenameSaving] = useState(false)
@@ -779,8 +835,8 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
   // Categorías del usuario (ver listCustomCategories)
   const [justCreated, setJustCreated] = useState<string[]>([])
   const customCats = useMemo(
-    () => listCustomCategories(capaOverrides ?? {}, transactions, justCreated),
-    [capaOverrides, transactions, justCreated]
+    () => listCustomCategories({}, transactions, [...(categoriasPropias ?? []), ...justCreated]),
+    [categoriasPropias, transactions, justCreated]
   )
 
   const handleDelete = async (t: Transaction) => {
@@ -823,6 +879,15 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
         const body = await failed.json().catch(() => ({}))
         throw new Error(body.error ?? 'Error desconocido')
       }
+      // La app recuerda la categoría por comercio (ver commerceRules.ts)
+      const bodies = await Promise.all(results.map(r => r.json().catch(() => ({}))))
+      const parecidos = bodies.reduce((n, b) => n + (Number(b.parecidosActualizados) || 0), 0)
+      setLearnMsg(
+        parecidos > 0
+          ? `Listo. También cambié ${parecidos} ${parecidos === 1 ? 'movimiento parecido' : 'movimientos parecidos'} de este mes, y los próximos de ese comercio llegarán así.`
+          : 'Listo. Los próximos movimientos de ese comercio llegarán con esta categoría.'
+      )
+      setTimeout(() => setLearnMsg(null), 6000)
       setPendingCats({})
       setSavedOk(true)
       setTimeout(() => setSavedOk(false), 1800)
@@ -857,6 +922,7 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
   }
 
   const pickerTx = pickerTxId ? transactions.find(t => t.id === pickerTxId) : null
+
   const renameTx = renameTxId ? transactions.find(t => t.id === renameTxId) : null
 
   const filtered = useMemo(() => transactions.filter(t => !deletedIds.has(t.id)).filter(t => {
@@ -879,8 +945,14 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
     return matchesCategory && matchesSearch
   }), [transactions, activeFilter, search, deletedIds])
 
-  const totalGastos   = useMemo(() => filtered.filter(t => isGasto(t.tipo, t.categoria) || t.categoria === 'AHORROS' || t.categoria === 'PRESTAMO' || (t.categoria === 'TRANSFERENCIA' && !isIngreso(t.tipo))).reduce((s, t) => s + t.monto, 0), [filtered])
-  const totalIngresos = useMemo(() => filtered.filter(t =>  isIngreso(t.tipo)).reduce((s, t) => s + t.monto, 0), [filtered])
+  // Misma regla que "Recibiste" y "Gastaste" arriba (ver naturaleza en
+  // monthSummary.ts): sin préstamos, plata entre cuentas, pagos de tarjeta,
+  // movimientos de ahorro ni compras pagadas con ahorros.
+  const totalGastos   = useMemo(() => filtered.filter(t => {
+    const n = naturaleza(t, capaOverrides ?? {})
+    return n === 'GASTO_FIJO' || n === 'GASTO_VARIABLE'
+  }).reduce((s, t) => s + t.monto, 0), [filtered, capaOverrides])
+  const totalIngresos = useMemo(() => filtered.filter(t => naturaleza(t, capaOverrides ?? {}) === 'INGRESO').reduce((s, t) => s + t.monto, 0), [filtered, capaOverrides])
   const groups        = useMemo(() => groupByDate(filtered), [filtered])
 
   return (
@@ -942,18 +1014,29 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
                   {items.length}
                 </span>
               </div>
-              {items.map((t, i) => (
-                <div key={t.id} role="listitem" data-testid={TEST_IDS.DASHBOARD_TRANSACTION_ITEM} style={i === items.length - 1 ? { borderBottom: 'none' } : {}}>
-                  <TransactionRow
-                    t={t}
-                    pendingCat={pendingCats[t.id]}
-                    capaOverrides={capaOverrides ?? {}}
-                    onCategoryClick={() => setPickerTxId(t.id)}
-                    onDelete={() => handleDelete(t)}
-                    onRenameClick={() => { setRenameError(null); setRenameTxId(t.id) }}
-                  />
-                </div>
-              ))}
+              {(search ? items.map(t => ({ tipo: 'tx' as const, t })) : agruparRepetidos(items)).map(b => {
+                const row = (t: Transaction) => (
+                  <div key={t.id} role="listitem" data-testid={TEST_IDS.DASHBOARD_TRANSACTION_ITEM}>
+                    <TransactionRow
+                      t={t}
+                      pendingCat={pendingCats[t.id]}
+                      capaOverrides={capaOverrides ?? {}}
+                      onCategoryClick={() => setPickerTxId(t.id)}
+                      onDelete={() => handleDelete(t)}
+                      onRenameClick={() => { setRenameError(null); setRenameTxId(t.id) }}
+                    />
+                  </div>
+                )
+                if (b.tipo === 'tx') return row(b.t)
+                const gkey = `${dateLabel}|${b.key}`
+                const open = openGroups.has(gkey)
+                return (
+                  <div key={gkey} role="listitem">
+                    <GroupRow txs={b.txs} total={b.total} open={open} onToggle={() => toggleGroup(gkey)} />
+                    {open && <div className={styles.groupChildren} role="list">{b.txs.map(row)}</div>}
+                  </div>
+                )
+              })}
             </div>
           ))
         )}
@@ -980,6 +1063,10 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
       )}
     </div>
 
+    {learnMsg && (
+      <div role="status" className={styles.learnToast}>{learnMsg}</div>
+    )}
+
     {/* Barra flotante de cambios pendientes */}
     {pendingCount > 0 && (
       <FloatingSaveBar
@@ -1001,6 +1088,7 @@ export default function TransactionsList({ transactions, activeFilter, onFilterC
         onClose={() => setPickerTxId(null)}
         budgetedCats={budgetedCats}
         customCats={customCats}
+        planCats={planCats ?? []}
         onCreated={key => { setJustCreated(prev => [...prev, key]); onCategoryCreated?.() }}
         onManage={onManageCategories}
       />

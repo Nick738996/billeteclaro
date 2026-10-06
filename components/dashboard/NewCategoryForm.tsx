@@ -1,7 +1,7 @@
 'use client'
 
-// Formulario para crear una categoría nueva eligiendo cómo cuenta en el plan
-// (Variable / Fijo / Ahorro). Lo usan el selector de categoría de una
+// Formulario para crear una categoría nueva (de día a día: los fijos salen
+// de los ítems del plan). Lo usan el selector de categoría de una
 // transacción y la hoja de "Categorías".
 
 import { useState } from 'react'
@@ -12,15 +12,8 @@ import styles from './NewCategoryForm.module.css'
 
 export const CAPA_LABELS: Record<Capa, string> = { AHORRO: 'Ahorro', FIJO: 'Fijo', VARIABLE: 'Variable' }
 export const CAPA_COLOR: Record<Capa, string> = { AHORRO: 'var(--blue)', FIJO: 'var(--purple)', VARIABLE: 'var(--text-muted)' }
-export const CAPA_HINT: Record<Capa, string> = {
-  VARIABLE: 'gasto del día a día, sale de tu cupo semanal',
-  FIJO: 'se paga todos los meses, cuenta contra tus fijos',
-  AHORRO: 'plata que apartas, suma a tu meta de ahorro',
-}
-export const CAPAS_ORDEN: Capa[] = ['VARIABLE', 'FIJO', 'AHORRO']
-
-/** Guarda la capa de una categoría nueva y retorna su clave normalizada */
-export async function createCategory(nombre: string, capa: Capa): Promise<string> {
+/** Registra una categoría nueva y retorna su clave normalizada */
+export async function createCategory(nombre: string, capa: Capa = 'VARIABLE'): Promise<string> {
   const key = normalizeCatKey(nombre)
   const res = await fetch('/api/category-capas', {
     method: 'POST',
@@ -40,7 +33,6 @@ interface Props {
 
 export default function NewCategoryForm({ existing, onDone }: Props) {
   const [nombre, setNombre] = useState('')
-  const [capa, setCapa] = useState<Capa>('VARIABLE')
   const [creando, setCreando] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -56,7 +48,7 @@ export default function NewCategoryForm({ existing, onDone }: Props) {
     setCreando(true)
     setError(null)
     try {
-      await createCategory(limpio, capa)
+      await createCategory(limpio)
       setNombre('')
       onDone(key, true)
     } catch {
@@ -86,22 +78,6 @@ export default function NewCategoryForm({ existing, onDone }: Props) {
         >
           {creando ? <RefreshCw size={11} className="animate-spin" /> : 'Crear'}
         </button>
-      </div>
-      <div className={styles.capaChoice} role="radiogroup" aria-label="Cómo cuenta en tu plan">
-        {CAPAS_ORDEN.map(c => (
-          <button
-            key={c}
-            role="radio"
-            aria-checked={capa === c}
-            onClick={() => setCapa(c)}
-            className={`${styles.capaOption} ${capa === c ? styles.capaOptionOn : ''}`}
-          >
-            <span className={styles.capaDot} style={{ background: CAPA_COLOR[c] }} aria-hidden="true" />
-            <span className={styles.capaOptionText}>
-              <strong>{CAPA_LABELS[c]}</strong>, {CAPA_HINT[c]}
-            </span>
-          </button>
-        ))}
       </div>
     </div>
   )

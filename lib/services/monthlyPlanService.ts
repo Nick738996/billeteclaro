@@ -3,17 +3,15 @@ import type { BudgetSubcat } from '@/lib/types'
 
 export interface MonthlyPlanInput {
   ingresoNetoMensual: number
-  /** Total declarado de gastos fijos este mes — un solo número que usa el
-   * resto de la app (pool variable, cupo semanal). Qué transacciones cuentan
-   * como Fijo se decide aparte (category_capas / transactions.capa_override).
-   * fijoItems es solo la ayuda opcional para llegar a este número: si el
-   * usuario prefiere desglosarlo (arriendo, servicios...) en vez de
-   * calcularlo de cabeza, esos ítems no tienen clasificación propia — nada
-   * más suman. */
+  /** Total de gastos fijos del mes. Si hay desglose (fijoItems), es la suma
+   * de sus ítems, y cada ítem es además una categoría fija (capasDelPlan en
+   * planCategories.ts): es la única fuente de lo que cuenta como fijo. */
   fijoTotalMonto: number
   fijoItems: BudgetSubcat[]
   ahorroMetaMonto: number
   ahorroItems: BudgetSubcat[]
+  /** Reserva para gastos grandes que no se repiten (vuelo, bici…) */
+  imprevistosMonto: number
 }
 
 export async function fetchMonthlyPlan(
@@ -23,7 +21,7 @@ export async function fetchMonthlyPlan(
 ): Promise<MonthlyPlanInput | null> {
   const { data, error } = await supabase
     .from('monthly_plan')
-    .select('ingreso_neto_mensual, fijo_total_monto, fijo_items, ahorro_meta_monto, ahorro_items')
+    .select('ingreso_neto_mensual, fijo_total_monto, fijo_items, ahorro_meta_monto, ahorro_items, imprevistos_monto')
     .eq('user_id', userId)
     .eq('mes', mes)
     .maybeSingle()
@@ -37,6 +35,7 @@ export async function fetchMonthlyPlan(
     fijoItems: (data.fijo_items as BudgetSubcat[]) ?? [],
     ahorroMetaMonto: Number(data.ahorro_meta_monto),
     ahorroItems: (data.ahorro_items as BudgetSubcat[]) ?? [],
+    imprevistosMonto: Number(data.imprevistos_monto ?? 0),
   }
 }
 
@@ -55,6 +54,7 @@ export async function saveMonthlyPlan(
       fijo_items: input.fijoItems,
       ahorro_meta_monto: input.ahorroMetaMonto,
       ahorro_items: input.ahorroItems,
+      imprevistos_monto: input.imprevistosMonto,
       updated_at: new Date().toISOString(),
     },
     { onConflict: 'user_id,mes' }

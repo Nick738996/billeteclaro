@@ -37,6 +37,7 @@ export type Categoria =
   | 'EDUCACION'
   | 'REEMBOLSABLE'
   | 'TRANSFERENCIA'
+  | 'ENTRE_CUENTAS'
   | 'INGRESO'
   | 'OTRO'
 
@@ -72,29 +73,31 @@ export type Capa = 'AHORRO' | 'FIJO' | 'VARIABLE'
 /**
  * Capa por defecto de cada categoría built-in. `null` = fuera de las 3 capas
  * (movimientos propios/entradas/préstamos, no gasto ni ahorro real).
- * Categorías mixtas (HOGAR, SALUD mezclan fijo y variable) toman el default
- * más común; el caso puntual se resuelve con `capa_override` en la transacción
- * o con una fila en `category_capas` para reclasificar la categoría entera.
+ *
+ * Ninguna categoría predeterminada es Fijo: los fijos son los ítems del
+ * desglose del plan del mes (Arriendo, Gym…), que se vuelven categorías con
+ * capa FIJO vía capasDelPlan() en planCategories.ts. Así hay un solo lugar
+ * donde se decide qué es fijo. Todo lo demás es día a día (o imprevisto, si
+ * es grande y no se repite).
  */
 export const CATEGORIA_CAPA_DEFAULT: Record<Categoria, Capa | null> = {
   AHORROS: 'AHORRO',
   INVERSION: 'AHORRO',
-  HOGAR: 'FIJO',
-  SUSCRIPCIONES: 'FIJO',
-  SALUD: 'FIJO',
-  EDUCACION: 'FIJO',
-  DEUDA: 'FIJO',
-  DONACIONES: 'FIJO',
+  HOGAR: 'VARIABLE',
+  SUSCRIPCIONES: 'VARIABLE',
+  SALUD: 'VARIABLE',
+  EDUCACION: 'VARIABLE',
+  DEUDA: 'VARIABLE',
+  DONACIONES: 'VARIABLE',
   TRANSPORTE: 'VARIABLE',
   SALIDAS: 'VARIABLE',
   COMPRAS_ONLINE: 'VARIABLE',
   OTRO: 'VARIABLE',
-  // Plata prestada a alguien no es ahorro (no queda apartada para ti) ni
-  // gasto de estilo de vida — queda fuera de las 3 capas y se muestra aparte
-  // en "Fuera de tu plan" (CategoriesCard) para que el total cuadre.
+  // Plata prestada a alguien no es ahorro (no queda apartada para ti) ni gasto
   PRESTAMO: null,
   REEMBOLSABLE: null,
   TRANSFERENCIA: null,
+  ENTRE_CUENTAS: null,
   INGRESO: null,
 }
 
@@ -104,20 +107,6 @@ export interface MonthlyPlan {
   mes: string
   ingreso_neto_mensual: number
   ahorro_meta_monto: number
-  created_at: string
-  updated_at: string
-}
-
-export interface WeeklyAllowance {
-  id: string
-  user_id: string
-  mes: string
-  semana_inicio: string
-  semana_fin: string
-  cupo_base: number
-  ajuste_carryover: number
-  cerrada: boolean
-  decision: 'bonus_ahorro' | 'rollover' | null
   created_at: string
   updated_at: string
 }
@@ -153,23 +142,17 @@ export interface BudgetEntry {
   subcategorias: BudgetSubcat[]
 }
 
-/** Categorías disponibles para presupuesto mensual (excluye TRANSFERENCIA, INGRESO, PRESTAMO) */
-export const PRESUPUESTO_CATS: Categoria[] = [
-  'HOGAR', 'TRANSPORTE', 'SALIDAS', 'SALUD', 'SUSCRIPCIONES',
-  'COMPRAS_ONLINE', 'INVERSION', 'AHORROS', 'DEUDA', 'DONACIONES', 'EDUCACION', 'REEMBOLSABLE', 'OTRO',
-]
-
-/** Subconjunto de PRESUPUESTO_CATS que son Gastos Fijos, las únicas que
- * BudgetManager deja presupuestar individualmente. Ahorro se configura como
- * una sola meta en monthly_plan; Variable se deriva, no se presupuesta
- * categoría por categoría. */
-export const FIJO_CATS: Categoria[] = PRESUPUESTO_CATS.filter(c => CATEGORIA_CAPA_DEFAULT[c] === 'FIJO')
-
 // Subcategoria usada en la transacción que se crea al retirar/aportar desde
 // Mis Ahorros — permite filtrarlas aparte de otros ingresos/gastos que
 // comparten la misma categoria (INGRESO / AHORROS).
 export const SUBCATEGORIA_RETIRO_AHORROS = 'retiro_ahorros'
 export const SUBCATEGORIA_APORTE_AHORROS = 'aporte_ahorros'
+// Gasto real que se pagó con plata de tus ahorros: cuenta en "En qué se fue",
+// pero no se come lo disponible del mes (el retiro del ahorro ya lo registra
+// la transacción retiro_ahorros correspondiente).
+export const SUBCATEGORIA_PAGADO_CON_AHORROS = 'pagado_con_ahorros'
+// El usuario ya respondió "Por revisar" para este movimiento y lo dejó como estaba.
+export const SUBCATEGORIA_CONFIRMADO = 'confirmado'
 
 export interface ExtractedTransaction {
   fecha: string | null
@@ -187,16 +170,6 @@ export interface ExtractedTransaction {
   contraparte_id?: string | null
 }
 
-export interface MonthlyStats {
-  gastos: number
-  gastosReales: number
-  ingresos: number
-  ahorros: number
-  balance: number
-  transacciones: number
-  porCategoria: Record<Categoria, number>
-}
-
 export const CATEGORIA_LABELS: Record<Categoria, string> = {
   HOGAR: 'Hogar',
   TRANSPORTE: 'Transporte',
@@ -212,8 +185,11 @@ export const CATEGORIA_LABELS: Record<Categoria, string> = {
   EDUCACION: 'Educación',
   REEMBOLSABLE: 'Reembolsable',
   TRANSFERENCIA: 'Transferencia',
+  ENTRE_CUENTAS: 'Entre mis cuentas',
   INGRESO: 'Ingreso',
-  OTRO: 'Otro',
+  // "Otro" es lo que no estaba en ninguna categoría planeada: cuenta como
+  // imprevisto (ver esImprevisto en monthSummary.ts). La clave sigue siendo OTRO.
+  OTRO: 'Imprevisto',
 }
 
 export const CATEGORIA_COLORS: Record<Categoria, string> = {
@@ -231,6 +207,7 @@ export const CATEGORIA_COLORS: Record<Categoria, string> = {
   EDUCACION: '#84cc16',   // lime     — educación
   REEMBOLSABLE: '#38bdf8', // light-blue — reembolsable
   TRANSFERENCIA: '#a855f7', // purple  — transferencias
+  ENTRE_CUENTAS: '#94a3b8', // slate   — plata entre cuentas propias
   INGRESO: '#22c55e',     // green    — ingresos
   OTRO: '#8b9cc4',        // slate-blue — sin categoría
 }
@@ -240,20 +217,6 @@ const CUSTOM_PALETTE = [
   '#34d399', '#60a5fa', '#c084fc', '#facc15', '#f87171',
   '#38bdf8', '#4ade80',
 ]
-
-/** Color de zona para % de presupuesto gastado: verde <80% ó 100-109% (completado), amarillo 80-99%, rojo ≥110% */
-export function zoneColor(pct: number): string {
-  if (pct >= 110) return 'var(--red)'
-  if (pct >= 80 && pct < 100) return 'var(--yellow)'
-  return 'var(--green)'
-}
-
-/** Fondo "-soft" a juego con zoneColor, para pastillas de porcentaje (ej. pctBadge) */
-export function zoneBg(pct: number): string {
-  if (pct >= 110) return 'var(--red-soft)'
-  if (pct >= 80 && pct < 100) return 'var(--yellow-soft)'
-  return 'var(--green-soft)'
-}
 
 export function getCategoryColor(cat: string): string {
   if (cat in CATEGORIA_COLORS) return CATEGORIA_COLORS[cat as Categoria]
@@ -297,17 +260,19 @@ export function normalizeCatKey(name: string): string {
   return name.trim().toUpperCase().replace(/\s+/g, '_')
 }
 
+/**
+ * Monto corto como se dice en Colombia: "$904 mil", "$4,7 millones".
+ * Antes era "$903.6K" / "$4.7M" (abreviaturas en inglés y punto decimal).
+ */
 export function formatCOPCompact(amount: number): string {
   const abs = Math.abs(amount)
   const sign = amount < 0 ? '-' : ''
   if (abs >= 1_000_000) {
-    const m = abs / 1_000_000
-    return `${sign}$${m % 1 === 0 ? m.toFixed(0) : m.toFixed(1)}M`
+    const m = Math.round(abs / 100_000) / 10
+    const txt = m % 1 === 0 ? m.toFixed(0) : m.toFixed(1).replace('.', ',')
+    return `${sign}$${txt} ${m === 1 ? 'millón' : 'millones'}`
   }
-  if (abs >= 1_000) {
-    const k = abs / 1_000
-    return `${sign}$${k % 1 === 0 ? k.toFixed(0) : k.toFixed(1)}K`
-  }
+  if (abs >= 1_000) return `${sign}$${Math.round(abs / 1_000)} mil`
   return `${sign}${formatCOP(abs)}`
 }
 
@@ -383,8 +348,8 @@ export function isIngreso(tipo: TipoTransaccion): boolean {
 }
 
 // ABONO_DEUDA = pago de tarjeta desde tu propia cuenta → no es gasto ni ingreso
-// AHORROS / PRESTAMO = movimientos propios que no son gastos del mes
+// AHORROS / PRESTAMO / ENTRE_CUENTAS = movimientos propios que no son gastos del mes
 export function isGasto(tipo: TipoTransaccion, categoria?: Categoria | string): boolean {
-  if (categoria === 'AHORROS' || categoria === 'PRESTAMO') return false
+  if (categoria === 'AHORROS' || categoria === 'PRESTAMO' || categoria === 'ENTRE_CUENTAS') return false
   return !isIngreso(tipo) && tipo !== 'ABONO_DEUDA'
 }

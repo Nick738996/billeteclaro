@@ -9,8 +9,8 @@ const inter = Inter({
   display: 'swap',
 })
 
-// Fuente de "cifras protagonistas" — el anillo del cupo semanal, el pool
-// variable — para que los números que de verdad importan tengan una
+// Fuente de "cifras protagonistas" (lo que te queda esta semana, los montos
+// grandes de las tarjetas) para que los números que de verdad importan tengan una
 // identidad propia en vez de ser Inter Bold como todo lo demás.
 const spaceGrotesk = Space_Grotesk({
   subsets: ['latin'],

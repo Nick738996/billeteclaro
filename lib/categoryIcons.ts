@@ -1,14 +1,14 @@
 import {
   Home, Car, Utensils, HeartPulse, Repeat, ShoppingBag, TrendingUp, PiggyBank,
   Landmark, CreditCard, Gift, GraduationCap, HandCoins, ArrowLeftRight, ArrowDownToLine, CircleEllipsis,
-  Dumbbell, Receipt, PawPrint, Plane, Shirt, Sparkles, Smartphone, Baby, Gamepad2, BookOpen, Wine,
+  Dumbbell, Receipt, Shuffle, PawPrint, Plane, Shirt, Sparkles, Smartphone, Baby, Gamepad2, BookOpen, Wine,
   type LucideIcon,
 } from 'lucide-react'
 import type { Categoria } from './types'
 
-// Ícono por categoría — usado en la placa de TransactionsList, la lista de
-// BudgetManager, la leyenda de CategoriesCard y el onboarding paso 3.
-// Centralizado acá para que las 4 pantallas muestren la misma categoría con
+// Ícono por categoría: usado en TransactionsList, En qué se fue
+// (SpendingCard), la hoja de Categorías y el onboarding paso 3.
+// Centralizado acá para que todas las pantallas muestren la misma categoría con
 // el mismo ícono en vez de cada una inventar su propio mapeo.
 export const CATEGORIA_ICON: Record<Categoria, LucideIcon> = {
   HOGAR: Home,
@@ -25,6 +25,7 @@ export const CATEGORIA_ICON: Record<Categoria, LucideIcon> = {
   EDUCACION: GraduationCap,
   REEMBOLSABLE: HandCoins,
   TRANSFERENCIA: ArrowLeftRight,
+  ENTRE_CUENTAS: Shuffle,
   INGRESO: ArrowDownToLine,
   OTRO: CircleEllipsis,
 }
